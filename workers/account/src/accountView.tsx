@@ -17,14 +17,20 @@ export function AccountView({
   tokens: AccountTokens;
 }) {
   return (
-    <div className="grid gap-5">
-      <header className="flex flex-col gap-3 border-b border-line pb-6">
+    <div className="grid gap-6">
+      <header className="flex flex-col gap-2 border-b border-line pb-6">
         <p className="text-sm font-semibold text-primary">Account</p>
-        <h1 className="font-serif text-4xl leading-tight tracking-normal text-ink">
-          Discord認証アカウント
+        <h1 className="text-3xl font-semibold leading-tight text-ink">
+          アカウント設定
         </h1>
       </header>
-      <Card>
+      <Card className="grid gap-6">
+        <div className="grid gap-1">
+          <h2 className="text-base font-semibold text-ink">プロフィール</h2>
+          <p className="text-sm leading-6 text-muted">
+            Discord認証情報と表示名を管理します。
+          </p>
+        </div>
         <dl>
           <Field
             label="Discord ID"
@@ -55,7 +61,12 @@ export function AccountView({
           />
           <Field label="状態" value={user.status} />
         </dl>
-        <form className="mt-6 grid gap-3" method="post" action="/profile">
+        <form
+          className="grid gap-3"
+          method="post"
+          action="/profile"
+          data-profile-form
+        >
           <input type="hidden" name="csrf_token" value={tokens.profile} />
           <label
             className="grid gap-2 text-sm font-semibold text-ink"
@@ -68,15 +79,26 @@ export function AccountView({
             name="display_name"
             defaultValue={user.display_name}
             maxLength={20}
+            placeholder="表示名"
             required
+            data-profile-input
           />
-          <div>
-            <Button type="submit">更新</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled data-profile-submit>
+              更新
+            </Button>
+            <p className="text-sm text-muted">20文字以内</p>
           </div>
         </form>
+        <script src="/profile-form.js" defer />
       </Card>
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">セッション操作</p>
+      <Card className="flex flex-wrap items-center justify-between gap-4">
+        <div className="grid gap-1">
+          <h2 className="text-base font-semibold text-ink">セッション</h2>
+          <p className="text-sm text-muted">
+            ログアウトまたはアカウント削除を行います。
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value={tokens.logout} />

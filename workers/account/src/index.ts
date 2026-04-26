@@ -18,11 +18,46 @@ import { isWebp512 } from "./webp.js";
 
 export default withAccountConfig(handleAccountRequest);
 
+const profileFormScript = `
+(() => {
+  const form = document.querySelector("[data-profile-form]");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  const input = form.querySelector("[data-profile-input]");
+  const submit = form.querySelector("[data-profile-submit]");
+  if (!(input instanceof HTMLInputElement) || !(submit instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const initialValue = input.value.trim();
+  const updateSubmitState = () => {
+    submit.disabled = input.value.trim() === initialValue || !input.checkValidity();
+  };
+
+  input.addEventListener("input", updateSubmitState);
+  form.addEventListener("submit", () => {
+    submit.disabled = true;
+    submit.textContent = "更新中";
+  });
+  updateSubmitState();
+})();
+`;
+
 async function handleAccountRequest(
   request: Request,
   config: AccountConfig,
 ): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname === "/profile-form.js" && request.method === "GET") {
+    return new Response(profileFormScript, {
+      headers: {
+        "cache-control": "public, max-age=3600",
+        "content-type": "text/javascript; charset=utf-8",
+      },
+    });
+  }
   if (url.pathname.startsWith("/assets/")) {
     return asset(url, config);
   }

@@ -32,15 +32,15 @@ async function handleAppRequest(
   return page(
     "App",
     <div className="grid flex-1 place-items-center">
-      <Card className="w-full max-w-lg">
+      <Card className="grid w-full max-w-lg gap-3">
         <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
           <IconApps aria-hidden size={18} />
           App
         </p>
-        <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">
+        <h1 className="text-3xl font-semibold leading-tight text-ink">
           ログイン済みです
         </h1>
-        <p className="mt-4 text-sm text-muted">{payload.display_name}</p>
+        <p className="text-sm text-muted">{payload.display_name}</p>
       </Card>
     </div>,
   );

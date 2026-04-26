@@ -43,15 +43,17 @@ async function handleAuthRequest(
   return page(
     "Auth",
     <div className="grid flex-1 place-items-center">
-      <Card className="w-full max-w-lg">
-        <p className="text-sm font-semibold text-primary">Auth</p>
-        <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">
-          Discordで本人確認
-        </h1>
-        <p className="mt-4 text-sm leading-7 text-muted">
-          Discordサーバー参加状態を確認して、アカウントページへ進みます。
-        </p>
-        <LinkButton className="mt-6" href="/login">
+      <Card className="grid w-full max-w-lg gap-5">
+        <div className="grid gap-2">
+          <p className="text-sm font-semibold text-primary">Auth</p>
+          <h1 className="text-3xl font-semibold leading-tight text-ink">
+            Discordで本人確認
+          </h1>
+          <p className="text-sm leading-7 text-muted">
+            Discordサーバー参加状態を確認して、アカウントページへ進みます。
+          </p>
+        </div>
+        <LinkButton href="/login">
           <IconBrandDiscord aria-hidden size={20} />
           Discordでログイン
         </LinkButton>
