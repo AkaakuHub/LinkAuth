@@ -1,0 +1,41 @@
+{
+  "name": "discord-auth",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "type": "module",
+  "scripts": {
+    "check": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "format": "biome check --write .",
+    "tf:fmt": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$terraform = 'C:\\terraform\\terraform.exe'; Get-ChildItem infra -Filter *.tf | ForEach-Object { & $terraform fmt $_.FullName }\"",
+    "tf:fmt:check": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$terraform = 'C:\\terraform\\terraform.exe'; Get-ChildItem infra -Filter *.tf | ForEach-Object { & $terraform fmt -check $_.FullName }\"",
+    "tf:validate": "\"C:\\terraform\\terraform.exe\" -chdir=infra validate",
+    "build:lambdas": "esbuild lambdas/discord-interactions/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/lambdas/discord-interactions/index.js && esbuild lambdas/user-api/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/lambdas/user-api/index.js",
+    "build:workers": "tsc --noEmit -p workers/tsconfig.json",
+    "dev": "pnpm dev:env && pnpm dev:services && concurrently --names auth,account,app --prefix-colors cyan,green,magenta \"pnpm dev:auth\" \"pnpm dev:account\" \"pnpm dev:app\"",
+    "dev:env": "tsx local/sync-dev-env.ts",
+    "dev:services": "docker compose --env-file .env.local up -d --build dynamodb-local user-api-local",
+    "dev:seed": "tsx local/seed-dynamodb.ts",
+    "dev:auth": "wrangler dev --config workers/auth/wrangler.toml --local --port 8787",
+    "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8788",
+    "dev:app": "wrangler dev --config workers/app/wrangler.toml --local --port 8789"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "@cloudflare/workers-types": "^4.20260426.0",
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^22.15.3",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.4.2",
+    "esbuild": "^0.25.3",
+    "lefthook": "^2.1.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.13.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.800.0",
+    "@aws-sdk/lib-dynamodb": "^3.800.0",
+    "tweetnacl": "^1.0.3"
+  }
+}

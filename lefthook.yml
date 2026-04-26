@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,json,jsonc}"
+      run: pnpm check
+    terraform-fmt:
+      glob: "*.tf"
+      run: pnpm tf:fmt:check
+    terraform-validate:
+      glob: "*.tf"
+      run: pnpm tf:validate

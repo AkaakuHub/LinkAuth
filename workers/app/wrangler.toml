@@ -1,0 +1,6 @@
+name = "org-auth-app"
+main = "src/index.ts"
+compatibility_date = "2026-04-26"
+
+[vars]
+SESSION_KID = "2026-04"

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.zip
+.dev.vars
+workers/**/.dev.vars
+.env
+.env.local
