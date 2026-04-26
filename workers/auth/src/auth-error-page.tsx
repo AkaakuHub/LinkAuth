@@ -1,4 +1,4 @@
-import { IconAlertTriangle, IconBrandDiscord } from "@tabler/icons-react";
+import { IconAlertTriangle, IconHome } from "@tabler/icons-react";
 import { page } from "../../shared/html.js";
 import { Card, LinkButton } from "../../shared/ui.js";
 
@@ -17,9 +17,9 @@ export function inactiveUserPage(): Promise<Response> {
         <p className="mt-4 text-sm leading-7 text-muted">
           このDiscordアカウントは未登録、無効化済み、または削除済みです。サーバーで登録し直してからログインしてください。
         </p>
-        <LinkButton className="mt-6" href="/login" variant="secondary">
-          <IconBrandDiscord aria-hidden size={20} />
-          もう一度ログイン
+        <LinkButton className="mt-6" href="/" variant="secondary">
+          <IconHome aria-hidden size={20} />
+          Authホームへ戻る
         </LinkButton>
       </Card>
     </div>,
