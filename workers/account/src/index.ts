@@ -25,9 +25,20 @@ const profileFormScript = `
     return;
   }
 
+  const view = form.querySelector("[data-profile-view]");
+  const editor = form.querySelector("[data-profile-editor]");
   const input = form.querySelector("[data-profile-input]");
   const submit = form.querySelector("[data-profile-submit]");
-  if (!(input instanceof HTMLInputElement) || !(submit instanceof HTMLButtonElement)) {
+  const edit = form.querySelector("[data-profile-edit]");
+  const cancel = form.querySelector("[data-profile-cancel]");
+  if (
+    !(view instanceof HTMLElement) ||
+    !(editor instanceof HTMLElement) ||
+    !(input instanceof HTMLInputElement) ||
+    !(submit instanceof HTMLButtonElement) ||
+    !(edit instanceof HTMLButtonElement) ||
+    !(cancel instanceof HTMLButtonElement)
+  ) {
     return;
   }
 
@@ -35,11 +46,26 @@ const profileFormScript = `
   const updateSubmitState = () => {
     submit.disabled = input.value.trim() === initialValue || !input.checkValidity();
   };
+  const openEditor = () => {
+    view.classList.add("hidden");
+    editor.classList.remove("hidden");
+    input.focus();
+    input.select();
+    updateSubmitState();
+  };
+  const closeEditor = () => {
+    input.value = initialValue;
+    editor.classList.add("hidden");
+    view.classList.remove("hidden");
+    updateSubmitState();
+  };
 
+  edit.addEventListener("click", openEditor);
+  cancel.addEventListener("click", closeEditor);
   input.addEventListener("input", updateSubmitState);
   form.addEventListener("submit", () => {
     submit.disabled = true;
-    submit.textContent = "更新中";
+    submit.replaceChildren("保存中");
   });
   updateSubmitState();
 })();
@@ -50,10 +76,13 @@ async function handleAccountRequest(
   config: AccountConfig,
 ): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === "/profile-form.js" && request.method === "GET") {
+  if (
+    url.pathname === "/profile-form.inline-edit.js" &&
+    request.method === "GET"
+  ) {
     return new Response(profileFormScript, {
       headers: {
-        "cache-control": "public, max-age=3600",
+        "cache-control": "no-store",
         "content-type": "text/javascript; charset=utf-8",
       },
     });

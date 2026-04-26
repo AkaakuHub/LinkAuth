@@ -1,9 +1,12 @@
 import {
+  IconCheck,
   IconId,
   IconLogout,
+  IconPencil,
   IconShieldCheck,
   IconTrash,
   IconUser,
+  IconX,
 } from "@tabler/icons-react";
 import { Button, Card, Field, TextInput } from "../../shared/ui.js";
 import type { User } from "../../shared/userApi.js";
@@ -44,10 +47,58 @@ export function AccountView({
           <Field
             label="表示名"
             value={
-              <span className="inline-flex items-center gap-2">
-                <IconUser aria-hidden size={18} />
-                {user.display_name}
-              </span>
+              <form
+                className="grid gap-3"
+                method="post"
+                action="/profile"
+                data-profile-form
+              >
+                <input type="hidden" name="csrf_token" value={tokens.profile} />
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3"
+                  data-profile-view
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <IconUser aria-hidden size={18} />
+                    {user.display_name}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    aria-label="表示名を編集"
+                    data-profile-edit
+                  >
+                    <IconPencil aria-hidden size={18} />
+                  </Button>
+                </div>
+                <div className="grid hidden gap-3" data-profile-editor>
+                  <TextInput
+                    id="display-name"
+                    name="display_name"
+                    defaultValue={user.display_name}
+                    maxLength={20}
+                    placeholder="表示名"
+                    required
+                    aria-label="表示名"
+                    data-profile-input
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="submit" disabled data-profile-submit>
+                      <IconCheck aria-hidden size={18} />
+                      保存
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      data-profile-cancel
+                    >
+                      <IconX aria-hidden size={18} />
+                      取消
+                    </Button>
+                    <p className="text-sm text-muted">20文字以内</p>
+                  </div>
+                </div>
+              </form>
             }
           />
           <Field
@@ -61,36 +112,7 @@ export function AccountView({
           />
           <Field label="状態" value={user.status} />
         </dl>
-        <form
-          className="grid gap-3"
-          method="post"
-          action="/profile"
-          data-profile-form
-        >
-          <input type="hidden" name="csrf_token" value={tokens.profile} />
-          <label
-            className="grid gap-2 text-sm font-semibold text-ink"
-            htmlFor="display-name"
-          >
-            表示名
-          </label>
-          <TextInput
-            id="display-name"
-            name="display_name"
-            defaultValue={user.display_name}
-            maxLength={20}
-            placeholder="表示名"
-            required
-            data-profile-input
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled data-profile-submit>
-              更新
-            </Button>
-            <p className="text-sm text-muted">20文字以内</p>
-          </div>
-        </form>
-        <script src="/profile-form.js" defer />
+        <script src="/profile-form.inline-edit.js" defer />
       </Card>
       <Card className="flex flex-wrap items-center justify-between gap-4">
         <div className="grid gap-1">
