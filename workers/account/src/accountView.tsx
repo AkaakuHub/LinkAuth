@@ -130,7 +130,8 @@ export function AccountView({
           />
           <Field label="状態" value={user.status} />
         </dl>
-        <script src="/profile-form.inline-edit.js" defer />
+        <div data-account-client-root />
+        <script src="/account-client.js" defer />
       </Card>
       <Card className="flex flex-wrap items-center justify-between gap-4">
         <div className="grid gap-1">
@@ -148,7 +149,7 @@ export function AccountView({
               ログアウト
             </Button>
           </form>
-          <form method="post" action="/delete">
+          <form method="post" action="/delete" data-delete-form>
             <input type="hidden" name="csrf_token" value={tokens.delete} />
             <input type="hidden" name="return_to" value={returnTo} />
             <Button type="submit" variant="danger">

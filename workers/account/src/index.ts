@@ -15,6 +15,7 @@ import {
   type User,
   UserApiError,
 } from "../../shared/userApi.js";
+import { accountClientScript } from "./accountClientGenerated.js";
 import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
 import { inactiveAccountPage } from "./accountErrorPage.js";
 import { accountLandingPage, noStoreHeaders } from "./accountLandingPage.js";
@@ -30,90 +31,13 @@ import { isWebp512 } from "./webp.js";
 
 export default withAccountConfig(handleAccountRequest);
 
-const profileFormScript = `
-(() => {
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) {
-      window.location.reload();
-    }
-  });
-
-  const historyBack = document.querySelector("[data-history-back]");
-  if (historyBack instanceof HTMLAnchorElement) {
-    historyBack.addEventListener("click", (event) => {
-      event.preventDefault();
-      window.location.assign(historyBack.href);
-    });
-  }
-
-  const form = document.querySelector("[data-profile-form]");
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-
-  const view = form.querySelector("[data-profile-view]");
-  const editor = form.querySelector("[data-profile-editor]");
-  const input = form.querySelector("[data-profile-input]");
-  const submit = form.querySelector("[data-profile-submit]");
-  const edit = form.querySelector("[data-profile-edit]");
-  const cancel = form.querySelector("[data-profile-cancel]");
-  if (
-    !(view instanceof HTMLElement) ||
-    !(editor instanceof HTMLElement) ||
-    !(input instanceof HTMLInputElement) ||
-    !(submit instanceof HTMLButtonElement) ||
-    !(edit instanceof HTMLButtonElement) ||
-    !(cancel instanceof HTMLButtonElement)
-  ) {
-    return;
-  }
-
-  const initialValue = input.value.trim();
-  const updateSubmitState = () => {
-    submit.disabled = input.value.trim() === initialValue || !input.checkValidity();
-  };
-  const openEditor = () => {
-    view.classList.add("hidden");
-    editor.classList.remove("hidden");
-    input.focus();
-    input.select();
-    updateSubmitState();
-  };
-  const closeEditor = () => {
-    input.value = initialValue;
-    editor.classList.add("hidden");
-    view.classList.remove("hidden");
-    updateSubmitState();
-  };
-
-  edit.addEventListener("click", openEditor);
-  cancel.addEventListener("click", closeEditor);
-  input.addEventListener("input", updateSubmitState);
-  form.addEventListener("submit", () => {
-    const currentUrl = new URL(window.location.href);
-    const formData = new FormData(form);
-    const returnTo = formData.get("return_to");
-    if (typeof returnTo === "string") {
-      currentUrl.searchParams.set("return_to", returnTo);
-      window.history.replaceState(null, "", currentUrl);
-    }
-    submit.disabled = true;
-    submit.replaceChildren("保存中");
-  });
-  updateSubmitState();
-})();
-`;
-
 async function handleAccountRequest(
   request: Request,
   config: AccountConfig,
 ): Promise<Response> {
   const url = new URL(request.url);
-  if (
-    url.pathname === "/profile-form.inline-edit.js" &&
-    request.method === "GET"
-  ) {
-    return new Response(profileFormScript, {
+  if (url.pathname === "/account-client.js" && request.method === "GET") {
+    return new Response(accountClientScript, {
       headers: {
         "cache-control": "no-store",
         "content-type": "text/javascript; charset=utf-8",

@@ -7,5 +7,6 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "WebWorker", "DOM.Iterable"]
   },
-  "include": ["**/*.ts", "**/*.tsx", "../shared/**/*.ts", "../shared/**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx", "../shared/**/*.ts", "../shared/**/*.tsx"],
+  "exclude": ["account/src/accountClient.tsx"]
 }

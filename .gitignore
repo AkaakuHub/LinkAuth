@@ -10,3 +10,6 @@ terraform.tfvars
 workers/**/.dev.vars
 .env
 .env.local
+workers/account/src/accountClientGenerated.ts
+workers/shared/stylesGenerated.css
+workers/shared/stylesGenerated.ts
