@@ -1,12 +1,14 @@
 import type { LoginNavigationConfig } from "../../shared/navigation.js";
 
 type AppEnv = {
+  ACCOUNT_URL: string;
   AUTH_LOGIN_URL: string;
   SESSION_KID: string;
   SESSION_HMAC_SECRET: string;
 };
 
 export type AppConfig = {
+  accountUrl: string;
   session: {
     kid: string;
     secret: string;
@@ -26,6 +28,7 @@ export function withAppConfig(
 
 function loadAppConfig(env: AppEnv): AppConfig {
   return {
+    accountUrl: requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL),
     session: {
       kid: requiredBinding("SESSION_KID", env.SESSION_KID),
       secret: requiredBinding("SESSION_HMAC_SECRET", env.SESSION_HMAC_SECRET),

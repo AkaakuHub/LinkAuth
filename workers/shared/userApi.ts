@@ -21,12 +21,14 @@ export type UserApiConfig = {
 export class UserApiError extends Error {
   readonly status: number;
   readonly path: string;
+  readonly reason: string;
 
-  constructor(path: string, status: number) {
-    super(`user-api ${path} failed: ${status}`);
+  constructor(path: string, status: number, reason: string) {
+    super(`user-api ${path} failed: ${status}: ${reason}`);
     this.name = "UserApiError";
     this.path = path;
     this.status = status;
+    this.reason = reason;
   }
 }
 
@@ -56,11 +58,24 @@ export async function callUserApi<T>(
     body: rawBody,
   });
   if (!response.ok) {
-    throw new UserApiError(path, response.status);
+    throw new UserApiError(
+      path,
+      response.status,
+      await responseError(response),
+    );
   }
   return (await response.json()) as T;
 }
 
 export async function hashToken(value: string): Promise<string> {
   return await sha256Hex(new TextEncoder().encode(value));
+}
+
+async function responseError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    return typeof body.error === "string" ? body.error : "unknown_error";
+  } catch {
+    return "unreadable_error";
+  }
 }

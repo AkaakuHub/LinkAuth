@@ -1,17 +1,29 @@
+import { randomBase64Url } from "../../../shared/src/crypto.js";
 import {
+  createCookie,
   deleteCookie,
   getSingleCookie,
   rememberCookieName,
   sessionCookieName,
+  signSessionCookie,
+  verifySessionCookie,
 } from "../../../shared/src/session.js";
+import { normalizeReturnTo } from "../../shared/navigation.js";
 import {
-  authHomeUrl,
-  redirectToCurrentOriginRoot,
-  redirectToLogin,
-} from "../../shared/navigation.js";
-import { callUserApi, type User } from "../../shared/userApi.js";
+  callUserApi,
+  hashToken,
+  type User,
+  UserApiError,
+} from "../../shared/userApi.js";
 import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
+import { inactiveAccountPage } from "./accountErrorPage.js";
+import { accountLandingPage, noStoreHeaders } from "./accountLandingPage.js";
+import { createAuthState, parseAuthState } from "./authState.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "./csrf.js";
+import {
+  fetchDiscordOAuthUser,
+  redirectToDiscordAuthorize,
+} from "./discordOauth.js";
 import { accountPage } from "./page.js";
 import { requireSession } from "./session.js";
 import { isWebp512 } from "./webp.js";
@@ -20,6 +32,22 @@ export default withAccountConfig(handleAccountRequest);
 
 const profileFormScript = `
 (() => {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+
+  const historyBack = document.querySelector("[data-history-back]");
+  if (historyBack instanceof HTMLAnchorElement) {
+    historyBack.addEventListener("click", (event) => {
+      if (window.history.length > 1) {
+        event.preventDefault();
+        window.history.back();
+      }
+    });
+  }
+
   const form = document.querySelector("[data-profile-form]");
   if (!(form instanceof HTMLFormElement)) {
     return;
@@ -90,21 +118,36 @@ async function handleAccountRequest(
   if (url.pathname.startsWith("/assets/")) {
     return asset(url, config);
   }
+  if (url.pathname === "/login") {
+    return login(url, config);
+  }
+  if (url.pathname === "/callback") {
+    return callback(url, config);
+  }
+  if (url.pathname === "/me") {
+    return me(request, config);
+  }
+
+  if (url.pathname === "/" && request.method === "GET") {
+    const session = await requireSession(request, config);
+    if (!session) {
+      return accountLandingPage(config);
+    }
+    const active = await verifyActiveUser(session.discord_id, config);
+    if (!active) {
+      return inactiveAccountPage(config);
+    }
+    return accountPage(
+      active.user,
+      url,
+      config,
+      accountReturnTo(url.searchParams.get("return_to"), config),
+    );
+  }
 
   const session = await requireSession(request, config);
   if (!session) {
-    return redirectToLogin(
-      config.navigation,
-      new URL("/", url.origin).toString(),
-    );
-  }
-  if (url.pathname === "/" && request.method === "GET") {
-    const active = await callUserApi<{ user: User }>(
-      config.userApi,
-      "/users/verify-active",
-      { discord_id: session.discord_id },
-    );
-    return accountPage(active.user, url, config);
+    return accountLandingPage(config);
   }
   if (url.pathname === "/profile" && request.method === "POST") {
     if (
@@ -119,12 +162,16 @@ async function handleAccountRequest(
       return new Response("forbidden", { status: 403 });
     }
     const form = await request.formData();
+    const returnTo = accountReturnTo(
+      String(form.get("return_to") ?? ""),
+      config,
+    );
     await callUserApi(config.userApi, "/users/update-profile", {
       discord_id: session.discord_id,
       display_name: String(form.get("display_name") ?? ""),
       request_id: crypto.randomUUID(),
     });
-    return redirectToCurrentOriginRoot(url);
+    return redirectToAccountRoot(url, returnTo);
   }
   if (url.pathname === "/avatar" && request.method === "POST") {
     if (
@@ -169,11 +216,16 @@ async function handleAccountRequest(
     ) {
       return new Response("forbidden", { status: 403 });
     }
+    const form = await request.formData();
+    const returnTo = accountReturnTo(
+      String(form.get("return_to") ?? ""),
+      config,
+    );
     await callUserApi(config.userApi, "/users/delete", {
       discord_id: session.discord_id,
       request_id: crypto.randomUUID(),
     });
-    return clearCookiesAndRedirectToAuthHome(config);
+    return clearCookiesAndRedirect(config, returnTo);
   }
   if (url.pathname === "/logout" && request.method === "POST") {
     if (
@@ -191,6 +243,11 @@ async function handleAccountRequest(
       request.headers.get("cookie"),
       rememberCookieName,
     );
+    const form = await request.formData();
+    const returnTo = accountReturnTo(
+      String(form.get("return_to") ?? ""),
+      config,
+    );
     const tokenId = remember?.split(".")[0];
     if (tokenId) {
       await callUserApi(config.userApi, "/remember/delete", {
@@ -199,9 +256,128 @@ async function handleAccountRequest(
         request_id: crypto.randomUUID(),
       });
     }
-    return clearCookiesAndRedirectToAuthHome(config);
+    return clearCookiesAndRedirect(config, returnTo);
   }
   return new Response("not found", { status: 404 });
+}
+
+function accountReturnTo(value: string | null, config: AccountConfig): string {
+  return (
+    normalizeReturnTo(value, config.navigation) ?? config.navigation.ACCOUNT_URL
+  );
+}
+
+function redirectToAccountRoot(requestUrl: URL, returnTo: string): Response {
+  const url = new URL("/", requestUrl.origin);
+  url.searchParams.set("return_to", returnTo);
+  return Response.redirect(url, 303);
+}
+
+async function login(url: URL, config: AccountConfig): Promise<Response> {
+  const state = await createAuthState(
+    url.searchParams.get("return_to"),
+    config,
+  );
+  if (!state) {
+    return accountLandingPage(config);
+  }
+  return redirectToDiscordAuthorize(state, config);
+}
+
+async function callback(url: URL, config: AccountConfig): Promise<Response> {
+  const code = url.searchParams.get("code");
+  const state = await parseAuthState(url.searchParams.get("state"), config);
+  if (!code || !state) {
+    return new Response("invalid callback", { status: 400 });
+  }
+
+  const discordUser = await fetchDiscordOAuthUser(code, config);
+  if (!discordUser) {
+    return new Response("oauth failed", { status: 401 });
+  }
+  const active = await verifyActiveUser(discordUser.id, config);
+  if (!active) {
+    return inactiveAccountPage(config);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const session = await signSessionCookie(
+    {
+      discord_id: active.user.discord_id,
+      role: active.user.role,
+      display_name: active.user.display_name,
+      iat: now,
+      exp: now + 86_400,
+      kid: config.session.kid,
+    },
+    config.session.secret,
+  );
+
+  const tokenId = randomBase64Url(16);
+  const randomToken = randomBase64Url(32);
+  const rememberValue = `${tokenId}.${randomToken}`;
+  await callUserApi(config.userApi, "/remember/create", {
+    discord_id: active.user.discord_id,
+    token_id: tokenId,
+    token_hash: await hashToken(randomToken),
+    expires_at: now + 15_552_000,
+  });
+
+  const headers = new Headers({ location: state.return_to });
+  headers.append(
+    "set-cookie",
+    createCookie(sessionCookieName, session, 86_400, config.domainName),
+  );
+  headers.append(
+    "set-cookie",
+    createCookie(
+      rememberCookieName,
+      rememberValue,
+      15_552_000,
+      config.domainName,
+    ),
+  );
+  return new Response(null, { status: 302, headers });
+}
+
+async function me(request: Request, config: AccountConfig): Promise<Response> {
+  const now = Math.floor(Date.now() / 1000);
+  const session = getSingleCookie(
+    request.headers.get("cookie"),
+    sessionCookieName,
+  );
+  if (session) {
+    const payload = await verifySessionCookie(
+      session,
+      { [config.session.kid]: config.session.secret },
+      now,
+    );
+    if (payload) {
+      const active = await verifyActiveUser(payload.discord_id, config);
+      if (active) {
+        return Response.json({ user: active.user });
+      }
+    }
+  }
+  return Response.json({ error: "unauthorized" }, { status: 401 });
+}
+
+async function verifyActiveUser(
+  discordId: string,
+  config: AccountConfig,
+): Promise<{ user: User } | null> {
+  try {
+    return await callUserApi<{ user: User }>(
+      config.userApi,
+      "/users/verify-active",
+      { discord_id: discordId },
+    );
+  } catch (error) {
+    if (error instanceof UserApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function asset(url: URL, config: AccountConfig): Promise<Response> {
@@ -218,8 +394,12 @@ async function asset(url: URL, config: AccountConfig): Promise<Response> {
   });
 }
 
-function clearCookiesAndRedirectToAuthHome(config: AccountConfig): Response {
-  const headers = new Headers({ location: authHomeUrl(config.navigation) });
+function clearCookiesAndRedirect(
+  config: AccountConfig,
+  redirectUrl: string,
+): Response {
+  const headers = noStoreHeaders();
+  headers.set("location", redirectUrl);
   headers.append(
     "set-cookie",
     deleteCookie(sessionCookieName, config.domainName),

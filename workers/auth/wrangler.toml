@@ -1,8 +1,0 @@
-name = "org-auth-auth"
-main = "src/index.tsx"
-compatibility_date = "2026-04-26"
-
-[vars]
-DISCORD_API_BASE = "https://discord.com/api/v10"
-SESSION_KID = "2026-04"
-INTERNAL_HMAC_KID = "2026-04"

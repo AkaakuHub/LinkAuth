@@ -1,5 +1,5 @@
 import { callbackUrl, redirectToUrl } from "../../shared/navigation.js";
-import type { AuthConfig } from "./authConfig.js";
+import type { AccountConfig } from "./accountConfig.js";
 
 export type DiscordOAuthUser = {
   id: string;
@@ -7,7 +7,7 @@ export type DiscordOAuthUser = {
 
 export function redirectToDiscordAuthorize(
   state: string,
-  config: AuthConfig,
+  config: AccountConfig,
 ): Response {
   const authorize = new URL(`${config.discord.apiBase}/oauth2/authorize`);
   authorize.searchParams.set("client_id", config.discord.clientId);
@@ -20,7 +20,7 @@ export function redirectToDiscordAuthorize(
 
 export async function fetchDiscordOAuthUser(
   code: string,
-  config: AuthConfig,
+  config: AccountConfig,
 ): Promise<DiscordOAuthUser | null> {
   const tokenResponse = await fetch(`${config.discord.apiBase}/oauth2/token`, {
     method: "POST",

@@ -2,7 +2,12 @@ import { createElement, type ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server.browser";
 import { styleSheet } from "./stylesGenerated.js";
 
-export async function page(title: string, body: ReactNode): Promise<Response> {
+export async function page(
+  title: string,
+  body: ReactNode,
+  status = 200,
+  headers?: Headers,
+): Promise<Response> {
   const stream = await renderToReadableStream(
     createElement(
       "html",
@@ -33,6 +38,13 @@ export async function page(title: string, body: ReactNode): Promise<Response> {
     ),
   );
   return new Response(stream, {
-    headers: { "content-type": "text/html; charset=utf-8" },
+    status,
+    headers: responseHeaders(headers),
   });
+}
+
+function responseHeaders(headers?: Headers): Headers {
+  const responseHeaders = headers ?? new Headers();
+  responseHeaders.set("content-type", "text/html; charset=utf-8");
+  return responseHeaders;
 }

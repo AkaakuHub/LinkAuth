@@ -6,7 +6,7 @@ Discordサーバー参加者だけを対象にした、Cloudflare Workers、AWS 
 
 - `infra/`: AWSとCloudflareリソースのTerraform定義
 - `lambdas/`: Discord Interaction受信とWorker専用ユーザーAPI
-- `workers/`: 認証、アカウントページ、ログイン必須アプリ用Worker
+- `workers/`: アカウント管理Worker、ローカル確認用サービスWorker
 - `shared/`: Cookie、HMAC、内部API署名の共通処理
 
 ## 設定
@@ -15,7 +15,7 @@ Discordサーバー参加者だけを対象にした、Cloudflare Workers、AWS 
 
 ## デプロイ順
 
-Workers Custom Domainは、対象Workerが先に存在している必要があります。初回はWranglerで`auth`、`account`、`app`を一度デプロイしてからTerraformを適用してください。
+Workers Custom Domainは、対象Workerが先に存在している必要があります。初回はWranglerで`account`を一度デプロイしてからTerraformを適用してください。
 
 ## ローカル確認
 
@@ -36,7 +36,6 @@ pnpm dev:env
 生成されるファイルは次です。secretは`.env.local`の1か所だけを編集します。
 
 ```txt
-workers/auth/.dev.vars
 workers/account/.dev.vars
 workers/app/.dev.vars
 infra/terraform.tfvars
@@ -54,21 +53,26 @@ pnpm dev:seed
 pnpm dev
 ```
 
-`pnpm dev`は、設定生成、DynamoDB Local、`user-api` local、3つのWorkerをまとめて起動します。
+`pnpm dev`は、設定生成、DynamoDB Local、`user-api` local、`account` Worker、ローカル確認用`service` Workerをまとめて起動します。
 
 ポートは次です。
 
 | Worker | URL |
 | --- | --- |
-| auth | `http://localhost:8787` |
-| account | `http://localhost:8788` |
-| app | `http://localhost:8789` |
+| account | `http://localhost:8787` |
+| service | `http://localhost:8789` |
 
-OAuth、DynamoDB連携、R2連携を含む操作はsecretと外部リソースが必要です。画面だけ確認する場合も、ログイン後のアカウントページは実セッションCookieがないとリダイレクトします。
+`http://localhost:8787`は`account.akaaku.net`相当のアカウント管理サイトです。OAuth2の`/login`と`/callback`も同じWorkerで受けます。
+
+`http://localhost:8789`はローカル確認用の呼び出し元サービス例です。Cloudflareへデプロイする対象ではありません。
+
+`8789`は未ログインでもトップを表示します。ログインボタンから`8787/login`へ進み、ログイン後は`8789`へ戻ります。`8789`からアカウント管理へ移動した場合、ログアウト後もDiscord OAuth2ではなく`8789`のトップへ戻ります。
+
+OAuth、DynamoDB連携、R2連携を含む操作はsecretと外部リソースが必要です。画面だけ確認する場合も、ログイン後のページは実セッションCookieがないとリダイレクトします。
 
 Discord OAuth2をローカルと本番の両方で試す場合は、Discord Developer PortalのOAuth2 Redirectsに両方を登録してください。
 
 ```txt
 http://localhost:8787/callback
-https://auth.<your-domain>/callback
+https://account.<your-domain>/callback
 ```

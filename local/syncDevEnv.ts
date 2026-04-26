@@ -4,7 +4,7 @@ import { readLocalEnvFile } from "./env.js";
 
 const source = await readLocalEnvFile();
 
-await writeEnvFile("workers/auth/.dev.vars", [
+await writeEnvFile("workers/account/.dev.vars", [
   "CSRF_HMAC_SECRET",
   "SESSION_HMAC_SECRET",
   "INTERNAL_HMAC_SECRET",
@@ -13,23 +13,16 @@ await writeEnvFile("workers/auth/.dev.vars", [
   "USER_API_URL",
   ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
   "ACCOUNT_URL",
-  "APP_URL",
-  "AUTH_CALLBACK_URL",
-]);
-
-await writeEnvFile("workers/account/.dev.vars", [
-  "CSRF_HMAC_SECRET",
-  "SESSION_HMAC_SECRET",
-  "INTERNAL_HMAC_SECRET",
-  "USER_API_URL",
-  ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
+  "ALLOWED_RETURN_TO_ORIGINS",
   "AUTH_LOGIN_URL",
+  "AUTH_CALLBACK_URL",
 ]);
 
 await writeEnvFile("workers/app/.dev.vars", [
   "SESSION_HMAC_SECRET",
   ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
   "AUTH_LOGIN_URL",
+  "ACCOUNT_URL",
 ]);
 
 await writeTerraformVarsFile("infra/terraform.tfvars", [

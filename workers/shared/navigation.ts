@@ -1,6 +1,6 @@
 export type AuthNavigationConfig = {
   ACCOUNT_URL: string;
-  APP_URL: string;
+  ALLOWED_RETURN_TO_ORIGINS: string;
   AUTH_CALLBACK_URL: string;
 };
 
@@ -43,27 +43,34 @@ export function authHomeUrl(config: LoginNavigationConfig): string {
 export function normalizeReturnTo(
   value: string | null,
   config: AuthNavigationConfig,
-): string {
+): string | null {
   if (!value) {
-    return config.ACCOUNT_URL;
+    return null;
   }
   try {
     const url = new URL(value);
     const accountUrl = new URL(config.ACCOUNT_URL);
-    const appUrl = new URL(config.APP_URL);
-    if (url.username || url.password || url.hash) {
-      return config.ACCOUNT_URL;
+    const allowedReturnToOrigins = config.ALLOWED_RETURN_TO_ORIGINS.split(",")
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0)
+      .map((origin) => new URL(origin));
+    if (url.username || url.password) {
+      return null;
     }
+    url.hash = "";
     if (sameOrigin(url, accountUrl) && url.pathname === "/") {
       return config.ACCOUNT_URL;
     }
-    if (sameOrigin(url, appUrl)) {
-      url.hash = "";
+    if (
+      allowedReturnToOrigins.some((allowedOrigin) =>
+        sameOrigin(url, allowedOrigin),
+      )
+    ) {
       return url.toString();
     }
-    return config.ACCOUNT_URL;
+    return null;
   } catch {
-    return config.ACCOUNT_URL;
+    return null;
   }
 }
 

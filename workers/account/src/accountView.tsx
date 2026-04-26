@@ -1,4 +1,5 @@
 import {
+  IconArrowLeft,
   IconCheck,
   IconId,
   IconLogout,
@@ -15,17 +16,33 @@ import type { AccountTokens } from "./accountTokens.js";
 export function AccountView({
   user,
   tokens,
+  returnTo,
+  showBackLink,
 }: {
   user: User;
   tokens: AccountTokens;
+  returnTo: string;
+  showBackLink: boolean;
 }) {
   return (
     <div className="grid gap-6">
-      <header className="flex flex-col gap-2 border-b border-line pb-6">
-        <p className="text-sm font-semibold text-primary">Account</p>
-        <h1 className="text-3xl font-semibold leading-tight text-ink">
-          アカウント設定
-        </h1>
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
+        <div className="grid gap-2">
+          <p className="text-sm font-semibold text-primary">Account</p>
+          <h1 className="text-3xl font-semibold leading-tight text-ink">
+            アカウント設定
+          </h1>
+        </div>
+        {showBackLink ? (
+          <a
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-panel px-4 text-sm font-semibold text-ink transition-colors hover:bg-haze focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            href={returnTo}
+            data-history-back
+          >
+            <IconArrowLeft aria-hidden size={18} />
+            戻る
+          </a>
+        ) : null}
       </header>
       <Card className="grid gap-6">
         <div className="grid gap-1">
@@ -54,6 +71,7 @@ export function AccountView({
                 data-profile-form
               >
                 <input type="hidden" name="csrf_token" value={tokens.profile} />
+                <input type="hidden" name="return_to" value={returnTo} />
                 <div
                   className="flex flex-wrap items-center justify-between gap-3"
                   data-profile-view
@@ -124,6 +142,7 @@ export function AccountView({
         <div className="flex flex-wrap gap-2">
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value={tokens.logout} />
+            <input type="hidden" name="return_to" value={returnTo} />
             <Button type="submit" variant="secondary">
               <IconLogout aria-hidden size={18} />
               ログアウト
@@ -131,6 +150,7 @@ export function AccountView({
           </form>
           <form method="post" action="/delete">
             <input type="hidden" name="csrf_token" value={tokens.delete} />
+            <input type="hidden" name="return_to" value={returnTo} />
             <Button type="submit" variant="danger">
               <IconTrash aria-hidden size={18} />
               削除

@@ -1,4 +1,4 @@
-name = "org-auth-app"
+name = "org-auth-local-service"
 main = "src/index.tsx"
 compatibility_date = "2026-04-26"
 

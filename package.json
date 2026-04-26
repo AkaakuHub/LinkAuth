@@ -13,13 +13,12 @@
     "tf:validate": "\"C:\\terraform\\terraform.exe\" -chdir=infra validate",
     "build:lambdas": "esbuild lambdas/discord-interactions/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/lambdas/discord-interactions/index.js && esbuild lambdas/user-api/src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/lambdas/user-api/index.js",
     "build:workers": "pnpm build:styles && tsc --noEmit -p workers/tsconfig.json",
-    "dev": "pnpm dev:env && pnpm build:styles && pnpm dev:services && concurrently --names auth,account,app --prefix-colors cyan,green,magenta \"pnpm dev:auth\" \"pnpm dev:account\" \"pnpm dev:app\"",
+    "dev": "pnpm dev:env && pnpm build:styles && pnpm dev:services && concurrently --names account,service --prefix-colors green,magenta \"pnpm dev:account\" \"pnpm dev:service\"",
     "dev:env": "tsx local/syncDevEnv.ts",
     "dev:services": "docker compose --env-file .env.local up -d --build dynamodb-local user-api-local",
     "dev:seed": "tsx local/seedDynamodb.ts",
-    "dev:auth": "wrangler dev --config workers/auth/wrangler.toml --local --port 8787",
-    "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8788",
-    "dev:app": "wrangler dev --config workers/app/wrangler.toml --local --port 8789"
+    "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787",
+    "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",

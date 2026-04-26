@@ -64,17 +64,7 @@ variable "dynamodb_max_write_request_units" {
   default = 2
 }
 
-variable "auth_worker_service_name" {
-  type    = string
-  default = "org-auth-auth"
-}
-
 variable "account_worker_service_name" {
   type    = string
   default = "org-auth-account"
-}
-
-variable "app_worker_service_name" {
-  type    = string
-  default = "org-auth-app"
 }

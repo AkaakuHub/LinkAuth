@@ -8,7 +8,7 @@ import {
   timingSafeEqual,
 } from "../../../shared/src/encoding.js";
 import { normalizeReturnTo } from "../../shared/navigation.js";
-import type { AuthConfig } from "./authConfig.js";
+import type { AccountConfig } from "./accountConfig.js";
 
 export type AuthState = {
   return_to: string;
@@ -16,9 +16,12 @@ export type AuthState = {
 
 export async function createAuthState(
   returnToValue: string | null,
-  config: AuthConfig,
-): Promise<string> {
+  config: AccountConfig,
+): Promise<string | null> {
   const returnTo = normalizeReturnTo(returnToValue, config.navigation);
+  if (!returnTo) {
+    return null;
+  }
   const statePayload = base64UrlEncodeText(
     JSON.stringify({
       nonce: randomBase64Url(16),
@@ -36,7 +39,7 @@ export async function createAuthState(
 
 export async function parseAuthState(
   value: string | null,
-  config: AuthConfig,
+  config: AccountConfig,
 ): Promise<AuthState | null> {
   if (!value) {
     return null;
@@ -64,8 +67,12 @@ export async function parseAuthState(
     ) {
       return null;
     }
+    const returnTo = normalizeReturnTo(parsed.return_to, config.navigation);
+    if (!returnTo) {
+      return null;
+    }
     return {
-      return_to: normalizeReturnTo(parsed.return_to, config.navigation),
+      return_to: returnTo,
     };
   } catch {
     return null;
