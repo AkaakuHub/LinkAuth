@@ -32,10 +32,7 @@ createServer(async (request, response) => {
         path: url.pathname,
         protocol: "HTTP/1.1",
         sourceIp,
-        userAgent: requireStringValue(
-          request.headers["user-agent"],
-          "user-agent",
-        ),
+        userAgent: optionalStringValue(request.headers["user-agent"]),
       },
       requestId: crypto.randomUUID(),
       routeKey: `${method} ${url.pathname}`,
@@ -74,6 +71,10 @@ function requireStringValue(
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+function optionalStringValue(value: string | string[] | undefined): string {
+  return typeof value === "string" ? value : "";
 }
 
 function normalizeHeaders(
