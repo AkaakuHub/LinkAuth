@@ -4,7 +4,8 @@
     "types": ["@cloudflare/workers-types"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
     "lib": ["ES2022", "WebWorker", "DOM.Iterable"]
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "../shared/**/*.ts", "../shared/**/*.tsx"]
 }

@@ -4,6 +4,9 @@ pre-commit:
     biome:
       glob: "*.{js,jsx,ts,tsx,json,jsonc}"
       run: pnpm check
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: pnpm typecheck
     terraform-fmt:
       glob: "*.tf"
       run: pnpm tf:fmt:check

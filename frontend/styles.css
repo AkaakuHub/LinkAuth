@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@source "../workers/**/*.{ts,tsx}";
+
+@theme {
+  --font-sans: "IBM Plex Sans JP", "BIZ UDPGothic", sans-serif;
+  --font-serif: "BIZ UDPMincho", "Yu Mincho", serif;
+  --color-paper: #f5f2eb;
+  --color-ink: #171717;
+  --color-muted: #6c665d;
+  --color-line: #d7d0c5;
+  --color-panel: #fffdf7;
+  --color-primary: #126b5c;
+  --color-primary-foreground: #ffffff;
+  --color-danger: #a2352d;
+  --color-danger-foreground: #ffffff;
+  --color-haze: #e6f0ec;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background:
+      linear-gradient(135deg, rgb(245 242 235 / 0.92), rgb(230 240 236 / 0.88)),
+      radial-gradient(
+        circle at top left,
+        rgb(18 107 92 / 0.16),
+        transparent 34rem
+      );
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+}

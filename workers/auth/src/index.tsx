@@ -1,3 +1,4 @@
+import { IconBrandDiscord } from "@tabler/icons-react";
 import { randomBase64Url } from "../../../shared/src/crypto.js";
 import {
   createCookie,
@@ -8,6 +9,7 @@ import {
   verifySessionCookie,
 } from "../../../shared/src/session.js";
 import { page } from "../../shared/html.js";
+import { Card, LinkButton } from "../../shared/ui.js";
 import { callUserApi, hashToken, type User } from "../../shared/user-api.js";
 import { type AuthConfig, withAuthConfig } from "./auth-config.js";
 import {
@@ -34,7 +36,21 @@ async function handleAuthRequest(
   }
   return page(
     "Auth",
-    `<h1>Auth</h1><div class="panel"><a class="button" href="/login">Discordでログイン</a></div>`,
+    <div className="grid flex-1 place-items-center">
+      <Card className="w-full max-w-lg">
+        <p className="text-sm font-semibold text-primary">Auth</p>
+        <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">
+          Discordで本人確認
+        </h1>
+        <p className="mt-4 text-sm leading-7 text-muted">
+          Discordサーバー参加状態を確認して、アカウントページへ進みます。
+        </p>
+        <LinkButton className="mt-6" href="/login">
+          <IconBrandDiscord aria-hidden size={20} />
+          Discordでログイン
+        </LinkButton>
+      </Card>
+    </div>,
   );
 }
 

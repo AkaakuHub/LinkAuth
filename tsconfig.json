@@ -11,13 +11,18 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "jsx": "react-jsx",
     "types": ["node", "@cloudflare/workers-types"]
   },
   "include": [
     "lambdas/**/*.ts",
+    "lambdas/**/*.tsx",
     "local/**/*.ts",
+    "local/**/*.tsx",
     "workers/**/*.ts",
+    "workers/**/*.tsx",
     "shared/**/*.ts",
+    "shared/**/*.tsx",
     "backend/**/*.ts"
   ]
 }

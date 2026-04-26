@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!frontend/styles.css",
+      "!!workers/shared/styles.generated.css",
+      "!!workers/shared/styles.generated.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
