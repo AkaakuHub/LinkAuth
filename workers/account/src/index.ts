@@ -41,10 +41,8 @@ const profileFormScript = `
   const historyBack = document.querySelector("[data-history-back]");
   if (historyBack instanceof HTMLAnchorElement) {
     historyBack.addEventListener("click", (event) => {
-      if (window.history.length > 1) {
-        event.preventDefault();
-        window.history.back();
-      }
+      event.preventDefault();
+      window.location.assign(historyBack.href);
     });
   }
 
@@ -92,6 +90,13 @@ const profileFormScript = `
   cancel.addEventListener("click", closeEditor);
   input.addEventListener("input", updateSubmitState);
   form.addEventListener("submit", () => {
+    const currentUrl = new URL(window.location.href);
+    const formData = new FormData(form);
+    const returnTo = formData.get("return_to");
+    if (typeof returnTo === "string") {
+      currentUrl.searchParams.set("return_to", returnTo);
+      window.history.replaceState(null, "", currentUrl);
+    }
     submit.disabled = true;
     submit.replaceChildren("保存中");
   });
