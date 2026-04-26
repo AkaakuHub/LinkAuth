@@ -1,5 +1,5 @@
 import { randomBase64Url, sha256Hex } from "../../shared/src/crypto.js";
-import { createInternalHeaders } from "../../shared/src/internal-signature.js";
+import { createInternalHeaders } from "../../shared/src/internalSignature.js";
 
 export type User = {
   discord_id: string;

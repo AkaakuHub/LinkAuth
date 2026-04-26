@@ -1,8 +1,8 @@
 import { page } from "../../shared/html.js";
-import type { User } from "../../shared/user-api.js";
-import type { AccountConfig } from "./account-config.js";
-import { createAccountTokens } from "./account-tokens.js";
-import { AccountView } from "./account-view.js";
+import type { User } from "../../shared/userApi.js";
+import type { AccountConfig } from "./accountConfig.js";
+import { createAccountTokens } from "./accountTokens.js";
+import { AccountView } from "./accountView.js";
 
 export async function accountPage(
   user: User,

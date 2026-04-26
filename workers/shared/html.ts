@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server.browser";
-import { styleSheet } from "./styles.generated.js";
+import { styleSheet } from "./stylesGenerated.js";
 
 export async function page(title: string, body: ReactNode): Promise<Response> {
   const stream = await renderToReadableStream(

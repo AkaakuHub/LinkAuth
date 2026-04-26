@@ -1,5 +1,5 @@
 import { callbackUrl, redirectToUrl } from "../../shared/navigation.js";
-import type { AuthConfig } from "./auth-config.js";
+import type { AuthConfig } from "./authConfig.js";
 
 export type DiscordOAuthUser = {
   id: string;

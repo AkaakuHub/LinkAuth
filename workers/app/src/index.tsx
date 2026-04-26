@@ -7,7 +7,7 @@ import {
 import { page } from "../../shared/html.js";
 import { redirectToLogin } from "../../shared/navigation.js";
 import { Card } from "../../shared/ui.js";
-import { type AppConfig, withAppConfig } from "./app-config.js";
+import { type AppConfig, withAppConfig } from "./appConfig.js";
 
 export default withAppConfig(handleAppRequest);
 

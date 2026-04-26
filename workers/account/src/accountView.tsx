@@ -6,8 +6,8 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import { Button, Card, Field, TextInput } from "../../shared/ui.js";
-import type { User } from "../../shared/user-api.js";
-import type { AccountTokens } from "./account-tokens.js";
+import type { User } from "../../shared/userApi.js";
+import type { AccountTokens } from "./accountTokens.js";
 
 export function AccountView({
   user,

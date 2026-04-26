@@ -15,13 +15,13 @@ import {
   hashToken,
   type User,
   UserApiError,
-} from "../../shared/user-api.js";
-import { type AuthConfig, withAuthConfig } from "./auth-config.js";
-import { inactiveUserPage } from "./auth-error-page.js";
+} from "../../shared/userApi.js";
+import { type AuthConfig, withAuthConfig } from "./authConfig.js";
+import { inactiveUserPage } from "./authErrorPage.js";
 import {
   fetchDiscordOAuthUser,
   redirectToDiscordAuthorize,
-} from "./discord-oauth.js";
+} from "./discordOauth.js";
 import { createAuthState, parseAuthState } from "./state.js";
 
 export default withAuthConfig(handleAuthRequest);

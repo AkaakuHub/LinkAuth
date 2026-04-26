@@ -10,8 +10,8 @@
       "**",
       "!!**/dist",
       "!!frontend/styles.css",
-      "!!workers/shared/styles.generated.css",
-      "!!workers/shared/styles.generated.ts"
+      "!!workers/shared/stylesGenerated.css",
+      "!!workers/shared/stylesGenerated.ts"
     ]
   },
   "formatter": {

@@ -8,7 +8,7 @@ import {
   timingSafeEqual,
 } from "../../../shared/src/encoding.js";
 import { normalizeReturnTo } from "../../shared/navigation.js";
-import type { AuthConfig } from "./auth-config.js";
+import type { AuthConfig } from "./authConfig.js";
 
 export type AuthState = {
   return_to: string;

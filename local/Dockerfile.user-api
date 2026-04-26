@@ -13,4 +13,4 @@ COPY local ./local
 
 EXPOSE 9999
 
-CMD ["pnpm", "tsx", "local/user-api-server.ts"]
+CMD ["pnpm", "tsx", "local/userApiServer.ts"]

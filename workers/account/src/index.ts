@@ -9,8 +9,8 @@ import {
   redirectToCurrentOriginRoot,
   redirectToLogin,
 } from "../../shared/navigation.js";
-import { callUserApi, type User } from "../../shared/user-api.js";
-import { type AccountConfig, withAccountConfig } from "./account-config.js";
+import { callUserApi, type User } from "../../shared/userApi.js";
+import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "./csrf.js";
 import { accountPage } from "./page.js";
 import { requireSession } from "./session.js";

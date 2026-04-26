@@ -1,4 +1,4 @@
-import type { UserApiConfig } from "../../shared/user-api.js";
+import type { UserApiConfig } from "../../shared/userApi.js";
 
 export type Env = UserApiConfig & {
   ASSETS: R2Bucket;

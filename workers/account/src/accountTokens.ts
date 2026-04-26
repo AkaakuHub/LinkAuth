@@ -1,7 +1,7 @@
 import { createCsrfToken } from "../../../shared/src/csrf.js";
-import type { User } from "../../shared/user-api.js";
-import type { AccountConfig } from "./account-config.js";
-import { assertSecret, requestOrigin } from "./request-context.js";
+import type { User } from "../../shared/userApi.js";
+import type { AccountConfig } from "./accountConfig.js";
+import { assertSecret, requestOrigin } from "./requestContext.js";
 
 export type AccountTokens = {
   profile: string;

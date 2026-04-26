@@ -1,5 +1,5 @@
 import type { AuthNavigationConfig } from "../../shared/navigation.js";
-import type { UserApiConfig } from "../../shared/user-api.js";
+import type { UserApiConfig } from "../../shared/userApi.js";
 
 export type AuthEnv = UserApiConfig & {
   DOMAIN_NAME: string;

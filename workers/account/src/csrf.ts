@@ -1,6 +1,6 @@
 import { type CsrfAction, verifyCsrfToken } from "../../../shared/src/csrf.js";
-import type { AccountConfig } from "./account-config.js";
-import { requestOrigin } from "./request-context.js";
+import type { AccountConfig } from "./accountConfig.js";
+import { requestOrigin } from "./requestContext.js";
 
 export async function verifyFormCsrf(
   request: Request,

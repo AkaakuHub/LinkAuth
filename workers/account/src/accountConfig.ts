@@ -1,5 +1,5 @@
 import type { LoginNavigationConfig } from "../../shared/navigation.js";
-import type { UserApiConfig } from "../../shared/user-api.js";
+import type { UserApiConfig } from "../../shared/userApi.js";
 import type { Env } from "./types.js";
 
 export type AccountConfig = {

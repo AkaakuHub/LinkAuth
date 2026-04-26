@@ -5,13 +5,13 @@ import type {
 import { loadUserApiConfig } from "./config.js";
 import type { UserApiContext } from "./context.js";
 import { isHttpError, json, parseBody, parseJsonBody } from "./http.js";
-import { verifyInternalSignature } from "./internal-auth.js";
+import { verifyInternalSignature } from "./internalAuth.js";
 import {
   deleteAllRememberTokens,
   deleteRememberToken,
   putRememberToken,
   rotateRememberToken,
-} from "./remember-tokens.js";
+} from "./rememberTokens.js";
 import {
   deleteUser,
   getActiveUser,
