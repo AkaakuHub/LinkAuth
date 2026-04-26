@@ -18,6 +18,18 @@ export type UserApiConfig = {
   INTERNAL_HMAC_SECRET: string;
 };
 
+export class UserApiError extends Error {
+  readonly status: number;
+  readonly path: string;
+
+  constructor(path: string, status: number) {
+    super(`user-api ${path} failed: ${status}`);
+    this.name = "UserApiError";
+    this.path = path;
+    this.status = status;
+  }
+}
+
 export async function callUserApi<T>(
   config: UserApiConfig,
   path: string,
@@ -44,7 +56,7 @@ export async function callUserApi<T>(
     body: rawBody,
   });
   if (!response.ok) {
-    throw new Error(`user-api ${path} failed: ${response.status}`);
+    throw new UserApiError(path, response.status);
   }
   return (await response.json()) as T;
 }

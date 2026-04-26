@@ -10,8 +10,14 @@ import {
 } from "../../../shared/src/session.js";
 import { page } from "../../shared/html.js";
 import { Card, LinkButton } from "../../shared/ui.js";
-import { callUserApi, hashToken, type User } from "../../shared/user-api.js";
+import {
+  callUserApi,
+  hashToken,
+  type User,
+  UserApiError,
+} from "../../shared/user-api.js";
 import { type AuthConfig, withAuthConfig } from "./auth-config.js";
+import { inactiveUserPage } from "./auth-error-page.js";
 import {
   fetchDiscordOAuthUser,
   redirectToDiscordAuthorize,
@@ -73,11 +79,10 @@ async function callback(url: URL, config: AuthConfig): Promise<Response> {
   if (!discordUser) {
     return new Response("oauth failed", { status: 401 });
   }
-  const active = await callUserApi<{ user: User }>(
-    config.userApi,
-    "/users/verify-active",
-    { discord_id: discordUser.id },
-  );
+  const active = await verifyActiveUser(discordUser.id, config);
+  if (!active) {
+    return inactiveUserPage();
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const session = await signSessionCookie(
@@ -120,6 +125,24 @@ async function callback(url: URL, config: AuthConfig): Promise<Response> {
     status: 302,
     headers,
   });
+}
+
+async function verifyActiveUser(
+  discordId: string,
+  config: AuthConfig,
+): Promise<{ user: User } | null> {
+  try {
+    return await callUserApi<{ user: User }>(
+      config.userApi,
+      "/users/verify-active",
+      { discord_id: discordId },
+    );
+  } catch (error) {
+    if (error instanceof UserApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function me(request: Request, config: AuthConfig): Promise<Response> {
