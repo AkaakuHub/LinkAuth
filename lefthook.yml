@@ -13,3 +13,6 @@ pre-commit:
     terraform-validate:
       glob: "*.tf"
       run: pnpm tf:validate
+    knip:
+      glob: "*.{ts,tsx}"
+      run: pnpm knip

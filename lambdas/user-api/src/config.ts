@@ -17,5 +17,3 @@ export function loadUserApiConfig() {
     }),
   };
 }
-
-export type UserApiConfig = ReturnType<typeof loadUserApiConfig>;

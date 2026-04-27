@@ -19,7 +19,8 @@
     "dev:services": "docker compose --env-file .env.local up -d --build dynamodb-local user-api-local",
     "dev:seed": "tsx local/seedDynamodb.ts",
     "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787",
-    "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789"
+    "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789",
+    "knip": "knip"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
@@ -32,6 +33,7 @@
     "concurrently": "^9.2.1",
     "dotenv": "^17.4.2",
     "esbuild": "^0.27.3",
+    "knip": "^6.7.0",
     "lefthook": "^2.1.6",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.20.6",

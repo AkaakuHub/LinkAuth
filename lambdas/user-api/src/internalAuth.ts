@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { getHeader } from "./http.js";
 
-export type InternalHmacConfig = {
+type InternalHmacConfig = {
   kid: string;
   secret: string;
 };

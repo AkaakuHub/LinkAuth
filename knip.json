@@ -1,0 +1,7 @@
+{
+	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"entry": ["lambdas/**/index.ts", "local/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "workers/**/*.{ts,tsx}"],
+	"project": ["lambdas/**/*.{ts,tsx}", "local/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "workers/**/*.{ts,tsx}"],
+	"ignoreBinaries": ["powershell"],
+	"ignoreDependencies": ["lefthook", "tailwindcss"]
+}

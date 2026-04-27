@@ -14,7 +14,3 @@ export function loadDiscordInteractionsConfig() {
     }),
   };
 }
-
-export type DiscordInteractionsConfig = ReturnType<
-  typeof loadDiscordInteractionsConfig
->;
