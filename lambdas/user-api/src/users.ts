@@ -16,11 +16,20 @@ export async function getActiveUser(
     }),
   );
   const user = result.Item as UserProfile | undefined;
-  if (!user || user.status !== "active") {
+  if (!user || user.status === "deleted") {
+    return null;
+  }
+  if (user.status === "disabled" && user.disabled_reason !== "left_guild") {
+    return null;
+  }
+  if (user.status === "disabled" && !checkGuild) {
     return null;
   }
   if (checkGuild) {
     await verifyGuildMembership(context, user, checkGuild === "current");
+  }
+  if (user.status !== "active" && user.disabled_reason !== "left_guild") {
+    return null;
   }
   return user;
 }
@@ -127,9 +136,11 @@ async function verifyGuildMembership(
         TableName: context.tableName,
         Key: profileKey(user.discord_id),
         UpdateExpression:
-          "SET guild_member_status = :status, guild_checked_at = :checked_at",
+          "SET #status = :active, guild_member_status = :member_status, guild_checked_at = :checked_at REMOVE disabled_reason",
+        ExpressionAttributeNames: { "#status": "status" },
         ExpressionAttributeValues: {
-          ":status": "active",
+          ":active": "active",
+          ":member_status": "active",
           ":checked_at": nowIso,
         },
       }),
@@ -142,11 +153,8 @@ async function verifyGuildMembership(
         TableName: context.tableName,
         Key: profileKey(user.discord_id),
         UpdateExpression:
-          "SET #status = :disabled, disabled_reason = :reason, guild_member_status = :left, guild_checked_at = :checked_at",
-        ExpressionAttributeNames: { "#status": "status" },
+          "SET guild_member_status = :left, guild_checked_at = :checked_at",
         ExpressionAttributeValues: {
-          ":disabled": "disabled",
-          ":reason": "left_guild",
           ":left": "left",
           ":checked_at": nowIso,
         },
