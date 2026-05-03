@@ -28,22 +28,7 @@ import {
   authFailedPage,
   inactiveAccountPage,
 } from "../views/accountErrorPage.js";
-import { accountLandingPage } from "../views/accountLandingPage.js";
 import { otpPage } from "../views/otpPage.js";
-
-export async function login(
-  url: URL,
-  config: AccountConfig,
-): Promise<Response> {
-  const state = await createAuthState(
-    url.searchParams.get("return_to"),
-    config,
-  );
-  if (!state) {
-    return accountLandingPage(config);
-  }
-  return redirectToDiscordAuthorize(state, config);
-}
 
 export async function authorize(
   request: Request,
@@ -61,9 +46,11 @@ export async function authorize(
   }
   const session = await requireSession(request, config);
   if (!session) {
-    const loginUrl = new URL("/login", url.origin);
-    loginUrl.searchParams.set("return_to", url.toString());
-    return Response.redirect(loginUrl, 302);
+    const state = await createAuthState(returnTo, config);
+    if (!state) {
+      return authFailedPage(config);
+    }
+    return redirectToDiscordAuthorize(state, config);
   }
   const active = await verifyCurrentMemberUser(session.discord_id, config);
   if (!active) {

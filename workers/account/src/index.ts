@@ -11,7 +11,6 @@ import { asset } from "./routes/assets.js";
 import {
   authorize,
   callback,
-  login,
   me,
   otp,
   sessionVerify,
@@ -35,9 +34,6 @@ async function handleAccountRequest(
   }
   if (url.pathname.startsWith("/assets/")) {
     return asset(url, config);
-  }
-  if (url.pathname === "/login") {
-    return login(url, config);
   }
   if (url.pathname === "/authorize") {
     return authorize(request, url, config);

@@ -1,11 +1,10 @@
 import { IconBrandDiscord } from "@tabler/icons-react";
 import { page } from "../../../shared/html.js";
 import { Card, LinkButton } from "../../../shared/ui.js";
-import type { AccountConfig } from "../accountConfig.js";
 
-export function accountLandingPage(config: AccountConfig): Promise<Response> {
-  const loginUrl = new URL("/login", config.navigation.AUTH_BASE_URL);
-  loginUrl.searchParams.set("return_to", config.navigation.ACCOUNT_URL);
+export function accountLandingPage(
+  discordAuthorizeUrl: string,
+): Promise<Response> {
   return page(
     "Account",
     <div className="grid flex-1 place-items-center">
@@ -19,7 +18,7 @@ export function accountLandingPage(config: AccountConfig): Promise<Response> {
             Discordでログインしてアカウント情報を管理します。
           </p>
         </div>
-        <LinkButton href={loginUrl.toString()}>
+        <LinkButton href={discordAuthorizeUrl}>
           <IconBrandDiscord aria-hidden size={20} />
           Discordでログイン
         </LinkButton>

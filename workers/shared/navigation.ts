@@ -8,16 +8,6 @@ export type AuthBaseNavigationConfig = {
   AUTH_BASE_URL: string;
 };
 
-export function redirectToLogin(
-  config: AuthBaseNavigationConfig,
-  returnTo: string,
-  status = 302,
-): Response {
-  const url = new URL("/login", config.AUTH_BASE_URL);
-  url.searchParams.set("return_to", returnTo);
-  return Response.redirect(url, status);
-}
-
 export function redirectToAuthHome(
   config: AuthBaseNavigationConfig,
   status = 302,
