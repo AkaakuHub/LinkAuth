@@ -9,9 +9,9 @@ import {
   IconUser,
   IconX,
 } from "@tabler/icons-react";
-import { Button, Card, Field, TextInput } from "../../shared/ui.js";
-import type { User } from "../../shared/userApi.js";
-import type { AccountTokens } from "./accountTokens.js";
+import { Button, Card, Field, TextInput } from "../../../shared/ui.js";
+import type { User } from "../../../shared/userApi.js";
+import type { AccountTokens } from "../security/accountTokens.js";
 
 export function AccountView({
   user,

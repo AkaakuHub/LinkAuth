@@ -25,7 +25,7 @@ import { requireString } from "./validation.js";
 const config = loadUserApiConfig();
 const context: UserApiContext = {
   tableName: config.tableName,
-  discordGuildId: config.discord.guildId,
+  discordGuildIds: config.discord.guildIds,
   discordBotToken: config.discord.botToken,
   dynamodb: config.dynamodb,
 };

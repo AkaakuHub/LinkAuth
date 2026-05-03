@@ -3,11 +3,11 @@ import {
   deleteCookie,
   rememberCookieName,
   sessionCookieName,
-} from "../../../shared/src/session.js";
-import { page } from "../../shared/html.js";
-import { authHomeUrl } from "../../shared/navigation.js";
-import { Card, LinkButton } from "../../shared/ui.js";
-import type { AccountConfig } from "./accountConfig.js";
+} from "../../../../shared/src/session.js";
+import { page } from "../../../shared/html.js";
+import { authHomeUrl } from "../../../shared/navigation.js";
+import { Card, LinkButton } from "../../../shared/ui.js";
+import type { AccountConfig } from "../accountConfig.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
 
 export function inactiveAccountPage(config: AccountConfig): Promise<Response> {

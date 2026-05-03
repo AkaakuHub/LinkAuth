@@ -1,3 +1,4 @@
+import { parseCommaSeparatedList } from "../../../shared/src/commaSeparated.js";
 import type {
   AuthBaseNavigationConfig,
   AuthNavigationConfig,
@@ -16,7 +17,7 @@ export type AccountConfig = {
     clientId: string;
     clientSecret: string;
     botToken: string;
-    guildId: string;
+    guildIds: string[];
   };
   csrf: {
     kid: string;
@@ -51,7 +52,10 @@ export function loadAccountConfig(env: Env): AccountConfig {
         env.DISCORD_CLIENT_SECRET,
       ),
       botToken: requiredBinding("DISCORD_BOT_TOKEN", env.DISCORD_BOT_TOKEN),
-      guildId: requiredBinding("DISCORD_GUILD_ID", env.DISCORD_GUILD_ID),
+      guildIds: parseCommaSeparatedList(
+        "DISCORD_GUILD_IDS",
+        requiredBinding("DISCORD_GUILD_IDS", env.DISCORD_GUILD_IDS),
+      ),
     },
     csrf: {
       kid: requiredBinding("CSRF_KID", env.CSRF_KID),

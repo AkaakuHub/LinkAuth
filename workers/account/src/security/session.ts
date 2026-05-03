@@ -2,8 +2,8 @@ import {
   getSingleCookie,
   sessionCookieName,
   verifySessionCookie,
-} from "../../../shared/src/session.js";
-import type { AccountConfig } from "./accountConfig.js";
+} from "../../../../shared/src/session.js";
+import type { AccountConfig } from "../accountConfig.js";
 
 export async function requireSession(
   request: Request,

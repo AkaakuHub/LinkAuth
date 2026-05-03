@@ -1,8 +1,8 @@
-import { page } from "../../shared/html.js";
-import type { User } from "../../shared/userApi.js";
-import type { AccountConfig } from "./accountConfig.js";
+import { page } from "../../../shared/html.js";
+import type { User } from "../../../shared/userApi.js";
+import type { AccountConfig } from "../accountConfig.js";
+import { createAccountTokens } from "../security/accountTokens.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
-import { createAccountTokens } from "./accountTokens.js";
 import { AccountView } from "./accountView.js";
 
 export async function accountPage(

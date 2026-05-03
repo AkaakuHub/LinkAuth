@@ -4,12 +4,20 @@ import {
   DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { parseCommaSeparatedList } from "../shared/src/commaSeparated.js";
 import { requiredLocalEnv } from "./env.js";
 
 const endpoint = "http://localhost:8000";
 const tableName = "org-auth-users";
 const discordId = requiredLocalEnv("LOCAL_DISCORD_ID");
-const discordGuildId = requiredLocalEnv("DISCORD_GUILD_ID");
+const discordGuildIds = parseCommaSeparatedList(
+  "DISCORD_GUILD_IDS",
+  requiredLocalEnv("DISCORD_GUILD_IDS"),
+);
+const discordGuildId = discordGuildIds[0];
+if (!discordGuildId) {
+  throw new Error("DISCORD_GUILD_IDS is required in .env.local");
+}
 
 const client = new DynamoDBClient({
   region: requiredLocalEnv("AWS_REGION"),

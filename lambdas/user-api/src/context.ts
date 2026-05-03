@@ -14,7 +14,7 @@ export type UserProfile = {
 
 export type UserApiContext = {
   tableName: string;
-  discordGuildId: string;
+  discordGuildIds: string[];
   discordBotToken: string;
   dynamodb: DynamoDBDocumentClient;
 };

@@ -19,7 +19,7 @@ await writeEnvFile("workers/account/.dev.vars", [
   "ACCOUNT_URL",
   ["AUTH_APPS", localApp.authApps],
   "DISCORD_BOT_TOKEN",
-  "DISCORD_GUILD_ID",
+  "DISCORD_GUILD_IDS",
 ]);
 
 await writeEnvFile("workers/app/.dev.vars", [
@@ -37,7 +37,7 @@ await writeTerraformVarsFile("infra/terraform.tfvars", [
   ["cloudflare_zone_id", "CLOUDFLARE_ZONE_ID"],
   ["cloudflare_api_token", "CLOUDFLARE_API_TOKEN"],
   ["discord_public_key", "DISCORD_PUBLIC_KEY"],
-  ["discord_guild_id", "DISCORD_GUILD_ID"],
+  ["discord_guild_ids", "DISCORD_GUILD_IDS"],
   ["discord_bot_token", "DISCORD_BOT_TOKEN"],
   ["internal_hmac_kid", "INTERNAL_HMAC_KID"],
   ["internal_hmac_secret", "INTERNAL_HMAC_SECRET"],

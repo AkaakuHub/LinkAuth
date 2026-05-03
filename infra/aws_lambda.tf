@@ -32,7 +32,7 @@ resource "aws_lambda_function" "discord_interactions" {
     variables = {
       DYNAMODB_TABLE     = aws_dynamodb_table.users.name
       ACCOUNT_URL        = "https://account.${var.domain_name}/"
-      DISCORD_GUILD_ID   = var.discord_guild_id
+      DISCORD_GUILD_IDS  = var.discord_guild_ids
       DISCORD_PUBLIC_KEY = var.discord_public_key
     }
   }
@@ -52,7 +52,7 @@ resource "aws_lambda_function" "user_api" {
     variables = {
       DYNAMODB_TABLE       = aws_dynamodb_table.users.name
       DISCORD_BOT_TOKEN    = var.discord_bot_token
-      DISCORD_GUILD_ID     = var.discord_guild_id
+      DISCORD_GUILD_IDS    = var.discord_guild_ids
       INTERNAL_HMAC_KID    = var.internal_hmac_kid
       INTERNAL_HMAC_SECRET = var.internal_hmac_secret
     }

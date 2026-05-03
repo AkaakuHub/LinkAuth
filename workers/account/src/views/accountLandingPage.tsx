@@ -1,7 +1,7 @@
 import { IconBrandDiscord } from "@tabler/icons-react";
-import { page } from "../../shared/html.js";
-import { Card, LinkButton } from "../../shared/ui.js";
-import type { AccountConfig } from "./accountConfig.js";
+import { page } from "../../../shared/html.js";
+import { Card, LinkButton } from "../../../shared/ui.js";
+import type { AccountConfig } from "../accountConfig.js";
 
 export function accountLandingPage(config: AccountConfig): Promise<Response> {
   const loginUrl = new URL("/login", config.navigation.AUTH_BASE_URL);

@@ -1,6 +1,6 @@
 import { IconBrandDiscord, IconShieldCheck } from "@tabler/icons-react";
-import { page } from "../../shared/html.js";
-import { Button, Card, TextInput } from "../../shared/ui.js";
+import { page } from "../../../shared/html.js";
+import { Button, Card, TextInput } from "../../../shared/ui.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
 
 export function otpPage(

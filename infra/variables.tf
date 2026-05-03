@@ -30,7 +30,7 @@ variable "discord_public_key" {
   sensitive = true
 }
 
-variable "discord_guild_id" {
+variable "discord_guild_ids" {
   type = string
 }
 

@@ -117,14 +117,9 @@ async function verifyGuildMembership(
   ) {
     return;
   }
-  const response = await fetch(
-    `https://discord.com/api/v10/guilds/${context.discordGuildId}/members/${user.discord_id}`,
-    {
-      headers: { authorization: `Bot ${context.discordBotToken}` },
-    },
-  );
+  const membership = await fetchActiveGuildMember(context, user.discord_id);
   const nowIso = new Date().toISOString();
-  if (response.status === 200) {
+  if (membership === "active") {
     await context.dynamodb.send(
       new UpdateCommand({
         TableName: context.tableName,
@@ -139,7 +134,7 @@ async function verifyGuildMembership(
     );
     return;
   }
-  if (response.status === 404) {
+  if (membership === "left") {
     await context.dynamodb.send(
       new UpdateCommand({
         TableName: context.tableName,
@@ -157,10 +152,37 @@ async function verifyGuildMembership(
     );
     throw httpError(401, "left_guild");
   }
-  if (response.status === 429 || response.status >= 500) {
+  if (membership === "unavailable") {
     throw httpError(503, "discord_unavailable");
   }
   throw httpError(401, "guild_check_failed");
+}
+
+async function fetchActiveGuildMember(
+  context: UserApiContext,
+  discordId: string,
+): Promise<"active" | "left" | "unavailable" | "failed"> {
+  let foundMissingMember = false;
+  for (const guildId of context.discordGuildIds) {
+    const response = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+      {
+        headers: { authorization: `Bot ${context.discordBotToken}` },
+      },
+    );
+    if (response.status === 200) {
+      return "active";
+    }
+    if (response.status === 404) {
+      foundMissingMember = true;
+      continue;
+    }
+    if (response.status === 429 || response.status >= 500) {
+      return "unavailable";
+    }
+    return "failed";
+  }
+  return foundMissingMember ? "left" : "failed";
 }
 
 type ResponsePayload = {

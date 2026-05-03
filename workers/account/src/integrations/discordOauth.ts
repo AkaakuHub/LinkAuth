@@ -1,5 +1,5 @@
-import { callbackUrl, redirectToUrl } from "../../shared/navigation.js";
-import type { AccountConfig } from "./accountConfig.js";
+import { callbackUrl, redirectToUrl } from "../../../shared/navigation.js";
+import type { AccountConfig } from "../accountConfig.js";
 
 export type DiscordOAuthUser = {
   id: string;
@@ -58,11 +58,16 @@ export async function fetchDiscordGuildMember(
   accessToken: string,
   config: AccountConfig,
 ): Promise<boolean> {
-  const response = await fetch(
-    `${config.discord.apiBase}/users/@me/guilds/${config.discord.guildId}/member`,
-    {
-      headers: { authorization: `Bearer ${accessToken}` },
-    },
-  );
-  return response.ok;
+  for (const guildId of config.discord.guildIds) {
+    const response = await fetch(
+      `${config.discord.apiBase}/users/@me/guilds/${guildId}/member`,
+      {
+        headers: { authorization: `Bearer ${accessToken}` },
+      },
+    );
+    if (response.ok) {
+      return true;
+    }
+  }
+  return false;
 }

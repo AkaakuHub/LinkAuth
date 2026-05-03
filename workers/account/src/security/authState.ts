@@ -1,14 +1,14 @@
 import {
   hmacSha256Base64Url,
   randomBase64Url,
-} from "../../../shared/src/crypto.js";
+} from "../../../../shared/src/crypto.js";
 import {
   base64UrlDecodeText,
   base64UrlEncodeText,
   timingSafeEqual,
-} from "../../../shared/src/encoding.js";
-import { normalizeReturnTo } from "../../shared/navigation.js";
-import type { AccountConfig } from "./accountConfig.js";
+} from "../../../../shared/src/encoding.js";
+import { normalizeReturnTo } from "../../../shared/navigation.js";
+import type { AccountConfig } from "../accountConfig.js";
 
 export type AuthState = {
   return_to: string;

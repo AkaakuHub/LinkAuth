@@ -9,7 +9,7 @@ import { loadDiscordInteractionsConfig } from "./config.js";
 const config = loadDiscordInteractionsConfig();
 const tableName = config.tableName;
 const accountUrl = config.accountUrl;
-const discordGuildId = config.discord.guildId;
+const discordGuildIds = config.discord.guildIds;
 const discordPublicKey = config.discord.publicKey;
 const dynamodb: DynamoDBDocumentClient = config.dynamodb;
 
@@ -46,7 +46,10 @@ export async function handler(
   if (interaction.type !== 2 || interaction.data?.name !== "register") {
     return discordMessage("未対応のコマンドです。");
   }
-  if (interaction.guild_id !== discordGuildId) {
+  if (
+    !interaction.guild_id ||
+    !discordGuildIds.includes(interaction.guild_id)
+  ) {
     return discordMessage("このサーバーでは登録できません。");
   }
 
@@ -70,7 +73,7 @@ export async function handler(
         display_name: displayName,
         role: "user",
         status: "active",
-        guild_id: discordGuildId,
+        guild_id: interaction.guild_id,
         guild_member_status: "active",
         guild_checked_at: nowIso,
         icon_source: user.avatar ? "discord" : "none",
