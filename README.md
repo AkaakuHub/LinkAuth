@@ -1,6 +1,6 @@
-# DiscordAuth
+# LinkAuth
 
-Discordサーバー参加者だけを対象にした、Cloudflare Workers、AWS Lambda、DynamoDB、Cloudflare Tunnel、Caddy構成の認証システムです。
+外部アカウント連携を扱う、Cloudflare Workers、AWS Lambda、DynamoDB、Cloudflare Tunnel、Caddy構成の認証システムです。
 
 ## 実装範囲
 
