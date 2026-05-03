@@ -26,6 +26,16 @@ export function authFailedPage(config: AccountConfig): Promise<Response> {
   });
 }
 
+export function otpDeliveryFailedPage(
+  config: AccountConfig,
+): Promise<Response> {
+  return accountErrorPage(config, {
+    title: "認証コードを送信できませんでした",
+    description:
+      "DiscordのDMへ認証コードを送信できませんでした。DiscordのDM設定、対象サーバーへの参加状態、Botの参加状態を確認してください。",
+  });
+}
+
 function accountErrorPage(
   config: AccountConfig,
   content: { title: string; description: string },

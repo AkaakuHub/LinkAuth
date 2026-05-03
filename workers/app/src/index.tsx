@@ -1,4 +1,10 @@
-import { IconApps, IconLogin2, IconSettings } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconApps,
+  IconHome,
+  IconLogin2,
+  IconSettings,
+} from "@tabler/icons-react";
 import {
   appSessionCookieName,
   createCookie,
@@ -153,7 +159,7 @@ async function startLogin(
 async function authCallback(url: URL, config: AppConfig): Promise<Response> {
   const code = url.searchParams.get("code");
   if (!code) {
-    return new Response("invalid callback", { status: 400 });
+    return appAuthFailedPage(url);
   }
   const tokenUrl = new URL("/token", config.navigation.AUTH_BASE_URL);
   const response = await fetch(tokenUrl, {
@@ -162,7 +168,7 @@ async function authCallback(url: URL, config: AppConfig): Promise<Response> {
     body: JSON.stringify({ app_id: config.appId, code }),
   });
   if (!response.ok) {
-    return new Response("token exchange failed", { status: 401 });
+    return appAuthFailedPage(url);
   }
   const body = (await response.json()) as {
     user?: {
@@ -178,7 +184,7 @@ async function authCallback(url: URL, config: AppConfig): Promise<Response> {
     typeof user.display_name !== "string" ||
     (user.role !== "user" && user.role !== "admin")
   ) {
-    return new Response("invalid token response", { status: 502 });
+    return appAuthFailedPage(url);
   }
   const now = Math.floor(Date.now() / 1000);
   const session = await signSessionCookie(
@@ -204,6 +210,36 @@ async function authCallback(url: URL, config: AppConfig): Promise<Response> {
     ),
   );
   return new Response(null, { status: 302, headers });
+}
+
+function appAuthFailedPage(url: URL): Promise<Response> {
+  return page(
+    "App認証に失敗しました",
+    <div className="grid flex-1 place-items-center">
+      <Card className="grid w-full max-w-lg gap-5">
+        <div className="grid gap-2">
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-danger">
+            <IconAlertTriangle aria-hidden size={18} />
+            認証できません
+          </p>
+          <h1 className="text-3xl font-semibold leading-tight text-ink">
+            app認証に失敗しました
+          </h1>
+          <p className="text-sm leading-7 text-muted">
+            認証リクエストが無効、期限切れ、またはすでに使用済みです。もう一度ログインしてください。
+          </p>
+        </div>
+        <LinkButton
+          href={new URL("/login", url.origin).toString()}
+          variant="secondary"
+        >
+          <IconHome aria-hidden size={18} />
+          ログイン画面へ戻る
+        </LinkButton>
+      </Card>
+    </div>,
+    401,
+  );
 }
 
 function appReturnTo(url: URL): string {

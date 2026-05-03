@@ -27,6 +27,7 @@ import {
 import {
   authFailedPage,
   inactiveAccountPage,
+  otpDeliveryFailedPage,
 } from "../views/accountErrorPage.js";
 import { otpPage } from "../views/otpPage.js";
 
@@ -42,7 +43,7 @@ export async function authorize(
     config.navigation,
   );
   if (!app || !returnTo || !matchesCallbackUrl(returnTo, app.callbackUrl)) {
-    return new Response("invalid authorize request", { status: 400 });
+    return authFailedPage(config);
   }
   const session = await requireSession(request, config);
   if (!session) {
@@ -137,9 +138,7 @@ export async function callback(
     config,
   );
   if (!otpResult.ok) {
-    return new Response(`otp send failed: ${otpResult.reason}`, {
-      status: 502,
-    });
+    return otpDeliveryFailedPage(config);
   }
   return otpPage(challengeId, state.return_to);
 }
