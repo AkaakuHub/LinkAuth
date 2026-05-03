@@ -31,6 +31,21 @@ test("Auth state keeps an allowed return_to after signature verification", async
   });
 });
 
+test("Auth state keeps the app id after signature verification", async () => {
+  const state = await createAuthState(
+    "https://app.example.com/callback",
+    config,
+    "hub",
+  );
+
+  const parsed = await parseAuthState(state, config);
+
+  expect(parsed).toEqual({
+    app_id: "hub",
+    return_to: "https://app.example.com/callback",
+  });
+});
+
 test("Auth state rejects tampered signatures", async () => {
   const state = await createAuthState(
     "https://app.example.com/callback",

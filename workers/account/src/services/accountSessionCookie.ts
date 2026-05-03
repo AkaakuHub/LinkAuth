@@ -12,9 +12,11 @@ import { noStoreHeaders } from "../views/accountLandingPage.js";
 
 export async function createAccountSessionResponse(
   user: User,
-  returnTo: string,
-  rememberMe: boolean,
-  config: AccountConfig,
+  input: {
+    config: AccountConfig;
+    rememberMe: boolean;
+    returnTo: string;
+  },
 ): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
   const session = await signSessionCookie(
@@ -24,21 +26,21 @@ export async function createAccountSessionResponse(
       display_name: user.display_name,
       iat: now,
       exp: now + 86_400,
-      kid: config.session.kid,
+      kid: input.config.session.kid,
     },
-    config.session.secret,
+    input.config.session.secret,
   );
 
-  const headers = new Headers({ location: returnTo });
+  const headers = new Headers({ location: input.returnTo });
   headers.append(
     "set-cookie",
-    createCookie(sessionCookieName, session, 86_400, config.domainName),
+    createCookie(sessionCookieName, session, 86_400, input.config.domainName),
   );
-  if (rememberMe) {
+  if (input.rememberMe) {
     const tokenId = randomBase64Url(16);
     const randomToken = randomBase64Url(32);
     const rememberValue = `${tokenId}.${randomToken}`;
-    await callUserApi(config.userApi, "/remember/create", {
+    await callUserApi(input.config.userApi, "/remember/create", {
       discord_id: user.discord_id,
       token_id: tokenId,
       token_hash: await hashToken(randomToken),
@@ -50,13 +52,13 @@ export async function createAccountSessionResponse(
         rememberCookieName,
         rememberValue,
         15_552_000,
-        config.domainName,
+        input.config.domainName,
       ),
     );
   } else {
     headers.append(
       "set-cookie",
-      deleteCookie(rememberCookieName, config.domainName),
+      deleteCookie(rememberCookieName, input.config.domainName),
     );
   }
   return new Response(null, { status: 302, headers });

@@ -9,6 +9,7 @@ export type Env = UserApiConfig & {
   DISCORD_CLIENT_SECRET: string;
   DISCORD_BOT_TOKEN: string;
   DISCORD_GUILD_IDS: string;
+  DISCORD_API_BASE?: string;
   SESSION_KID: string;
   SESSION_HMAC_SECRET: string;
   CSRF_KID: string;

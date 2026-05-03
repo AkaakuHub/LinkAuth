@@ -21,6 +21,7 @@
   "include": [
     "lambdas/**/*.ts",
     "local/**/*.ts",
+    "playwright.config.ts",
     "tests/**/*.ts",
     "vitest.*.config.ts",
     "workers/**/*.ts",

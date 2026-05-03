@@ -35,6 +35,15 @@ test("Account config derives allowed return_to origins from app callback URLs", 
   expect(config.apps[0]?.sessionVerifySecret).toBe("app-session-secret");
 });
 
+test("Account config can override the Discord API base for local E2E mocks", () => {
+  const config = loadAccountConfig({
+    ...baseEnv,
+    DISCORD_API_BASE: "http://localhost:8787/discord",
+  });
+
+  expect(config.discord.apiBase).toBe("http://localhost:8787/discord");
+});
+
 test("Account config rejects AUTH_APPS when it is not an array", () => {
   expect(() =>
     loadAccountConfig({

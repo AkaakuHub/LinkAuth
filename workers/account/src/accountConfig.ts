@@ -45,7 +45,7 @@ export function loadAccountConfig(env: Env): AccountConfig {
     apps,
     assets: env.ASSETS,
     discord: {
-      apiBase: discordApiBase,
+      apiBase: env.DISCORD_API_BASE || discordApiBase,
       clientId: requiredBinding("DISCORD_CLIENT_ID", env.DISCORD_CLIENT_ID),
       clientSecret: requiredBinding(
         "DISCORD_CLIENT_SECRET",

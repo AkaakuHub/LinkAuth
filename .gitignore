@@ -13,3 +13,5 @@ workers/**/.dev.vars
 workers/account/src/accountClientGenerated.ts
 workers/shared/stylesGenerated.css
 workers/shared/stylesGenerated.ts
+test-results/
+playwright-report/

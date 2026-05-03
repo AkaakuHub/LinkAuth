@@ -6,6 +6,7 @@
   "scripts": {
     "check": "biome check .",
     "test": "pnpm test:node && pnpm test:workers",
+    "test:e2e": "playwright test --config playwright.config.ts",
     "test:node": "vitest run --config vitest.node.config.ts",
     "test:workers": "vitest run --config vitest.workers.config.ts",
     "typecheck": "tsc --noEmit",
@@ -31,6 +32,7 @@
     "@biomejs/biome": "^2.4.13",
     "@cloudflare/vitest-pool-workers": "^0.15.2",
     "@cloudflare/workers-types": "^4.20260503.1",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/cli": "^4.2.4",
     "@types/aws-lambda": "^8.10.149",
     "@types/node": "^22.15.3",

@@ -47,7 +47,7 @@ export async function authorize(
   }
   const session = await requireSession(request, config);
   if (!session) {
-    const state = await createAuthState(returnTo, config);
+    const state = await createAuthState(returnTo, config, app.appId);
     if (!state) {
       return authFailedPage(config);
     }
@@ -153,7 +153,7 @@ export async function callback(
   if (!otpResult.ok) {
     return otpDeliveryFailedPage(config);
   }
-  return otpPage(challengeId, state.return_to);
+  return otpPage(challengeId, state.return_to, state.app_id);
 }
 
 export async function otp(
@@ -165,6 +165,7 @@ export async function otp(
   const otpCode = String(form.get("otp") ?? "");
   const rememberMe = form.get("remember_me") === "1";
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  const appId = String(form.get("app_id") ?? "");
   if (!/^[0-9]{6}$/.test(otpCode)) {
     return authFailedPage(config);
   }
@@ -183,9 +184,12 @@ export async function otp(
     }
     return await createAccountSessionResponse(
       active.user,
-      returnTo,
-      rememberMe,
-      config,
+      postOtpReturnTo({
+        appId,
+        config,
+        rememberMe,
+        returnTo,
+      }),
     );
   } catch (error) {
     if (error instanceof UserApiError && error.status === 401) {
@@ -193,6 +197,35 @@ export async function otp(
     }
     throw error;
   }
+}
+
+function postOtpReturnTo(input: {
+  appId: string;
+  config: AccountConfig;
+  rememberMe: boolean;
+  returnTo: string;
+}): {
+  config: AccountConfig;
+  rememberMe: boolean;
+  returnTo: string;
+} {
+  const app = input.appId ? findApp(input.config, input.appId) : null;
+  if (!app) {
+    return input;
+  }
+  if (!matchesCallbackUrl(input.returnTo, app.callbackUrl)) {
+    return input;
+  }
+  const authorizeUrl = new URL(
+    "/authorize",
+    input.config.navigation.ACCOUNT_URL,
+  );
+  authorizeUrl.searchParams.set("app_id", app.appId);
+  authorizeUrl.searchParams.set("return_to", input.returnTo);
+  return {
+    ...input,
+    returnTo: authorizeUrl.toString(),
+  };
 }
 
 export async function sessionVerify(

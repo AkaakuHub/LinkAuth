@@ -11,12 +11,14 @@ import { normalizeReturnTo } from "../../../shared/navigation.js";
 import type { AccountConfig } from "../accountConfig.js";
 
 export type AuthState = {
+  app_id?: string;
   return_to: string;
 };
 
 export async function createAuthState(
   returnToValue: string | null,
   config: AccountConfig,
+  appId?: string,
 ): Promise<string | null> {
   const returnTo = normalizeReturnTo(returnToValue, config.navigation);
   if (!returnTo) {
@@ -25,6 +27,7 @@ export async function createAuthState(
   const statePayload = base64UrlEncodeText(
     JSON.stringify({
       nonce: randomBase64Url(16),
+      ...(appId ? { app_id: appId } : {}),
       return_to: returnTo,
       iat: Date.now(),
       exp: Date.now() + 600_000,
@@ -57,6 +60,7 @@ export async function parseAuthState(
       return null;
     }
     const parsed = JSON.parse(base64UrlDecodeText(parts[0])) as {
+      app_id?: unknown;
       return_to?: string;
       exp?: number;
     };
@@ -67,11 +71,15 @@ export async function parseAuthState(
     ) {
       return null;
     }
+    if (parsed.app_id !== undefined && typeof parsed.app_id !== "string") {
+      return null;
+    }
     const returnTo = normalizeReturnTo(parsed.return_to, config.navigation);
     if (!returnTo) {
       return null;
     }
     return {
+      ...(parsed.app_id ? { app_id: parsed.app_id } : {}),
       return_to: returnTo,
     };
   } catch {

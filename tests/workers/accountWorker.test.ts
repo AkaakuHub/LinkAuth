@@ -9,6 +9,7 @@ import {
 } from "../../shared/src/session.js";
 import type { AccountConfig } from "../../workers/account/src/accountConfig.js";
 import worker from "../../workers/account/src/index.js";
+import { parseAuthState } from "../../workers/account/src/security/authState.js";
 import type { Env } from "../../workers/account/src/types.js";
 
 const assets: R2Bucket = {
@@ -91,7 +92,14 @@ test("Account Worker redirects unauthenticated authorize requests to Discord", a
   expect(location.origin).toBe("https://discord.com");
   expect(location.pathname).toBe("/api/v10/oauth2/authorize");
   expect(location.searchParams.get("client_id")).toBe("discord-client-id");
-  expect(location.searchParams.get("state")).toBeTruthy();
+  const state = await parseAuthState(
+    location.searchParams.get("state"),
+    testAccountConfig(),
+  );
+  expect(state).toEqual({
+    app_id: "hub",
+    return_to: "https://app.example.com/_auth/callback",
+  });
 });
 
 test("Account Worker issues an auth code for an active session", async () => {
@@ -363,7 +371,7 @@ test("Account Worker logout deletes the remember token and clears account cookie
 });
 
 test("Account Worker callback creates an OTP challenge and renders the OTP form", async () => {
-  const state = await createCallbackState();
+  const state = await createCallbackState("hub");
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -405,6 +413,7 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
 
   expect(response.status).toBe(200);
   expect(body).toContain("OTP認証");
+  expect(body).toContain('name="app_id" value="hub"');
   expect(body).toContain('name="remember_me" value="1" checked');
   expect(calls).toContain("/api/v10/oauth2/token");
   expect(calls).toContain("/api/v10/users/@me");
@@ -413,6 +422,106 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   expect(calls).toContain("/otp-challenge/create");
   expect(calls).toContain("/api/v10/users/@me/channels");
   expect(calls).toContain("/api/v10/channels/dm-channel/messages");
+});
+
+test("Account Worker callback rejects Discord users outside the configured guilds", async () => {
+  const state = await createCallbackState("hub");
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    if (url.pathname === "/api/v10/oauth2/token") {
+      return Response.json({ access_token: "discord-access-token" });
+    }
+    if (url.pathname === "/api/v10/users/@me") {
+      return Response.json({ id: "123456789" });
+    }
+    if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+      return Response.json({ error: "unknown_member" }, { status: 404 });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+  );
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("利用資格がありません");
+  expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
+  expect(calls).not.toContain("/users/verify-current-membership");
+  expect(calls).not.toContain("/otp-challenge/create");
+});
+
+test("Account Worker OTP success returns to authorize for app callbacks", async () => {
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === "/otp-challenge/consume") {
+        const body = decodeJsonBody(init);
+        expect(body.challenge_id).toBe("challenge-id");
+        expect(body.otp).toBe("123456");
+        return Response.json({ discord_id: "123456789" });
+      }
+      if (url.pathname === "/users/verify-active") {
+        return Response.json({ user: activeUser });
+      }
+      return Response.json({ error: "not_found" }, { status: 404 });
+    },
+  );
+
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      app_id: "hub",
+      challenge_id: "challenge-id",
+      otp: "123456",
+      return_to: "https://app.example.com/_auth/callback",
+    }),
+    method: "POST",
+  });
+  const location = new URL(response.headers.get("location") ?? "");
+
+  expect(response.status).toBe(302);
+  expect(location.origin).toBe("https://auth.example.com");
+  expect(location.pathname).toBe("/authorize");
+  expect(location.searchParams.get("app_id")).toBe("hub");
+  expect(location.searchParams.get("return_to")).toBe(
+    "https://app.example.com/_auth/callback",
+  );
+});
+
+test("Account Worker OTP success does not use app_id for non-callback return_to values", async () => {
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === "/otp-challenge/consume") {
+        const body = decodeJsonBody(init);
+        expect(body.challenge_id).toBe("challenge-id");
+        expect(body.otp).toBe("123456");
+        return Response.json({ discord_id: "123456789" });
+      }
+      if (url.pathname === "/users/verify-active") {
+        return Response.json({ user: activeUser });
+      }
+      return Response.json({ error: "not_found" }, { status: 404 });
+    },
+  );
+
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      app_id: "hub",
+      challenge_id: "challenge-id",
+      otp: "123456",
+      return_to: "https://app.example.com/",
+    }),
+    method: "POST",
+  });
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe("https://app.example.com/");
 });
 
 test("Account Worker OTP success creates account and remember cookies when remember_me is on", async () => {
@@ -565,29 +674,34 @@ async function createAccountCsrfToken(
   });
 }
 
-async function createCallbackState(): Promise<string> {
+async function createCallbackState(appId?: string): Promise<string> {
   const { createAuthState } = await import(
     "../../workers/account/src/security/authState.js"
   );
   const state = await createAuthState(
     "https://app.example.com/_auth/callback",
-    {
-      csrf: {
-        kid: env.CSRF_KID,
-        secret: env.CSRF_HMAC_SECRET,
-      },
-      navigation: {
-        ACCOUNT_URL: env.ACCOUNT_URL,
-        ALLOWED_RETURN_TO_ORIGINS: "https://app.example.com",
-        AUTH_BASE_URL: env.ACCOUNT_URL,
-        AUTH_CALLBACK_URL: `${env.ACCOUNT_URL}/callback`,
-      },
-    } as AccountConfig,
+    testAccountConfig(),
+    appId,
   );
   if (!state) {
     throw new Error("Callback state was not created");
   }
   return state;
+}
+
+function testAccountConfig(): AccountConfig {
+  return {
+    csrf: {
+      kid: env.CSRF_KID,
+      secret: env.CSRF_HMAC_SECRET,
+    },
+    navigation: {
+      ACCOUNT_URL: env.ACCOUNT_URL,
+      ALLOWED_RETURN_TO_ORIGINS: "https://app.example.com",
+      AUTH_BASE_URL: env.ACCOUNT_URL,
+      AUTH_CALLBACK_URL: `${env.ACCOUNT_URL}/callback`,
+    },
+  } as AccountConfig;
 }
 
 function decodeJsonBody(
