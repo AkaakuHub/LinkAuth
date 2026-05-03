@@ -3,7 +3,7 @@ import type { User } from "../../../shared/userApi.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { createAccountTokens } from "../security/accountTokens.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
-import { AccountView } from "./accountView.js";
+import { accountView } from "./accountView.js";
 
 export async function accountPage(
   user: User,
@@ -15,12 +15,12 @@ export async function accountPage(
   const showBackLink = returnTo !== config.navigation.ACCOUNT_URL;
   return page(
     "Account",
-    <AccountView
-      user={user}
-      tokens={tokens}
-      returnTo={returnTo}
-      showBackLink={showBackLink}
-    />,
+    accountView({
+      user,
+      tokens,
+      returnTo,
+      showBackLink,
+    }),
     200,
     noStoreHeaders(),
   );

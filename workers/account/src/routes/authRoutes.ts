@@ -151,6 +151,9 @@ export async function otp(
   const challengeId = String(form.get("challenge_id") ?? "");
   const otpCode = String(form.get("otp") ?? "");
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  if (!/^[0-9]{6}$/.test(otpCode)) {
+    return authFailedPage(config);
+  }
   try {
     const result = await callUserApi<{ discord_id: string }>(
       config.userApi,

@@ -17,6 +17,7 @@ export async function putOtpChallenge(
   body: JsonBody,
 ): Promise<void> {
   const challengeId = requireString(body, "challenge_id");
+  const otp = requireOtp(body, "otp");
   await context.dynamodb.send(
     new PutCommand({
       TableName: context.tableName,
@@ -24,7 +25,7 @@ export async function putOtpChallenge(
         ...otpChallengeKey(challengeId),
         challenge_id: challengeId,
         discord_id: requireString(body, "discord_id"),
-        otp_hash: await hashOtp(requireString(body, "otp")),
+        otp_hash: await hashOtp(otp),
         created_at: new Date().toISOString(),
         expires_at: requireNumber(body, "expires_at"),
       },
@@ -39,7 +40,7 @@ export async function consumeOtpChallenge(
   body: JsonBody,
 ): Promise<APIGatewayProxyStructuredResultV2> {
   const challengeId = requireString(body, "challenge_id");
-  const otp = requireString(body, "otp");
+  const otp = requireOtp(body, "otp");
   const result = await context.dynamodb.send(
     new DeleteCommand({
       TableName: context.tableName,
@@ -59,6 +60,14 @@ export async function consumeOtpChallenge(
     return json(401, { error: "invalid_otp" });
   }
   return json(200, { discord_id: item.discord_id });
+}
+
+function requireOtp(body: JsonBody, key: string): string {
+  const value = requireString(body, key);
+  if (!/^[0-9]{6}$/.test(value)) {
+    return "";
+  }
+  return value;
 }
 
 async function hashOtp(otp: string): Promise<string> {

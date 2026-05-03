@@ -1,46 +1,45 @@
-import { createElement, type ReactNode } from "react";
-import { renderToReadableStream } from "react-dom/server.browser";
 import { styleSheet } from "./stylesGenerated.js";
 
-export async function page(
+export function page(
   title: string,
-  body: ReactNode,
+  body: string,
   status = 200,
   headers?: Headers,
-): Promise<Response> {
-  const stream = await renderToReadableStream(
-    createElement(
-      "html",
-      { lang: "ja" },
-      createElement(
-        "head",
-        null,
-        createElement("meta", { charSet: "utf-8" }),
-        createElement("meta", {
-          name: "viewport",
-          content: "width=device-width, initial-scale=1",
-        }),
-        createElement("title", null, title),
-        createElement("style", null, styleSheet),
-      ),
-      createElement(
-        "body",
-        null,
-        createElement(
-          "main",
-          {
-            className:
-              "mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8",
-          },
-          body,
-        ),
-      ),
-    ),
+): Response {
+  return new Response(
+    `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>${styleSheet}</style></head><body><main class="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8">${body}</main></body></html>`,
+    {
+      status,
+      headers: responseHeaders(headers),
+    },
   );
-  return new Response(stream, {
-    status,
-    headers: responseHeaders(headers),
+}
+
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
   });
+}
+
+export function attr(name: string, value: string | number | boolean): string {
+  if (value === false) {
+    return "";
+  }
+  if (value === true) {
+    return ` ${name}`;
+  }
+  return ` ${name}="${escapeHtml(String(value))}"`;
 }
 
 function responseHeaders(headers?: Headers): Headers {

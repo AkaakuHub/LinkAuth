@@ -1,9 +1,9 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const output = await build({
   bundle: true,
-  entryPoints: ["workers/account/src/accountClient.tsx"],
+  entryPoints: ["workers/account/src/accountClient.ts"],
   format: "iife",
   minify: true,
   platform: "browser",
@@ -15,12 +15,7 @@ if (!accountClientScript) {
   throw new Error("account client bundle was not generated");
 }
 
-const reactLicenseText = await readFile(
-  "node_modules/react-dom/LICENSE",
-  "utf8",
-);
-
 await writeFile(
   "workers/account/src/accountClientGenerated.ts",
-  `export const accountClientScript = ${JSON.stringify(`/*\n${reactLicenseText.trim()}\n*/\n${accountClientScript}`)};\n`,
+  `export const accountClientScript = ${JSON.stringify(accountClientScript)};\n`,
 );
