@@ -4,22 +4,22 @@ export type AuthNavigationConfig = {
   AUTH_CALLBACK_URL: string;
 };
 
-export type LoginNavigationConfig = {
-  AUTH_LOGIN_URL: string;
+export type AuthBaseNavigationConfig = {
+  AUTH_BASE_URL: string;
 };
 
 export function redirectToLogin(
-  config: LoginNavigationConfig,
+  config: AuthBaseNavigationConfig,
   returnTo: string,
   status = 302,
 ): Response {
-  const url = new URL(config.AUTH_LOGIN_URL);
+  const url = new URL("/login", config.AUTH_BASE_URL);
   url.searchParams.set("return_to", returnTo);
   return Response.redirect(url, status);
 }
 
 export function redirectToAuthHome(
-  config: LoginNavigationConfig,
+  config: AuthBaseNavigationConfig,
   status = 302,
 ): Response {
   return Response.redirect(authHomeUrl(config), status);
@@ -36,8 +36,8 @@ export function redirectToUrl(url: URL, status = 302): Response {
   return Response.redirect(url, status);
 }
 
-export function authHomeUrl(config: LoginNavigationConfig): string {
-  return new URL("/", config.AUTH_LOGIN_URL).toString();
+export function authHomeUrl(config: AuthBaseNavigationConfig): string {
+  return new URL("/", config.AUTH_BASE_URL).toString();
 }
 
 export function normalizeReturnTo(

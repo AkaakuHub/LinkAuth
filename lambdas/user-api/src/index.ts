@@ -2,10 +2,12 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
+import { consumeAuthCode, putAuthCode } from "./authCodes.js";
 import { loadUserApiConfig } from "./config.js";
 import type { UserApiContext } from "./context.js";
 import { isHttpError, json, parseBody, parseJsonBody } from "./http.js";
 import { verifyInternalSignature } from "./internalAuth.js";
+import { consumeOtpChallenge, putOtpChallenge } from "./otpChallenges.js";
 import {
   deleteAllRememberTokens,
   deleteRememberToken,
@@ -55,7 +57,15 @@ async function handle(
   const path = event.rawPath;
   const body = parseBody(rawBody);
 
-  if (path === "/users/get" || path === "/users/verify-active") {
+  if (path === "/users/get") {
+    const user = await getActiveUser(
+      context,
+      requireString(body, "discord_id"),
+      false,
+    );
+    return user ? json(200, { user }) : json(401, { error: "inactive_user" });
+  }
+  if (path === "/users/verify-active") {
     const user = await getActiveUser(
       context,
       requireString(body, "discord_id"),
@@ -93,6 +103,20 @@ async function handle(
   if (path === "/remember/delete-all") {
     await deleteAllRememberTokens(context, requireString(body, "discord_id"));
     return json(200, { ok: true });
+  }
+  if (path === "/auth-code/create") {
+    await putAuthCode(context, body);
+    return json(200, { ok: true });
+  }
+  if (path === "/auth-code/consume") {
+    return await consumeAuthCode(context, body);
+  }
+  if (path === "/otp-challenge/create") {
+    await putOtpChallenge(context, body);
+    return json(200, { ok: true });
+  }
+  if (path === "/otp-challenge/consume") {
+    return await consumeOtpChallenge(context, body);
   }
 
   return json(404, { error: "not_found" });

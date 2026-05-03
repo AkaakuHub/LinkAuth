@@ -18,8 +18,8 @@
     "dev:env": "tsx local/syncDevEnv.ts",
     "dev:services": "docker compose --env-file .env.local up -d --build dynamodb-local user-api-local",
     "dev:seed": "tsx local/seedDynamodb.ts",
-    "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787",
-    "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789",
+    "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787 --inspector-port 9229",
+    "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789 --inspector-port 9230",
     "knip": "knip"
   },
   "devDependencies": {

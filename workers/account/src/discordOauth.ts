@@ -5,6 +5,11 @@ export type DiscordOAuthUser = {
   id: string;
 };
 
+export type DiscordOAuthResult = {
+  user: DiscordOAuthUser;
+  accessToken: string;
+};
+
 export function redirectToDiscordAuthorize(
   state: string,
   config: AccountConfig,
@@ -13,15 +18,15 @@ export function redirectToDiscordAuthorize(
   authorize.searchParams.set("client_id", config.discord.clientId);
   authorize.searchParams.set("redirect_uri", callbackUrl(config.navigation));
   authorize.searchParams.set("response_type", "code");
-  authorize.searchParams.set("scope", "identify");
+  authorize.searchParams.set("scope", "identify guilds.members.read");
   authorize.searchParams.set("state", state);
   return redirectToUrl(authorize);
 }
 
-export async function fetchDiscordOAuthUser(
+export async function fetchDiscordOAuthResult(
   code: string,
   config: AccountConfig,
-): Promise<DiscordOAuthUser | null> {
+): Promise<DiscordOAuthResult | null> {
   const tokenResponse = await fetch(`${config.discord.apiBase}/oauth2/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -43,5 +48,21 @@ export async function fetchDiscordOAuthUser(
   if (!userResponse.ok) {
     return null;
   }
-  return (await userResponse.json()) as DiscordOAuthUser;
+  return {
+    user: (await userResponse.json()) as DiscordOAuthUser,
+    accessToken: token.access_token,
+  };
+}
+
+export async function fetchDiscordGuildMember(
+  accessToken: string,
+  config: AccountConfig,
+): Promise<boolean> {
+  const response = await fetch(
+    `${config.discord.apiBase}/users/@me/guilds/${config.discord.guildId}/member`,
+    {
+      headers: { authorization: `Bearer ${accessToken}` },
+    },
+  );
+  return response.ok;
 }

@@ -1,5 +1,6 @@
 import { randomBase64Url } from "../../../shared/src/crypto.js";
 import {
+  appSessionCookieName,
   createCookie,
   deleteCookie,
   getSingleCookie,
@@ -22,9 +23,11 @@ import { accountLandingPage, noStoreHeaders } from "./accountLandingPage.js";
 import { createAuthState, parseAuthState } from "./authState.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "./csrf.js";
 import {
-  fetchDiscordOAuthUser,
+  fetchDiscordGuildMember,
+  fetchDiscordOAuthResult,
   redirectToDiscordAuthorize,
 } from "./discordOauth.js";
+import { otpPage } from "./otpPage.js";
 import { accountPage } from "./page.js";
 import { requireSession } from "./session.js";
 import { isWebp512 } from "./webp.js";
@@ -49,6 +52,18 @@ async function handleAccountRequest(
   }
   if (url.pathname === "/login") {
     return login(url, config);
+  }
+  if (url.pathname === "/authorize") {
+    return authorize(request, url, config);
+  }
+  if (url.pathname === "/token" && request.method === "POST") {
+    return token(request, config);
+  }
+  if (url.pathname === "/otp" && request.method === "POST") {
+    return otp(request, config);
+  }
+  if (url.pathname === "/session/verify") {
+    return sessionVerify(request, url, config);
   }
   if (url.pathname === "/callback") {
     return callback(url, config);
@@ -213,6 +228,71 @@ async function login(url: URL, config: AccountConfig): Promise<Response> {
   return redirectToDiscordAuthorize(state, config);
 }
 
+async function authorize(
+  request: Request,
+  url: URL,
+  config: AccountConfig,
+): Promise<Response> {
+  const appId = url.searchParams.get("app_id");
+  const app = appId ? findApp(config, appId) : null;
+  const returnTo = normalizeReturnTo(
+    url.searchParams.get("return_to"),
+    config.navigation,
+  );
+  if (!app || !returnTo || !sameUrl(returnTo, app.callbackUrl)) {
+    return new Response("invalid authorize request", { status: 400 });
+  }
+  const session = await requireSession(request, config);
+  if (!session) {
+    const loginUrl = new URL("/login", url.origin);
+    loginUrl.searchParams.set("return_to", url.toString());
+    return Response.redirect(loginUrl, 302);
+  }
+  const active = await verifyActiveUser(session.discord_id, config);
+  if (!active) {
+    return inactiveAccountPage(config);
+  }
+  const code = randomBase64Url(32);
+  await callUserApi(config.userApi, "/auth-code/create", {
+    app_id: appId,
+    code,
+    user: {
+      discord_id: active.user.discord_id,
+      display_name: active.user.display_name,
+      role: active.user.role,
+    },
+    expires_at: Math.floor(Date.now() / 1000) + 300,
+  });
+  const callbackUrl = new URL(returnTo);
+  callbackUrl.searchParams.set("code", code);
+  return Response.redirect(callbackUrl, 302);
+}
+
+async function token(
+  request: Request,
+  config: AccountConfig,
+): Promise<Response> {
+  const body = (await request.json()) as Record<string, unknown>;
+  const appId = body.app_id;
+  const code = body.code;
+  if (typeof appId !== "string" || typeof code !== "string") {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
+  try {
+    return Response.json(
+      await callUserApi(config.userApi, "/auth-code/consume", {
+        app_id: appId,
+        code,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof UserApiError && error.status === 401) {
+      return Response.json({ error: "invalid_auth_code" }, { status: 401 });
+    }
+    throw error;
+  }
+}
+
 async function callback(url: URL, config: AccountConfig): Promise<Response> {
   const code = url.searchParams.get("code");
   const state = await parseAuthState(url.searchParams.get("state"), config);
@@ -220,21 +300,125 @@ async function callback(url: URL, config: AccountConfig): Promise<Response> {
     return new Response("invalid callback", { status: 400 });
   }
 
-  const discordUser = await fetchDiscordOAuthUser(code, config);
-  if (!discordUser) {
+  const discordResult = await fetchDiscordOAuthResult(code, config);
+  if (!discordResult) {
     return new Response("oauth failed", { status: 401 });
   }
-  const active = await verifyActiveUser(discordUser.id, config);
+  const guildMember = await fetchDiscordGuildMember(
+    discordResult.accessToken,
+    config,
+  );
+  if (!guildMember) {
+    return inactiveAccountPage(config);
+  }
+  const active = await getActiveUser(discordResult.user.id, config);
   if (!active) {
     return inactiveAccountPage(config);
   }
 
+  const challengeId = randomBase64Url(24);
+  const otpCode = randomOtpCode();
+  await callUserApi(config.userApi, "/otp-challenge/create", {
+    challenge_id: challengeId,
+    discord_id: active.user.discord_id,
+    otp: otpCode,
+    expires_at: Math.floor(Date.now() / 1000) + 300,
+  });
+  const otpResult = await sendOtp(active.user.discord_id, otpCode, config);
+  if (!otpResult.ok) {
+    return new Response(`otp send failed: ${otpResult.reason}`, {
+      status: 502,
+    });
+  }
+  return otpPage(challengeId, state.return_to);
+}
+
+async function otp(request: Request, config: AccountConfig): Promise<Response> {
+  const form = await request.formData();
+  const challengeId = String(form.get("challenge_id") ?? "");
+  const otpCode = String(form.get("otp") ?? "");
+  const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  try {
+    const result = await callUserApi<{ discord_id: string }>(
+      config.userApi,
+      "/otp-challenge/consume",
+      {
+        challenge_id: challengeId,
+        otp: otpCode,
+      },
+    );
+    const active = await verifyActiveUser(result.discord_id, config);
+    if (!active) {
+      return inactiveAccountPage(config);
+    }
+    return await createAccountSessionResponse(active.user, returnTo, config);
+  } catch (error) {
+    if (error instanceof UserApiError && error.status === 401) {
+      return new Response("invalid otp", { status: 401 });
+    }
+    throw error;
+  }
+}
+
+async function sessionVerify(
+  request: Request,
+  url: URL,
+  config: AccountConfig,
+): Promise<Response> {
+  const appId = url.searchParams.get("app_id");
+  if (appId) {
+    const app = findApp(config, appId);
+    if (!app?.sessionVerifySecret) {
+      return Response.json({ error: "unknown_app" }, { status: 403 });
+    }
+    const session = getSingleCookie(
+      request.headers.get("cookie"),
+      appSessionCookieName(app.appId),
+    );
+    const payload = session
+      ? await verifySessionCookie(
+          session,
+          { [config.session.kid]: app.sessionVerifySecret },
+          Math.floor(Date.now() / 1000),
+        )
+      : null;
+    if (!payload || payload.app_id !== app.appId) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+    return Response.json({
+      user: {
+        discord_id: payload.discord_id,
+        display_name: payload.display_name,
+        role: payload.role,
+      },
+    });
+  }
+  const session = await requireSession(request, config);
+  return session
+    ? Response.json({ ok: true })
+    : Response.json({ error: "unauthorized" }, { status: 401 });
+}
+
+async function createAccountSessionResponse(
+  user: User,
+  returnTo: string,
+  config: AccountConfig,
+): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
+  return await createSignedAccountSessionResponse(user, returnTo, config, now);
+}
+
+async function createSignedAccountSessionResponse(
+  user: User,
+  returnTo: string,
+  config: AccountConfig,
+  now: number,
+): Promise<Response> {
   const session = await signSessionCookie(
     {
-      discord_id: active.user.discord_id,
-      role: active.user.role,
-      display_name: active.user.display_name,
+      discord_id: user.discord_id,
+      role: user.role,
+      display_name: user.display_name,
       iat: now,
       exp: now + 86_400,
       kid: config.session.kid,
@@ -246,13 +430,13 @@ async function callback(url: URL, config: AccountConfig): Promise<Response> {
   const randomToken = randomBase64Url(32);
   const rememberValue = `${tokenId}.${randomToken}`;
   await callUserApi(config.userApi, "/remember/create", {
-    discord_id: active.user.discord_id,
+    discord_id: user.discord_id,
     token_id: tokenId,
     token_hash: await hashToken(randomToken),
     expires_at: now + 15_552_000,
   });
 
-  const headers = new Headers({ location: state.return_to });
+  const headers = new Headers({ location: returnTo });
   headers.append(
     "set-cookie",
     createCookie(sessionCookieName, session, 86_400, config.domainName),
@@ -267,6 +451,99 @@ async function callback(url: URL, config: AccountConfig): Promise<Response> {
     ),
   );
   return new Response(null, { status: 302, headers });
+}
+
+async function sendOtp(
+  discordId: string,
+  otpCode: string,
+  config: AccountConfig,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const channelResponse = await fetch(
+    `${config.discord.apiBase}/users/@me/channels`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bot ${config.discord.botToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ recipient_id: discordId }),
+    },
+  );
+  if (!channelResponse.ok) {
+    return {
+      ok: false,
+      reason: await discordError("create_dm", channelResponse),
+    };
+  }
+  const channel = (await channelResponse.json()) as { id?: unknown };
+  if (typeof channel.id !== "string") {
+    return { ok: false, reason: "create_dm returned no channel id" };
+  }
+  const messageResponse = await fetch(
+    `${config.discord.apiBase}/channels/${channel.id}/messages`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bot ${config.discord.botToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ content: `認証コード: ${otpCode}` }),
+    },
+  );
+  if (!messageResponse.ok) {
+    return {
+      ok: false,
+      reason: await discordError("send_dm", messageResponse),
+    };
+  }
+  return { ok: true };
+}
+
+async function discordError(
+  action: string,
+  response: Response,
+): Promise<string> {
+  const body = await response.text();
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown; message?: unknown };
+    if (parsed.code === 50278) {
+      return `${action} ${response.status}: DISCORD_BOT_TOKENのBotが対象Discordサーバーに参加していません`;
+    }
+    if (typeof parsed.message === "string") {
+      return `${action} ${response.status}: ${parsed.message}`;
+    }
+  } catch {
+    return `${action} ${response.status}: ${body}`;
+  }
+  return `${action} ${response.status}: ${body}`;
+}
+
+function randomOtpCode(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const value =
+    ((bytes[0] ?? 0) << 24) |
+    ((bytes[1] ?? 0) << 16) |
+    ((bytes[2] ?? 0) << 8) |
+    (bytes[3] ?? 0);
+  return String(Math.abs(value) % 1_000_000).padStart(6, "0");
+}
+
+function findApp(config: AccountConfig, appId: string) {
+  return config.apps.find((app) => app.appId === appId) ?? null;
+}
+
+function sameUrl(left: string, right: string): boolean {
+  try {
+    const leftUrl = new URL(left);
+    const rightUrl = new URL(right);
+    return (
+      leftUrl.origin === rightUrl.origin &&
+      leftUrl.pathname === rightUrl.pathname
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function me(request: Request, config: AccountConfig): Promise<Response> {
@@ -301,6 +578,22 @@ async function verifyActiveUser(
       "/users/verify-active",
       { discord_id: discordId },
     );
+  } catch (error) {
+    if (error instanceof UserApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function getActiveUser(
+  discordId: string,
+  config: AccountConfig,
+): Promise<{ user: User } | null> {
+  try {
+    return await callUserApi<{ user: User }>(config.userApi, "/users/get", {
+      discord_id: discordId,
+    });
   } catch (error) {
     if (error instanceof UserApiError && error.status === 401) {
       return null;

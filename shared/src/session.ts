@@ -10,6 +10,7 @@ export const rememberCookieName = "__Secure-org_remember";
 
 export type SessionPayload = {
   discord_id: string;
+  app_id?: string;
   role: "user" | "admin";
   display_name: string;
   iat: number;
@@ -83,6 +84,7 @@ export async function verifySessionCookie(
   ) as Partial<SessionPayload>;
   if (
     typeof payload.discord_id !== "string" ||
+    (payload.app_id !== undefined && typeof payload.app_id !== "string") ||
     (payload.role !== "user" && payload.role !== "admin") ||
     typeof payload.display_name !== "string" ||
     typeof payload.iat !== "number" ||
@@ -94,6 +96,10 @@ export async function verifySessionCookie(
   }
 
   return payload as SessionPayload;
+}
+
+export function appSessionCookieName(appId: string): string {
+  return `__Secure-${appId}_session`;
 }
 
 export function getSingleCookie(

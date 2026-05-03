@@ -1,19 +1,22 @@
-import type { LoginNavigationConfig } from "../../shared/navigation.js";
+import type { AuthBaseNavigationConfig } from "../../shared/navigation.js";
 
 type AppEnv = {
+  APP_ID: string;
+  DOMAIN_NAME: string;
   ACCOUNT_URL: string;
-  AUTH_LOGIN_URL: string;
   SESSION_KID: string;
-  SESSION_HMAC_SECRET: string;
+  APP_SESSION_HMAC_SECRET: string;
 };
 
 export type AppConfig = {
+  appId: string;
+  domainName: string;
   accountUrl: string;
   session: {
     kid: string;
     secret: string;
   };
-  navigation: LoginNavigationConfig;
+  navigation: AuthBaseNavigationConfig;
 };
 
 export function withAppConfig(
@@ -28,13 +31,18 @@ export function withAppConfig(
 
 function loadAppConfig(env: AppEnv): AppConfig {
   return {
+    appId: requiredBinding("APP_ID", env.APP_ID),
+    domainName: requiredBinding("DOMAIN_NAME", env.DOMAIN_NAME),
     accountUrl: requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL),
     session: {
       kid: requiredBinding("SESSION_KID", env.SESSION_KID),
-      secret: requiredBinding("SESSION_HMAC_SECRET", env.SESSION_HMAC_SECRET),
+      secret: requiredBinding(
+        "APP_SESSION_HMAC_SECRET",
+        env.APP_SESSION_HMAC_SECRET,
+      ),
     },
     navigation: {
-      AUTH_LOGIN_URL: requiredBinding("AUTH_LOGIN_URL", env.AUTH_LOGIN_URL),
+      AUTH_BASE_URL: requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL),
     },
   };
 }

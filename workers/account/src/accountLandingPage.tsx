@@ -4,7 +4,7 @@ import { Card, LinkButton } from "../../shared/ui.js";
 import type { AccountConfig } from "./accountConfig.js";
 
 export function accountLandingPage(config: AccountConfig): Promise<Response> {
-  const loginUrl = new URL(config.navigation.AUTH_LOGIN_URL);
+  const loginUrl = new URL("/login", config.navigation.AUTH_BASE_URL);
   loginUrl.searchParams.set("return_to", config.navigation.ACCOUNT_URL);
   return page(
     "Account",

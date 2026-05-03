@@ -1,6 +1,6 @@
 import type {
+  AuthBaseNavigationConfig,
   AuthNavigationConfig,
-  LoginNavigationConfig,
 } from "../../shared/navigation.js";
 import type { UserApiConfig } from "../../shared/userApi.js";
 import type { Env } from "./types.js";
@@ -9,11 +9,14 @@ const discordApiBase = "https://discord.com/api/v10";
 
 export type AccountConfig = {
   domainName: string;
+  apps: AppDefinition[];
   assets: R2Bucket;
   discord: {
     apiBase: string;
     clientId: string;
     clientSecret: string;
+    botToken: string;
+    guildId: string;
   };
   csrf: {
     kid: string;
@@ -23,13 +26,22 @@ export type AccountConfig = {
     kid: string;
     secret: string;
   };
-  navigation: AuthNavigationConfig & LoginNavigationConfig;
+  navigation: AuthNavigationConfig & AuthBaseNavigationConfig;
   userApi: UserApiConfig;
 };
 
+export type AppDefinition = {
+  appId: string;
+  callbackUrl: string;
+  sessionVerifySecret?: string;
+};
+
 export function loadAccountConfig(env: Env): AccountConfig {
+  const accountUrl = requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL);
+  const apps = parseAppDefinitions(requiredBinding("AUTH_APPS", env.AUTH_APPS));
   return {
     domainName: requiredBinding("DOMAIN_NAME", env.DOMAIN_NAME),
+    apps,
     assets: env.ASSETS,
     discord: {
       apiBase: discordApiBase,
@@ -38,6 +50,8 @@ export function loadAccountConfig(env: Env): AccountConfig {
         "DISCORD_CLIENT_SECRET",
         env.DISCORD_CLIENT_SECRET,
       ),
+      botToken: requiredBinding("DISCORD_BOT_TOKEN", env.DISCORD_BOT_TOKEN),
+      guildId: requiredBinding("DISCORD_GUILD_ID", env.DISCORD_GUILD_ID),
     },
     csrf: {
       kid: requiredBinding("CSRF_KID", env.CSRF_KID),
@@ -48,16 +62,10 @@ export function loadAccountConfig(env: Env): AccountConfig {
       secret: requiredBinding("SESSION_HMAC_SECRET", env.SESSION_HMAC_SECRET),
     },
     navigation: {
-      ACCOUNT_URL: requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL),
-      ALLOWED_RETURN_TO_ORIGINS: requiredBinding(
-        "ALLOWED_RETURN_TO_ORIGINS",
-        env.ALLOWED_RETURN_TO_ORIGINS,
-      ),
-      AUTH_LOGIN_URL: requiredBinding("AUTH_LOGIN_URL", env.AUTH_LOGIN_URL),
-      AUTH_CALLBACK_URL: requiredBinding(
-        "AUTH_CALLBACK_URL",
-        env.AUTH_CALLBACK_URL,
-      ),
+      ACCOUNT_URL: accountUrl,
+      ALLOWED_RETURN_TO_ORIGINS: appOrigins(apps),
+      AUTH_BASE_URL: accountUrl,
+      AUTH_CALLBACK_URL: new URL("/callback", accountUrl).toString(),
     },
     userApi: {
       USER_API_URL: requiredBinding("USER_API_URL", env.USER_API_URL),
@@ -88,4 +96,38 @@ function requiredBinding(name: string, value: string): string {
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+function parseAppDefinitions(value: string): AppDefinition[] {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("AUTH_APPS must be an array");
+  }
+  return parsed.map((item) => {
+    if (!item || typeof item !== "object") {
+      throw new Error("AUTH_APPS item is invalid");
+    }
+    const record = item as Record<string, unknown>;
+    if (
+      typeof record.app_id !== "string" ||
+      typeof record.callback_url !== "string" ||
+      (record.session_verify_secret !== undefined &&
+        typeof record.session_verify_secret !== "string")
+    ) {
+      throw new Error("AUTH_APPS item is invalid");
+    }
+    const app = {
+      appId: record.app_id,
+      callbackUrl: record.callback_url,
+    };
+    return record.session_verify_secret
+      ? { ...app, sessionVerifySecret: record.session_verify_secret }
+      : app;
+  });
+}
+
+function appOrigins(apps: AppDefinition[]): string {
+  return [...new Set(apps.map((app) => new URL(app.callbackUrl).origin))].join(
+    ",",
+  );
 }

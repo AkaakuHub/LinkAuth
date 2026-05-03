@@ -1,6 +1,3 @@
-name = "org-auth-local-service"
+name = "org-auth-service"
 main = "src/index.tsx"
 compatibility_date = "2026-04-26"
-
-[vars]
-SESSION_KID = "2026-04"

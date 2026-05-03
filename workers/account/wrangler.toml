@@ -5,8 +5,3 @@ compatibility_date = "2026-04-26"
 [[r2_buckets]]
 binding = "ASSETS"
 bucket_name = "org-auth-assets"
-
-[vars]
-SESSION_KID = "2026-04"
-CSRF_KID = "2026-04"
-INTERNAL_HMAC_KID = "2026-04"
