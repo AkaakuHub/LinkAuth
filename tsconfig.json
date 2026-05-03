@@ -12,11 +12,17 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node", "@cloudflare/workers-types"]
+    "types": [
+      "node",
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types"
+    ]
   },
   "include": [
     "lambdas/**/*.ts",
     "local/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.*.config.ts",
     "workers/**/*.ts",
     "shared/**/*.ts",
     "backend/**/*.ts"

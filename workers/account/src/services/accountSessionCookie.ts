@@ -13,6 +13,7 @@ import { noStoreHeaders } from "../views/accountLandingPage.js";
 export async function createAccountSessionResponse(
   user: User,
   returnTo: string,
+  rememberMe: boolean,
   config: AccountConfig,
 ): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
@@ -28,30 +29,36 @@ export async function createAccountSessionResponse(
     config.session.secret,
   );
 
-  const tokenId = randomBase64Url(16);
-  const randomToken = randomBase64Url(32);
-  const rememberValue = `${tokenId}.${randomToken}`;
-  await callUserApi(config.userApi, "/remember/create", {
-    discord_id: user.discord_id,
-    token_id: tokenId,
-    token_hash: await hashToken(randomToken),
-    expires_at: now + 15_552_000,
-  });
-
   const headers = new Headers({ location: returnTo });
   headers.append(
     "set-cookie",
     createCookie(sessionCookieName, session, 86_400, config.domainName),
   );
-  headers.append(
-    "set-cookie",
-    createCookie(
-      rememberCookieName,
-      rememberValue,
-      15_552_000,
-      config.domainName,
-    ),
-  );
+  if (rememberMe) {
+    const tokenId = randomBase64Url(16);
+    const randomToken = randomBase64Url(32);
+    const rememberValue = `${tokenId}.${randomToken}`;
+    await callUserApi(config.userApi, "/remember/create", {
+      discord_id: user.discord_id,
+      token_id: tokenId,
+      token_hash: await hashToken(randomToken),
+      expires_at: now + 15_552_000,
+    });
+    headers.append(
+      "set-cookie",
+      createCookie(
+        rememberCookieName,
+        rememberValue,
+        15_552_000,
+        config.domainName,
+      ),
+    );
+  } else {
+    headers.append(
+      "set-cookie",
+      deleteCookie(rememberCookieName, config.domainName),
+    );
+  }
   return new Response(null, { status: 302, headers });
 }
 

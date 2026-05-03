@@ -75,16 +75,20 @@ export async function verifyCsrfToken(input: {
   if (!timingSafeEqual(signature, expected)) {
     return false;
   }
-  const parsed = JSON.parse(
-    base64UrlDecodeText(payload),
-  ) as Partial<CsrfPayload>;
-  return (
-    parsed.typ === "csrf" &&
-    parsed.discord_id === input.discordId &&
-    parsed.origin === input.origin &&
-    parsed.action === input.action &&
-    parsed.kid === input.kid &&
-    typeof parsed.exp === "number" &&
-    parsed.exp > input.now
-  );
+  try {
+    const parsed = JSON.parse(
+      base64UrlDecodeText(payload),
+    ) as Partial<CsrfPayload>;
+    return (
+      parsed.typ === "csrf" &&
+      parsed.discord_id === input.discordId &&
+      parsed.origin === input.origin &&
+      parsed.action === input.action &&
+      parsed.kid === input.kid &&
+      typeof parsed.exp === "number" &&
+      parsed.exp > input.now
+    );
+  } catch {
+    return false;
+  }
 }

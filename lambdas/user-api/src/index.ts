@@ -22,19 +22,18 @@ import {
 } from "./users.js";
 import { requireString } from "./validation.js";
 
-const config = loadUserApiConfig();
-const context: UserApiContext = {
-  tableName: config.tableName,
-  discordGuildIds: config.discord.guildIds,
-  discordBotToken: config.discord.botToken,
-  dynamodb: config.dynamodb,
-};
-
 export async function handler(
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyStructuredResultV2> {
   try {
-    return await handle(event);
+    const config = loadUserApiConfig();
+    const context: UserApiContext = {
+      tableName: config.tableName,
+      discordGuildIds: config.discord.guildIds,
+      discordBotToken: config.discord.botToken,
+      dynamodb: config.dynamodb,
+    };
+    return await handleUserApiRequest(event, context, config.internalHmac);
   } catch (error) {
     if (isHttpError(error)) {
       return json(error.statusCode, { error: error.reason });
@@ -46,11 +45,13 @@ export async function handler(
   }
 }
 
-async function handle(
+export async function handleUserApiRequest(
   event: APIGatewayProxyEventV2,
+  context: UserApiContext,
+  internalHmac: { kid: string; secret: string },
 ): Promise<APIGatewayProxyStructuredResultV2> {
   const rawBody = parseJsonBody(event);
-  if (!verifyInternalSignature(event, rawBody, config.internalHmac)) {
+  if (!verifyInternalSignature(event, rawBody, internalHmac)) {
     return json(401, { error: "invalid_signature" });
   }
 

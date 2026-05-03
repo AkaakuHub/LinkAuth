@@ -54,7 +54,7 @@ export async function rotateRememberToken(
     | undefined;
   if (
     !item ||
-    item.expires_at === undefined ||
+    typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
     item.token_hash !== oldTokenHash
   ) {

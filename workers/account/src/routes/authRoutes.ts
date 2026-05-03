@@ -77,7 +77,7 @@ export async function token(
   request: Request,
   config: AccountConfig,
 ): Promise<Response> {
-  const body = (await request.json()) as Record<string, unknown>;
+  const body = await parseJsonRequest(request);
   const appId = body.app_id;
   const code = body.code;
   if (typeof appId !== "string" || typeof code !== "string") {
@@ -95,6 +95,19 @@ export async function token(
       return Response.json({ error: "invalid_auth_code" }, { status: 401 });
     }
     throw error;
+  }
+}
+
+async function parseJsonRequest(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  try {
+    const body = (await request.json()) as unknown;
+    return body && typeof body === "object"
+      ? (body as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
   }
 }
 
@@ -150,6 +163,7 @@ export async function otp(
   const form = await request.formData();
   const challengeId = String(form.get("challenge_id") ?? "");
   const otpCode = String(form.get("otp") ?? "");
+  const rememberMe = form.get("remember_me") === "1";
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   if (!/^[0-9]{6}$/.test(otpCode)) {
     return authFailedPage(config);
@@ -167,7 +181,12 @@ export async function otp(
     if (!active) {
       return inactiveAccountPage(config);
     }
-    return await createAccountSessionResponse(active.user, returnTo, config);
+    return await createAccountSessionResponse(
+      active.user,
+      returnTo,
+      rememberMe,
+      config,
+    );
   } catch (error) {
     if (error instanceof UserApiError && error.status === 401) {
       return authFailedPage(config);

@@ -56,46 +56,50 @@ export async function verifySessionCookie(
     return null;
   }
 
-  const header = JSON.parse(
-    base64UrlDecodeText(encodedHeader),
-  ) as Partial<TokenHeader>;
-  if (
-    header.alg !== "HS256" ||
-    header.typ !== "session" ||
-    typeof header.kid !== "string"
-  ) {
-    return null;
-  }
+  try {
+    const header = JSON.parse(
+      base64UrlDecodeText(encodedHeader),
+    ) as Partial<TokenHeader>;
+    if (
+      header.alg !== "HS256" ||
+      header.typ !== "session" ||
+      typeof header.kid !== "string"
+    ) {
+      return null;
+    }
 
-  const secret = secrets[header.kid];
-  if (!secret) {
-    return null;
-  }
-  const expectedSignature = await hmacSha256Base64Url(
-    secret,
-    `${encodedHeader}.${encodedPayload}`,
-  );
-  if (!timingSafeEqual(signature, expectedSignature)) {
-    return null;
-  }
+    const secret = secrets[header.kid];
+    if (!secret) {
+      return null;
+    }
+    const expectedSignature = await hmacSha256Base64Url(
+      secret,
+      `${encodedHeader}.${encodedPayload}`,
+    );
+    if (!timingSafeEqual(signature, expectedSignature)) {
+      return null;
+    }
 
-  const payload = JSON.parse(
-    base64UrlDecodeText(encodedPayload),
-  ) as Partial<SessionPayload>;
-  if (
-    typeof payload.discord_id !== "string" ||
-    (payload.app_id !== undefined && typeof payload.app_id !== "string") ||
-    (payload.role !== "user" && payload.role !== "admin") ||
-    typeof payload.display_name !== "string" ||
-    typeof payload.iat !== "number" ||
-    typeof payload.exp !== "number" ||
-    payload.kid !== header.kid ||
-    payload.exp <= now
-  ) {
+    const payload = JSON.parse(
+      base64UrlDecodeText(encodedPayload),
+    ) as Partial<SessionPayload>;
+    if (
+      typeof payload.discord_id !== "string" ||
+      (payload.app_id !== undefined && typeof payload.app_id !== "string") ||
+      (payload.role !== "user" && payload.role !== "admin") ||
+      typeof payload.display_name !== "string" ||
+      typeof payload.iat !== "number" ||
+      typeof payload.exp !== "number" ||
+      payload.kid !== header.kid ||
+      payload.exp <= now
+    ) {
+      return null;
+    }
+
+    return payload as SessionPayload;
+  } catch {
     return null;
   }
-
-  return payload as SessionPayload;
 }
 
 export function appSessionCookieName(appId: string): string {

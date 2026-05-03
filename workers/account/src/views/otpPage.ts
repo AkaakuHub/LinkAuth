@@ -13,10 +13,12 @@ export function otpPage(challengeId: string, returnTo: string): Response {
           attributes:
             ' id="otp-code" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" data-otp-input required autofocus',
         },
-      )}</div>${button({
-        type: "submit",
-        children: `${icon("shield-check")}認証`,
-      })}</form><script src="/account-client.js" defer></script>`,
+      )}</div><label class="inline-flex items-start gap-2 text-sm leading-6 text-ink"><input type="checkbox" name="remember_me" value="1" checked><span>この端末でログイン状態を保持する</span></label>${button(
+        {
+          type: "submit",
+          children: `${icon("shield-check")}認証`,
+        },
+      )}</form><script src="/account-client.js" defer></script>`,
     })}</div>`,
     200,
     noStoreHeaders(),
