@@ -168,7 +168,7 @@ export async function otp(
     return await createAccountSessionResponse(active.user, returnTo, config);
   } catch (error) {
     if (error instanceof UserApiError && error.status === 401) {
-      return new Response("invalid otp", { status: 401 });
+      return authFailedPage(config);
     }
     throw error;
   }
