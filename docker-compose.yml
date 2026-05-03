@@ -15,6 +15,10 @@ services:
       dockerfile: local/Dockerfile.user-api
     depends_on:
       - dynamodb-local
+    volumes:
+      - ./lambdas:/app/lambdas:ro
+      - ./local:/app/local:ro
+      - ./shared:/app/shared:ro
     environment:
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
