@@ -20,8 +20,14 @@ import { createAuthState, parseAuthState } from "../security/authState.js";
 import { requireSession } from "../security/session.js";
 import { createAccountSessionResponse } from "../services/accountSessionCookie.js";
 import { sendDiscordOtp } from "../services/discordOtp.js";
-import { getActiveUser, verifyActiveUser } from "../services/userDirectory.js";
-import { inactiveAccountPage } from "../views/accountErrorPage.js";
+import {
+  verifyActiveUser,
+  verifyCurrentMemberUser,
+} from "../services/userDirectory.js";
+import {
+  authFailedPage,
+  inactiveAccountPage,
+} from "../views/accountErrorPage.js";
 import { accountLandingPage } from "../views/accountLandingPage.js";
 import { otpPage } from "../views/otpPage.js";
 
@@ -59,7 +65,7 @@ export async function authorize(
     loginUrl.searchParams.set("return_to", url.toString());
     return Response.redirect(loginUrl, 302);
   }
-  const active = await verifyActiveUser(session.discord_id, config);
+  const active = await verifyCurrentMemberUser(session.discord_id, config);
   if (!active) {
     return inactiveAccountPage(config);
   }
@@ -111,12 +117,12 @@ export async function callback(
   const code = url.searchParams.get("code");
   const state = await parseAuthState(url.searchParams.get("state"), config);
   if (!code || !state) {
-    return new Response("invalid callback", { status: 400 });
+    return authFailedPage(config);
   }
 
   const discordResult = await fetchDiscordOAuthResult(code, config);
   if (!discordResult) {
-    return new Response("oauth failed", { status: 401 });
+    return authFailedPage(config);
   }
   const guildMember = await fetchDiscordGuildMember(
     discordResult.accessToken,
@@ -125,7 +131,7 @@ export async function callback(
   if (!guildMember) {
     return inactiveAccountPage(config);
   }
-  const active = await getActiveUser(discordResult.user.id, config);
+  const active = await verifyCurrentMemberUser(discordResult.user.id, config);
   if (!active) {
     return inactiveAccountPage(config);
   }

@@ -7,7 +7,7 @@ import { normalizeDisplayName, requireString } from "./validation.js";
 export async function getActiveUser(
   context: UserApiContext,
   discordId: string,
-  checkGuild: boolean,
+  checkGuild: boolean | "current",
 ): Promise<UserProfile | null> {
   const result = await context.dynamodb.send(
     new GetCommand({
@@ -20,7 +20,7 @@ export async function getActiveUser(
     return null;
   }
   if (checkGuild) {
-    await verifyGuildMembership(context, user);
+    await verifyGuildMembership(context, user, checkGuild === "current");
   }
   return user;
 }
@@ -106,11 +106,13 @@ async function requireActiveUser(
 async function verifyGuildMembership(
   context: UserApiContext,
   user: UserProfile,
+  forceCurrent: boolean,
 ): Promise<void> {
   const checkedAt = user.guild_checked_at
     ? Date.parse(user.guild_checked_at)
     : 0;
   if (
+    !forceCurrent &&
     user.guild_member_status === "active" &&
     Number.isFinite(checkedAt) &&
     Date.now() - checkedAt <= 600_000

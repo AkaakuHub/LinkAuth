@@ -73,6 +73,14 @@ async function handle(
     );
     return user ? json(200, { user }) : json(401, { error: "inactive_user" });
   }
+  if (path === "/users/verify-current-membership") {
+    const user = await getActiveUser(
+      context,
+      requireString(body, "discord_id"),
+      "current",
+    );
+    return user ? json(200, { user }) : json(401, { error: "inactive_user" });
+  }
   if (path === "/users/update-profile") {
     return json(200, await updateUserProfile(context, body));
   }
