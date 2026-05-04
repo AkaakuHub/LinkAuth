@@ -124,6 +124,40 @@ test("App Worker rejects callback requests when token exchange fails", async () 
   expect(response.status).toBe(401);
 });
 
+test("App Worker rejects callback requests when token exchange throws", async () => {
+  vi.stubGlobal("fetch", async () => {
+    throw new Error("account unavailable");
+  });
+
+  const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
+    secret: env.APP_SESSION_HMAC_SECRET,
+  });
+  const response = await fetchApp(appCallbackUrl("auth-code", state), {
+    headers: {
+      cookie: `${appAuthStateCookieName("hub")}=${encodeURIComponent(state)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+});
+
+test("App Worker rejects callback requests when token response is invalid JSON", async () => {
+  vi.stubGlobal("fetch", async () => new Response("invalid json"));
+
+  const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
+    secret: env.APP_SESSION_HMAC_SECRET,
+  });
+  const response = await fetchApp(appCallbackUrl("auth-code", state), {
+    headers: {
+      cookie: `${appAuthStateCookieName("hub")}=${encodeURIComponent(state)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+});
+
 test("App Worker exchanges a code and creates an app session cookie", async () => {
   vi.stubGlobal(
     "fetch",

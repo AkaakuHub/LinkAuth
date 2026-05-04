@@ -51,6 +51,21 @@ export async function handleUserApiRequest(
   context: UserApiContext,
   internalHmac: { kid: string; secret: string },
 ): Promise<APIGatewayProxyStructuredResultV2> {
+  try {
+    return await routeUserApiRequest(event, context, internalHmac);
+  } catch (error) {
+    if (isHttpError(error)) {
+      return json(error.statusCode, { error: error.reason });
+    }
+    throw error;
+  }
+}
+
+async function routeUserApiRequest(
+  event: APIGatewayProxyEventV2,
+  context: UserApiContext,
+  internalHmac: { kid: string; secret: string },
+): Promise<APIGatewayProxyStructuredResultV2> {
   const rawBody = parseJsonBody(event);
   if (!(await verifyInternalSignature(event, rawBody, internalHmac, context))) {
     return json(401, { error: "invalid_signature" });

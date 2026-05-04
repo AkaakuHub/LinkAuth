@@ -49,14 +49,19 @@ export async function callUserApi<T>(
     nonce: randomBase64Url(16),
     timestamp: new Date().toISOString(),
   });
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      ...headers,
-      "content-type": "application/json",
-    },
-    body: rawBody,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+      },
+      body: rawBody,
+    });
+  } catch {
+    throw new UserApiError(path, 503, "fetch_failed");
+  }
   if (!response.ok) {
     throw new UserApiError(
       path,
@@ -64,7 +69,11 @@ export async function callUserApi<T>(
       await responseError(response),
     );
   }
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new UserApiError(path, 502, "invalid_json");
+  }
 }
 
 export async function hashToken(value: string): Promise<string> {

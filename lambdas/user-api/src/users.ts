@@ -174,12 +174,17 @@ async function fetchActiveGuildMember(
 ): Promise<"active" | "left" | "unavailable" | "failed"> {
   let foundMissingMember = false;
   for (const guildId of context.discordGuildIds) {
-    const response = await fetch(
-      `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
-      {
-        headers: { authorization: `Bot ${context.discordBotToken}` },
-      },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+        {
+          headers: { authorization: `Bot ${context.discordBotToken}` },
+        },
+      );
+    } catch {
+      return "unavailable";
+    }
     if (response.status === 200) {
       return "active";
     }

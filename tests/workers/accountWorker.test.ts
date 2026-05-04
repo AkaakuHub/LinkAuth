@@ -585,6 +585,53 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   expect(calls).toContain("/api/v10/channels/dm-channel/messages");
 });
 
+test("Account Worker callback shows a delivery error when Discord DM sending throws", async () => {
+  const state = await createCallbackState("hub");
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === "/api/v10/oauth2/token") {
+        return Response.json({ access_token: "discord-access-token" });
+      }
+      if (url.pathname === "/api/v10/users/@me") {
+        return Response.json({ id: "123456789" });
+      }
+      if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+        return Response.json({ ok: true });
+      }
+      if (url.pathname === "/users/verify-current-membership") {
+        return Response.json({ user: activeUser });
+      }
+      if (url.pathname === "/otp-challenge/create") {
+        expect(decodeJsonBody(init).discord_id).toBe("123456789");
+        return Response.json({ ok: true });
+      }
+      if (url.pathname === "/api/v10/users/@me/channels") {
+        throw new Error("discord unavailable");
+      }
+      return Response.json({ error: "not_found" }, { status: 404 });
+    },
+  );
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
+  );
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("認証コードを送信できませんでした");
+  expect(body).toContain("対象サーバーからのDM受信設定");
+  expect(response.headers.get("set-cookie")).not.toContain(
+    `${otpStateCookieName}=`,
+  );
+});
+
 test("Account Worker callback rejects app auth states without the browser state cookie", async () => {
   const state = await createCallbackState("hub");
 

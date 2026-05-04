@@ -147,27 +147,29 @@ async function authCallback(
   }
   const tokenUrl = new URL("/token", config.navigation.AUTH_BASE_URL);
   const rawBody = JSON.stringify({ app_id: config.appId, code });
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-app-token-signature": await hmacSha256Base64Url(
-        config.session.secret,
-        `${config.appId}.${code}`,
-      ),
-    },
-    body: rawBody,
-  });
+  let response: Response;
+  try {
+    response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-app-token-signature": await hmacSha256Base64Url(
+          config.session.secret,
+          `${config.appId}.${code}`,
+        ),
+      },
+      body: rawBody,
+    });
+  } catch {
+    return clearAppAuthState(appAuthFailedPage(url), config);
+  }
   if (!response.ok) {
     return clearAppAuthState(appAuthFailedPage(url), config);
   }
-  const body = (await response.json()) as {
-    user?: {
-      discord_id?: unknown;
-      display_name?: unknown;
-      role?: unknown;
-    };
-  };
+  const body = await parseTokenResponse(response);
+  if (!body) {
+    return clearAppAuthState(appAuthFailedPage(url), config);
+  }
   const user = body.user;
   if (
     !user ||
@@ -202,6 +204,26 @@ async function authCallback(
     deleteCookie(appAuthStateCookieName(config.appId)),
   );
   return new Response(null, { status: 302, headers });
+}
+
+async function parseTokenResponse(response: Response): Promise<{
+  user?: {
+    discord_id?: unknown;
+    display_name?: unknown;
+    role?: unknown;
+  };
+} | null> {
+  try {
+    return (await response.json()) as {
+      user?: {
+        discord_id?: unknown;
+        display_name?: unknown;
+        role?: unknown;
+      };
+    };
+  } catch {
+    return null;
+  }
 }
 
 function clearAppAuthState(response: Response, config: AppConfig): Response {

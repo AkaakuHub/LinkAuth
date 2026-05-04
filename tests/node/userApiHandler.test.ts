@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { handleUserApiRequest } from "../../lambdas/user-api/src/index.js";
 import { createInternalHeaders } from "../../shared/src/internalSignature.js";
 import {
@@ -11,6 +11,10 @@ const internalHmac = {
   kid: "internal-key",
   secret: "internal-secret",
 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 test("User API handler rejects requests with an invalid internal signature", async () => {
   const { context } = createUserApiContext();
@@ -93,6 +97,31 @@ test("User API handler returns active users through the signed boundary", async 
       status: "active",
     },
   });
+});
+
+test("User API handler returns discord_unavailable when guild membership fetch throws", async () => {
+  const { context } = createUserApiContext([
+    {
+      pk: "USER#123456789",
+      sk: "PROFILE",
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      role: "admin",
+      status: "active",
+    },
+  ]);
+  context.discordGuildIds = ["guild"];
+  vi.stubGlobal("fetch", async () => {
+    throw new Error("discord unavailable");
+  });
+  const event = await createEvent("/users/verify-current-membership", {
+    discord_id: "123456789",
+  });
+
+  const response = await handleUserApiRequest(event, context, internalHmac);
+
+  expect(response.statusCode).toBe(503);
+  expect(parseJsonResponse(response)).toEqual({ error: "discord_unavailable" });
 });
 
 async function createEvent(

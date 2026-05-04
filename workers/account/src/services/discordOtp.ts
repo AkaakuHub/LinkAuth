@@ -7,45 +7,49 @@ export async function sendDiscordOtp(
   otpCode: string,
   config: AccountConfig,
 ): Promise<OtpSendResult> {
-  const channelResponse = await fetch(
-    `${config.discord.apiBase}/users/@me/channels`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bot ${config.discord.botToken}`,
-        "content-type": "application/json",
+  try {
+    const channelResponse = await fetch(
+      `${config.discord.apiBase}/users/@me/channels`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bot ${config.discord.botToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ recipient_id: discordId }),
       },
-      body: JSON.stringify({ recipient_id: discordId }),
-    },
-  );
-  if (!channelResponse.ok) {
-    return {
-      ok: false,
-      reason: await discordError("create_dm", channelResponse),
-    };
-  }
-  const channel = (await channelResponse.json()) as { id?: unknown };
-  if (typeof channel.id !== "string") {
-    return { ok: false, reason: "create_dm returned no channel id" };
-  }
-  const messageResponse = await fetch(
-    `${config.discord.apiBase}/channels/${channel.id}/messages`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bot ${config.discord.botToken}`,
-        "content-type": "application/json",
+    );
+    if (!channelResponse.ok) {
+      return {
+        ok: false,
+        reason: await discordError("create_dm", channelResponse),
+      };
+    }
+    const channel = (await channelResponse.json()) as { id?: unknown };
+    if (typeof channel.id !== "string") {
+      return { ok: false, reason: "create_dm returned no channel id" };
+    }
+    const messageResponse = await fetch(
+      `${config.discord.apiBase}/channels/${channel.id}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bot ${config.discord.botToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ content: `認証コード: ${otpCode}` }),
       },
-      body: JSON.stringify({ content: `認証コード: ${otpCode}` }),
-    },
-  );
-  if (!messageResponse.ok) {
-    return {
-      ok: false,
-      reason: await discordError("send_dm", messageResponse),
-    };
+    );
+    if (!messageResponse.ok) {
+      return {
+        ok: false,
+        reason: await discordError("send_dm", messageResponse),
+      };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "discord request failed" };
   }
-  return { ok: true };
 }
 
 async function discordError(
