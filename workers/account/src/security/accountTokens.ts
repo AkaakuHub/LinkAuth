@@ -5,6 +5,7 @@ import { assertSecret, requestOrigin } from "./requestContext.js";
 
 export type AccountTokens = {
   profile: string;
+  avatar: string;
   logout: string;
   delete: string;
 };
@@ -23,6 +24,14 @@ export async function createAccountTokens(
       discordId: user.discord_id,
       origin,
       action: "profile",
+      kid: config.csrf.kid,
+      secret: config.csrf.secret,
+      now,
+    }),
+    avatar: await createCsrfToken({
+      discordId: user.discord_id,
+      origin,
+      action: "avatar",
       kid: config.csrf.kid,
       secret: config.csrf.secret,
       now,

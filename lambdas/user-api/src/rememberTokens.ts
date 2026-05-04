@@ -21,8 +21,10 @@ export async function putRememberToken(
     new PutCommand({
       TableName: context.tableName,
       Item: {
-        pk: `USER#${discordId}`,
-        sk: `REMEMBER#${requireString(body, "token_id")}`,
+        ...rememberKey(requireString(body, "token_id")),
+        discord_id: discordId,
+        gsi1pk: `USER#${discordId}`,
+        gsi1sk: `REMEMBER#${requireString(body, "token_id")}`,
         token_id: requireString(body, "token_id"),
         token_hash: requireString(body, "token_hash"),
         created_at: new Date().toISOString(),
@@ -39,29 +41,29 @@ export async function rotateRememberToken(
   context: UserApiContext,
   body: JsonBody,
 ): Promise<APIGatewayProxyStructuredResultV2> {
-  const discordId = requireString(body, "discord_id");
   const tokenId = requireString(body, "token_id");
   const oldTokenHash = requireString(body, "old_token_hash");
   const newTokenHash = requireString(body, "new_token_hash");
   const result = await context.dynamodb.send(
     new GetCommand({
       TableName: context.tableName,
-      Key: rememberKey(discordId, tokenId),
+      Key: rememberKey(tokenId),
     }),
   );
   const item = result.Item as
-    | { token_hash?: string; expires_at?: number }
+    | { discord_id?: string; token_hash?: string; expires_at?: number }
     | undefined;
   if (
     !item ||
+    typeof item.discord_id !== "string" ||
     typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
     item.token_hash !== oldTokenHash
   ) {
-    await deleteRememberToken(context, discordId, tokenId);
+    await deleteRememberToken(context, tokenId);
     return json(401, { error: "invalid_remember_token" });
   }
-  const user = await getActiveUser(context, discordId, true);
+  const user = await getActiveUser(context, item.discord_id, true);
   if (!user) {
     return json(401, { error: "inactive_user" });
   }
@@ -69,7 +71,7 @@ export async function rotateRememberToken(
     await context.dynamodb.send(
       new UpdateCommand({
         TableName: context.tableName,
-        Key: rememberKey(discordId, tokenId),
+        Key: rememberKey(tokenId),
         UpdateExpression:
           "SET token_hash = :token_hash, last_used_at = :last_used_at, expires_at = :expires_at",
         ConditionExpression: "token_hash = :old_token_hash",
@@ -89,13 +91,12 @@ export async function rotateRememberToken(
 
 export async function deleteRememberToken(
   context: UserApiContext,
-  discordId: string,
   tokenId: string,
 ): Promise<void> {
   await context.dynamodb.send(
     new DeleteCommand({
       TableName: context.tableName,
-      Key: rememberKey(discordId, tokenId),
+      Key: rememberKey(tokenId),
     }),
   );
 }
@@ -107,7 +108,8 @@ export async function deleteAllRememberTokens(
   const result = await context.dynamodb.send(
     new QueryCommand({
       TableName: context.tableName,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :remember)",
+      IndexName: "gsi1",
+      KeyConditionExpression: "gsi1pk = :pk AND begins_with(gsi1sk, :remember)",
       ExpressionAttributeValues: {
         ":pk": `USER#${discordId}`,
         ":remember": "REMEMBER#",

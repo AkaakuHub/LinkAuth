@@ -65,6 +65,16 @@ export function createUserApiContext(items: DynamoItem[] = []): {
   });
   dynamodbMock.on(QueryCommand).callsFake((input) => {
     const values = input.ExpressionAttributeValues as Record<string, string>;
+    if (input.IndexName === "gsi1") {
+      return {
+        Items: [...storage.values()].filter(
+          (item) =>
+            item.gsi1pk === values[":pk"] &&
+            typeof item.gsi1sk === "string" &&
+            item.gsi1sk.startsWith(values[":remember"] ?? ""),
+        ),
+      };
+    }
     return {
       Items: [...storage.values()].filter(
         (item) =>

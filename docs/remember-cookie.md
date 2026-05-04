@@ -16,6 +16,10 @@ account Workerは`random_token`を平文保存せず、SHA-256でハッシュ化
 
 remember cookieの有効期限は180日です。
 
+account session cookieが無効でremember cookieが有効な場合、account Workerは`token_id`と`random_token`のSHA-256ハッシュを使ってuser-apiの`/remember/rotate`を呼びます。
+
+user-apiは`token_id`でremember tokenを取得し、保存済みの`token_hash`と照合します。成功した場合、account Workerはaccount session cookieを再発行し、remember cookieの`random_token`を更新します。
+
 ## オフの場合
 
 account WorkerはOTP検証成功後にaccount session cookieだけを発行します。

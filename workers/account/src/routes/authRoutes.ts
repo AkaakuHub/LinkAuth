@@ -8,7 +8,6 @@ import {
   createCookie,
   deleteCookie,
   getSingleCookie,
-  sessionCookieName,
   verifySessionCookie,
 } from "../../../../shared/src/session.js";
 import { normalizeReturnTo } from "../../../shared/navigation.js";
@@ -32,7 +31,7 @@ import {
   otpStateCookieName,
   verifyOtpState,
 } from "../security/otpState.js";
-import { requireSession } from "../security/session.js";
+import { appendSessionCookies, requireSession } from "../security/session.js";
 import { createAccountSessionResponse } from "../services/accountSessionCookie.js";
 import { sendDiscordOtp } from "../services/discordOtp.js";
 import {
@@ -88,7 +87,7 @@ export async function authorize(
   });
   const callbackUrl = new URL(returnTo);
   callbackUrl.searchParams.set("code", code);
-  return Response.redirect(callbackUrl, 302);
+  return appendSessionCookies(Response.redirect(callbackUrl, 302), session);
 }
 
 export async function token(
@@ -339,7 +338,7 @@ export async function sessionVerify(
   }
   const session = await requireSession(request, config);
   return session
-    ? Response.json({ ok: true })
+    ? appendSessionCookies(Response.json({ ok: true }), session)
     : Response.json({ error: "unauthorized" }, { status: 401 });
 }
 
@@ -347,22 +346,14 @@ export async function me(
   request: Request,
   config: AccountConfig,
 ): Promise<Response> {
-  const now = Math.floor(Date.now() / 1000);
-  const session = getSingleCookie(
-    request.headers.get("cookie"),
-    sessionCookieName,
-  );
+  const session = await requireSession(request, config);
   if (session) {
-    const payload = await verifySessionCookie(
-      session,
-      { [config.session.kid]: config.session.secret },
-      now,
-    );
-    if (payload) {
-      const active = await verifyActiveUser(payload.discord_id, config);
-      if (active) {
-        return Response.json({ user: active.user });
-      }
+    const active = await verifyActiveUser(session.discord_id, config);
+    if (active) {
+      return appendSessionCookies(
+        Response.json({ user: active.user }),
+        session,
+      );
     }
   }
   return Response.json({ error: "unauthorized" }, { status: 401 });

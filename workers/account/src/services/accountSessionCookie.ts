@@ -10,6 +10,9 @@ import { callUserApi, hashToken, type User } from "../../../shared/userApi.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { noStoreHeaders } from "../views/accountLandingPage.js";
 
+export const accountSessionMaxAgeSeconds = 86_400;
+export const rememberMaxAgeSeconds = 15_552_000;
+
 export async function createAccountSessionResponse(
   user: User,
   input: {
@@ -18,42 +21,77 @@ export async function createAccountSessionResponse(
     returnTo: string;
   },
 ): Promise<Response> {
-  const now = Math.floor(Date.now() / 1000);
+  const now = nowSeconds();
+  const headers = new Headers({ location: input.returnTo });
+  headers.append(
+    "set-cookie",
+    await createAccountSessionCookie(user, input.config),
+  );
+  if (input.rememberMe) {
+    headers.append(
+      "set-cookie",
+      await createRememberCookie(user, input.config, now),
+    );
+  } else {
+    headers.append("set-cookie", deleteCookie(rememberCookieName));
+  }
+  return new Response(null, { status: 302, headers });
+}
+
+export async function createAccountSessionCookie(
+  user: Pick<User, "discord_id" | "display_name" | "role">,
+  config: AccountConfig,
+): Promise<string> {
+  const now = nowSeconds();
   const session = await signSessionCookie(
     {
       discord_id: user.discord_id,
       role: user.role,
       display_name: user.display_name,
       iat: now,
-      exp: now + 86_400,
-      kid: input.config.session.kid,
+      exp: now + accountSessionMaxAgeSeconds,
+      kid: config.session.kid,
     },
-    input.config.session.secret,
+    config.session.secret,
   );
+  return createCookie(sessionCookieName, session, accountSessionMaxAgeSeconds);
+}
 
-  const headers = new Headers({ location: input.returnTo });
-  headers.append(
-    "set-cookie",
-    createCookie(sessionCookieName, session, 86_400),
+export async function createRememberCookie(
+  user: Pick<User, "discord_id">,
+  config: AccountConfig,
+  now: number,
+): Promise<string> {
+  return await createRememberCookieWithToken({
+    config,
+    now,
+    tokenId: randomBase64Url(16),
+    user,
+  });
+}
+
+async function createRememberCookieWithToken(input: {
+  config: AccountConfig;
+  now: number;
+  tokenId: string;
+  user: Pick<User, "discord_id">;
+}): Promise<string> {
+  const randomToken = randomBase64Url(32);
+  await callUserApi(input.config.userApi, "/remember/create", {
+    discord_id: input.user.discord_id,
+    token_id: input.tokenId,
+    token_hash: await hashToken(randomToken),
+    expires_at: input.now + rememberMaxAgeSeconds,
+  });
+  return createCookie(
+    rememberCookieName,
+    `${input.tokenId}.${randomToken}`,
+    rememberMaxAgeSeconds,
   );
-  if (input.rememberMe) {
-    const tokenId = randomBase64Url(16);
-    const randomToken = randomBase64Url(32);
-    const rememberValue = `${tokenId}.${randomToken}`;
-    await callUserApi(input.config.userApi, "/remember/create", {
-      discord_id: user.discord_id,
-      token_id: tokenId,
-      token_hash: await hashToken(randomToken),
-      expires_at: now + 15_552_000,
-    });
-    headers.append(
-      "set-cookie",
-      createCookie(rememberCookieName, rememberValue, 15_552_000),
-    );
-  } else {
-    headers.append("set-cookie", deleteCookie(rememberCookieName));
-  }
-  return new Response(null, { status: 302, headers });
+}
+
+export function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
 export function clearAccountCookiesAndRedirect(redirectUrl: string): Response {

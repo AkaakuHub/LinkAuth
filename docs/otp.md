@@ -10,7 +10,7 @@ account WorkerはOTP challenge作成時に`expires_at = now + 300`をuser-apiへ
 
 OTPは平文では保存しません。
 
-user-apiはOTPをSHA-256でハッシュ化し、DynamoDBに`otp_hash`として保存します。
+user-apiは`challenge_id`とOTPをHMAC-SHA-256でハッシュ化し、DynamoDBに`otp_hash`として保存します。
 
 ## 消費方法
 

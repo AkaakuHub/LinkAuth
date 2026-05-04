@@ -103,11 +103,7 @@ export async function handleUserApiRequest(
     return await rotateRememberToken(context, body);
   }
   if (path === "/remember/delete") {
-    await deleteRememberToken(
-      context,
-      requireString(body, "discord_id"),
-      requireString(body, "token_id"),
-    );
+    await deleteRememberToken(context, requireString(body, "token_id"));
     return json(200, { ok: true });
   }
   if (path === "/remember/delete-all") {

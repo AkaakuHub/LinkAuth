@@ -10,7 +10,7 @@ import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
 import { isWebp512 } from "../media/webp.js";
 import { authStateCookieName, createAuthState } from "../security/authState.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "../security/csrf.js";
-import { requireSession } from "../security/session.js";
+import { appendSessionCookies, requireSession } from "../security/session.js";
 import { clearAccountCookiesAndRedirect } from "../services/accountSessionCookie.js";
 import { verifyActiveUser } from "../services/userDirectory.js";
 import { inactiveAccountPage } from "../views/accountErrorPage.js";
@@ -30,11 +30,14 @@ export async function accountHome(
   if (!active) {
     return inactiveAccountPage(config);
   }
-  return accountPage(
-    active.user,
-    url,
-    config,
-    accountReturnTo(url.searchParams.get("return_to"), config),
+  return appendSessionCookies(
+    await accountPage(
+      active.user,
+      url,
+      config,
+      accountReturnTo(url.searchParams.get("return_to"), config),
+    ),
+    session,
   );
 }
 
@@ -59,7 +62,7 @@ export async function updateProfile(
     display_name: String(form.get("display_name") ?? ""),
     request_id: crypto.randomUUID(),
   });
-  return redirectToAccountRoot(url, returnTo);
+  return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
 }
 
 export async function updateAvatar(
@@ -99,7 +102,7 @@ export async function updateAvatar(
     icon_key: iconKey,
     request_id: crypto.randomUUID(),
   });
-  return Response.json({ ok: true });
+  return appendSessionCookies(Response.json({ ok: true }), session);
 }
 
 export async function deleteAccount(
@@ -148,7 +151,6 @@ export async function logout(
   const tokenId = remember?.split(".")[0];
   if (tokenId) {
     await callUserApi(config.userApi, "/remember/delete", {
-      discord_id: session.discord_id,
       token_id: tokenId,
       request_id: crypto.randomUUID(),
     });

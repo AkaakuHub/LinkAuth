@@ -1,6 +1,6 @@
 import { createExecutionContext } from "cloudflare:test";
 import { afterEach, expect, test, vi } from "vitest";
-import { hmacSha256Base64Url } from "../../shared/src/crypto.js";
+import { hmacSha256Base64Url, sha256Hex } from "../../shared/src/crypto.js";
 import { createCsrfToken } from "../../shared/src/csrf.js";
 import {
   appSessionCookieName,
@@ -405,7 +405,6 @@ test("Account Worker logout deletes the remember token and clears account cookie
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(calls).toEqual([
     expect.objectContaining({
-      discord_id: "123456789",
       token_id: "remember-id",
     }),
   ]);
@@ -440,6 +439,9 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
         expect(body.app_id).toBe("hub");
         expect(body.return_to).toBe("https://app.example.com/_auth/callback");
         expect(body.otp).toMatch(/^[0-9]{6}$/);
+        expect(body.expires_at).toBeGreaterThanOrEqual(
+          Math.floor(Date.now() / 1000) + 299,
+        );
         return Response.json({ ok: true });
       }
       if (url.pathname === "/api/v10/users/@me/channels") {
@@ -664,6 +666,7 @@ test("Account Worker OTP success ignores tampered app_id and return_to form fiel
 
 test("Account Worker OTP success creates account and remember cookies when remember_me is on", async () => {
   const calls: string[] = [];
+  const rememberCreateBodies: Record<string, unknown>[] = [];
   vi.stubGlobal(
     "fetch",
     async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -683,6 +686,7 @@ test("Account Worker OTP success creates account and remember cookies when remem
       }
       if (url.pathname === "/remember/create") {
         const body = decodeJsonBody(init);
+        rememberCreateBodies.push(body);
         expect(body.discord_id).toBe("123456789");
         expect(typeof body.token_hash).toBe("string");
         return Response.json({ ok: true });
@@ -707,11 +711,68 @@ test("Account Worker OTP success creates account and remember cookies when remem
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
+  expect(setCookie).toContain("Max-Age=15552000");
   expect(setCookie).toContain("HttpOnly");
   expect(setCookie).toContain("Secure");
+  const rememberValue = rememberCookieValue(setCookie);
+  expect(rememberValue).not.toBeNull();
+  const rememberParts = rememberValue?.split(".");
+  expect(rememberParts).toHaveLength(2);
+  const rememberCreateBody = rememberCreateBodies[0];
+  expect(rememberCreateBody?.token_id).toBe(rememberParts?.[0]);
+  expect(rememberCreateBody?.token_hash).toBe(
+    await hashTokenForTest(rememberParts?.[1] ?? ""),
+  );
+  expect(rememberCreateBody).not.toHaveProperty("random_token");
+  expect(rememberCreateBody?.expires_at).toBeGreaterThanOrEqual(
+    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
+  );
   expect(calls).toContain("/otp-challenge/consume");
   expect(calls).toContain("/users/verify-active");
   expect(calls).toContain("/remember/create");
+});
+
+test("Account Worker restores an account session with a valid remember cookie", async () => {
+  const oldRandomToken = "old-random-token";
+  const rememberRotateBodies: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === "/remember/rotate") {
+        const body = decodeJsonBody(init);
+        rememberRotateBodies.push(body);
+        expect(body.token_id).toBe("remember-id");
+        expect(body.old_token_hash).toBe(
+          await hashTokenForTest(oldRandomToken),
+        );
+        expect(typeof body.new_token_hash).toBe("string");
+        return Response.json({ user: activeUser });
+      }
+      if (url.pathname === "/users/verify-active") {
+        return Response.json({ user: activeUser });
+      }
+      return Response.json({ error: "not_found" }, { status: 404 });
+    },
+  );
+
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${rememberCookieName}=remember-id.${oldRandomToken}`,
+    },
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+
+  expect(response.status).toBe(200);
+  const body = await response.text();
+  expect(body).toContain("アカウント設定");
+  expect(body).toContain("data-avatar-csrf");
+  expect(setCookie).toContain(`${sessionCookieName}=`);
+  expect(setCookie).toContain(`${rememberCookieName}=`);
+  const rememberRotateBody = rememberRotateBodies[0];
+  expect(rememberRotateBody?.expires_at).toBeGreaterThanOrEqual(
+    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
+  );
 });
 
 test("Account Worker OTP success skips remember token creation when remember_me is off", async () => {
@@ -883,6 +944,15 @@ function decodeJsonBody(
       ? new TextDecoder().decode(init.body)
       : String(init.body);
   return JSON.parse(body) as Record<string, unknown>;
+}
+
+function rememberCookieValue(setCookie: string): string | null {
+  const match = setCookie.match(/__Host-org_remember=([^;,]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+async function hashTokenForTest(value: string): Promise<string> {
+  return await sha256Hex(new TextEncoder().encode(value));
 }
 
 const activeUser = {

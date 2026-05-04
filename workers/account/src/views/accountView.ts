@@ -21,24 +21,26 @@ export function accountView({
       returnTo,
       showBackLink,
     },
-  )}</header>${card({
-    className: "grid gap-6",
-    children: `<div class="grid gap-1"><h2 class="text-base font-semibold text-ink">プロフィール</h2><p class="text-sm leading-6 text-muted">Discord認証情報と表示名を管理します。</p></div><dl>${field(
-      {
-        label: "Discord ID",
-        value: `<span class="inline-flex items-center gap-2">${icon("id")}${escapeHtml(user.discord_id)}</span>`,
-      },
-    )}${field({
-      label: "表示名",
-      value: profileForm({ user, tokens, escapedReturnTo }),
-    })}${field({
-      label: "権限",
-      value: `<span class="inline-flex items-center gap-2">${icon("shield-check")}${escapeHtml(user.role)}</span>`,
-    })}${field({
-      label: "状態",
-      value: escapeHtml(user.status),
-    })}</dl><script src="/account-client.js" defer></script>`,
-  })}${card({
+  )}</header><input type="hidden" name="avatar_csrf_token"${attr("value", tokens.avatar)} data-avatar-csrf>${card(
+    {
+      className: "grid gap-6",
+      children: `<div class="grid gap-1"><h2 class="text-base font-semibold text-ink">プロフィール</h2><p class="text-sm leading-6 text-muted">Discord認証情報と表示名を管理します。</p></div><dl>${field(
+        {
+          label: "Discord ID",
+          value: `<span class="inline-flex items-center gap-2">${icon("id")}${escapeHtml(user.discord_id)}</span>`,
+        },
+      )}${field({
+        label: "表示名",
+        value: profileForm({ user, tokens, escapedReturnTo }),
+      })}${field({
+        label: "権限",
+        value: `<span class="inline-flex items-center gap-2">${icon("shield-check")}${escapeHtml(user.role)}</span>`,
+      })}${field({
+        label: "状態",
+        value: escapeHtml(user.status),
+      })}</dl><script src="/account-client.js" defer></script>`,
+    },
+  )}${card({
     className: "flex flex-wrap items-center justify-between gap-4",
     children: `<div class="grid gap-1"><h2 class="text-base font-semibold text-ink">セッション</h2><p class="text-sm text-muted">ログアウトまたはアカウント削除を行います。</p></div><div class="flex flex-wrap gap-2"><form method="post" action="/logout"><input type="hidden" name="csrf_token"${attr("value", tokens.logout)}><input type="hidden" name="return_to" value="${escapedReturnTo}">${button(
       {
