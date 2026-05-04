@@ -158,6 +158,33 @@ test("Account Worker issues an auth code for an active session", async () => {
   expect(location.searchParams.get("code")).toBeTruthy();
 });
 
+test("Account Worker inactive authorize errors return to the app callback", async () => {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/users/verify-current-membership") {
+      return Response.json({ error: "inactive_user" }, { status: 401 });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+  const session = await createAccountSession();
+
+  const response = await fetchAccount(
+    "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2F_auth%2Fcallback%3Fstate%3Dapp-state",
+    {
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("利用資格がありません");
+  expect(body).toContain(
+    'href="https://app.example.com/_auth/callback?state=app-state"',
+  );
+});
+
 test("Account Worker token endpoint rejects invalid JSON fields", async () => {
   const response = await fetchAccount("https://auth.example.com/token", {
     body: JSON.stringify({ app_id: "hub" }),
@@ -669,7 +696,10 @@ test("Account Worker callback rejects mismatched browser state cookies", async (
 });
 
 test("Account Worker callback rejects Discord users outside the configured guilds", async () => {
-  const state = await createCallbackState("hub");
+  const state = await createCallbackState(
+    "hub",
+    "https://app.example.com/_auth/callback?state=app-state",
+  );
   const calls: string[] = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -698,6 +728,9 @@ test("Account Worker callback rejects Discord users outside the configured guild
 
   expect(response.status).toBe(401);
   expect(body).toContain("利用資格がありません");
+  expect(body).toContain(
+    'href="https://app.example.com/_auth/callback?state=app-state"',
+  );
   expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
   expect(calls).not.toContain("/users/verify-current-membership");
   expect(calls).not.toContain("/otp-challenge/create");
@@ -1098,15 +1131,14 @@ async function otpHeaders(
   };
 }
 
-async function createCallbackState(appId?: string): Promise<string> {
+async function createCallbackState(
+  appId?: string,
+  returnTo = "https://app.example.com/_auth/callback",
+): Promise<string> {
   const { createAuthState } = await import(
     "../../workers/account/src/security/authState.js"
   );
-  const state = await createAuthState(
-    "https://app.example.com/_auth/callback",
-    testAccountConfig(),
-    appId,
-  );
+  const state = await createAuthState(returnTo, testAccountConfig(), appId);
   if (!state) {
     throw new Error("Callback state was not created");
   }

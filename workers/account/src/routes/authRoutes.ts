@@ -79,7 +79,7 @@ export async function authorize(
   }
   const active = await verifyCurrentMemberUser(session.discord_id, config);
   if (!active) {
-    return inactiveAccountPage(config);
+    return inactiveAccountPage(config, returnTo);
   }
   const code = randomBase64Url(32);
   await callUserApi(config.userApi, "/auth-code/create", {
@@ -173,18 +173,18 @@ export async function callback(
 
   const discordResult = await fetchDiscordOAuthResult(code, config);
   if (!discordResult) {
-    return callbackResponse(authFailedPage(config));
+    return callbackResponse(authFailedPage(config, state.return_to));
   }
   const guildMember = await fetchDiscordGuildMember(
     discordResult.accessToken,
     config,
   );
   if (!guildMember) {
-    return callbackResponse(inactiveAccountPage(config));
+    return callbackResponse(inactiveAccountPage(config, state.return_to));
   }
   const active = await verifyCurrentMemberUser(discordResult.user.id, config);
   if (!active) {
-    return callbackResponse(inactiveAccountPage(config));
+    return callbackResponse(inactiveAccountPage(config, state.return_to));
   }
 
   const challengeId = randomBase64Url(24);
@@ -203,7 +203,7 @@ export async function callback(
     config,
   );
   if (!otpResult.ok) {
-    return callbackResponse(otpDeliveryFailedPage(config));
+    return callbackResponse(otpDeliveryFailedPage(config, state.return_to));
   }
   const response = callbackResponse(
     otpPage(challengeId, state.return_to, state.app_id),
