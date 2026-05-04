@@ -5,8 +5,8 @@ import {
   timingSafeEqual,
 } from "./encoding.js";
 
-export const sessionCookieName = "__Secure-org_session";
-export const rememberCookieName = "__Secure-org_remember";
+export const sessionCookieName = "__Host-org_session";
+export const rememberCookieName = "__Host-org_remember";
 
 export type SessionPayload = {
   discord_id: string;
@@ -103,7 +103,7 @@ export async function verifySessionCookie(
 }
 
 export function appSessionCookieName(appId: string): string {
-  return `__Secure-${appId}_session`;
+  return `__Host-${appId}_session`;
 }
 
 export function getSingleCookie(
@@ -131,13 +131,11 @@ export function createCookie(
   name: string,
   value: string,
   maxAgeSeconds: number,
-  domain: string,
 ): string {
   return [
     `${name}=${encodeURIComponent(value)}`,
     `Max-Age=${maxAgeSeconds}`,
     "Path=/",
-    cookieDomainAttribute(domain),
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
@@ -146,20 +144,15 @@ export function createCookie(
     .join("; ");
 }
 
-export function deleteCookie(name: string, domain: string): string {
+export function deleteCookie(name: string): string {
   return [
     `${name}=`,
     "Max-Age=0",
     "Path=/",
-    cookieDomainAttribute(domain),
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
   ]
     .filter(Boolean)
     .join("; ");
-}
-
-function cookieDomainAttribute(domain: string): string {
-  return domain === "localhost" ? "" : `Domain=.${domain}`;
 }

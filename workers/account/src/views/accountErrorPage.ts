@@ -39,14 +39,8 @@ function accountErrorPage(
   content: { title: string; description: string },
 ): Response {
   const headers = noStoreHeaders();
-  headers.append(
-    "set-cookie",
-    deleteCookie(sessionCookieName, config.domainName),
-  );
-  headers.append(
-    "set-cookie",
-    deleteCookie(rememberCookieName, config.domainName),
-  );
+  headers.append("set-cookie", deleteCookie(sessionCookieName));
+  headers.append("set-cookie", deleteCookie(rememberCookieName));
 
   return page(
     "認証できません",

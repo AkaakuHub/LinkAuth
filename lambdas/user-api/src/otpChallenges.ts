@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import type { UserApiContext } from "./context.js";
-import { type JsonBody, json } from "./http.js";
+import { httpError, type JsonBody, json } from "./http.js";
 import { otpChallengeKey } from "./keys.js";
 import { requireNumber, requireString } from "./validation.js";
 
@@ -29,7 +29,7 @@ export async function putOtpChallenge(
         discord_id: requireString(body, "discord_id"),
         ...optionalStringItem(body, "app_id"),
         return_to: requireString(body, "return_to"),
-        otp_hash: await hashOtp(otp),
+        otp_hash: hashOtp(context.otpHashSecret, challengeId, otp),
         created_at: new Date().toISOString(),
         expires_at: requireNumber(body, "expires_at"),
       },
@@ -60,7 +60,7 @@ export async function consumeOtpChallenge(
     typeof item.otp_hash !== "string" ||
     typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
-    item.otp_hash !== (await hashOtp(otp))
+    item.otp_hash !== hashOtp(context.otpHashSecret, challengeId, otp)
   ) {
     return json(401, { error: "invalid_otp" });
   }
@@ -77,13 +77,15 @@ export async function consumeOtpChallenge(
 function requireOtp(body: JsonBody, key: string): string {
   const value = requireString(body, key);
   if (!/^[0-9]{6}$/.test(value)) {
-    return "";
+    throw httpError(400, `invalid_${key}`);
   }
   return value;
 }
 
-async function hashOtp(otp: string): Promise<string> {
-  return createHash("sha256").update(otp, "utf8").digest("hex");
+function hashOtp(secret: string, challengeId: string, otp: string): string {
+  return createHmac("sha256", secret)
+    .update(`${challengeId}.${otp}`, "utf8")
+    .digest("hex");
 }
 
 function optionalStringItem(

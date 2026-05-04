@@ -1,6 +1,8 @@
+import { hmacSha256Base64Url } from "../../../shared/src/crypto.js";
 import {
   appSessionCookieName,
   createCookie,
+  deleteCookie,
   getSingleCookie,
   signSessionCookie,
   verifySessionCookie,
@@ -9,6 +11,11 @@ import { attr, escapeHtml, page } from "../../shared/html.js";
 import { icon } from "../../shared/icons.js";
 import { card, linkButton } from "../../shared/ui.js";
 import { type AppConfig, withAppConfig } from "./appConfig.js";
+import {
+  appAuthStateCookieName,
+  createAppAuthState,
+  verifyAppAuthState,
+} from "./authState.js";
 
 export default withAppConfig(handleAppRequest);
 
@@ -18,7 +25,7 @@ async function handleAppRequest(
 ): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === "/_auth/callback" && request.method === "GET") {
-    return authCallback(url, config);
+    return authCallback(request, url, config);
   }
 
   const sessionCookie = appSessionCookieName(config.appId);
@@ -102,27 +109,57 @@ async function startLogin(
     String(form.get("return_to") ?? ""),
     new URL("/", request.url),
   );
+  const state = await createAppAuthState({ secret: config.session.secret });
   const callbackUrl = new URL("/_auth/callback", request.url);
+  callbackUrl.searchParams.set("state", state);
   callbackUrl.searchParams.set("return_to", returnTo);
   const authorizeUrl = new URL("/authorize", config.navigation.AUTH_BASE_URL);
   authorizeUrl.searchParams.set("app_id", config.appId);
   authorizeUrl.searchParams.set("return_to", callbackUrl.toString());
-  return Response.redirect(authorizeUrl, 302);
+  const headers = new Headers({ location: authorizeUrl.toString() });
+  headers.append(
+    "set-cookie",
+    createCookie(appAuthStateCookieName(config.appId), state, 600),
+  );
+  return new Response(null, { headers, status: 302 });
 }
 
-async function authCallback(url: URL, config: AppConfig): Promise<Response> {
+async function authCallback(
+  request: Request,
+  url: URL,
+  config: AppConfig,
+): Promise<Response> {
   const code = url.searchParams.get("code");
-  if (!code) {
-    return appAuthFailedPage(url);
+  const state = url.searchParams.get("state");
+  const cookieState = getSingleCookie(
+    request.headers.get("cookie"),
+    appAuthStateCookieName(config.appId),
+  );
+  if (
+    !code ||
+    !(await verifyAppAuthState({
+      expected: state,
+      secret: config.session.secret,
+      value: cookieState,
+    }))
+  ) {
+    return clearAppAuthState(appAuthFailedPage(url), config);
   }
   const tokenUrl = new URL("/token", config.navigation.AUTH_BASE_URL);
+  const rawBody = JSON.stringify({ app_id: config.appId, code });
   const response = await fetch(tokenUrl, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ app_id: config.appId, code }),
+    headers: {
+      "content-type": "application/json",
+      "x-app-token-signature": await hmacSha256Base64Url(
+        config.session.secret,
+        `${config.appId}.${code}`,
+      ),
+    },
+    body: rawBody,
   });
   if (!response.ok) {
-    return appAuthFailedPage(url);
+    return clearAppAuthState(appAuthFailedPage(url), config);
   }
   const body = (await response.json()) as {
     user?: {
@@ -138,7 +175,7 @@ async function authCallback(url: URL, config: AppConfig): Promise<Response> {
     typeof user.display_name !== "string" ||
     (user.role !== "user" && user.role !== "admin")
   ) {
-    return appAuthFailedPage(url);
+    return clearAppAuthState(appAuthFailedPage(url), config);
   }
   const now = Math.floor(Date.now() / 1000);
   const session = await signSessionCookie(
@@ -156,14 +193,26 @@ async function authCallback(url: URL, config: AppConfig): Promise<Response> {
   const headers = new Headers({ location: appReturnTo(url) });
   headers.append(
     "set-cookie",
-    createCookie(
-      appSessionCookieName(config.appId),
-      session,
-      3_600,
-      config.domainName,
-    ),
+    createCookie(appSessionCookieName(config.appId), session, 3_600),
+  );
+  headers.append(
+    "set-cookie",
+    deleteCookie(appAuthStateCookieName(config.appId)),
   );
   return new Response(null, { status: 302, headers });
+}
+
+function clearAppAuthState(response: Response, config: AppConfig): Response {
+  const headers = new Headers(response.headers);
+  headers.append(
+    "set-cookie",
+    deleteCookie(appAuthStateCookieName(config.appId)),
+  );
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
 }
 
 function appAuthFailedPage(url: URL): Response {

@@ -1,4 +1,5 @@
 import {
+  createCookie,
   getSingleCookie,
   rememberCookieName,
 } from "../../../../shared/src/session.js";
@@ -7,7 +8,7 @@ import type { AccountConfig } from "../accountConfig.js";
 import { accountReturnTo, redirectToAccountRoot } from "../domain/returnTo.js";
 import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
 import { isWebp512 } from "../media/webp.js";
-import { createAuthState } from "../security/authState.js";
+import { authStateCookieName, createAuthState } from "../security/authState.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "../security/csrf.js";
 import { requireSession } from "../security/session.js";
 import { clearAccountCookiesAndRedirect } from "../services/accountSessionCookie.js";
@@ -23,7 +24,7 @@ export async function accountHome(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return accountLandingPage(await accountHomeDiscordAuthorizeUrl(config));
+    return await accountLandingResponse(config);
   }
   const active = await verifyActiveUser(session.discord_id, config);
   if (!active) {
@@ -44,7 +45,7 @@ export async function updateProfile(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return accountLandingPage(await accountHomeDiscordAuthorizeUrl(config));
+    return await accountLandingResponse(config);
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "profile"))
@@ -68,7 +69,7 @@ export async function updateAvatar(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return accountLandingPage(await accountHomeDiscordAuthorizeUrl(config));
+    return await accountLandingResponse(config);
   }
   if (
     !(await verifyHeaderCsrf(
@@ -108,7 +109,7 @@ export async function deleteAccount(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return accountLandingPage(await accountHomeDiscordAuthorizeUrl(config));
+    return await accountLandingResponse(config);
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "delete"))
@@ -121,7 +122,7 @@ export async function deleteAccount(
     discord_id: session.discord_id,
     request_id: crypto.randomUUID(),
   });
-  return clearAccountCookiesAndRedirect(config, returnTo);
+  return clearAccountCookiesAndRedirect(returnTo);
 }
 
 export async function logout(
@@ -131,7 +132,7 @@ export async function logout(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return accountLandingPage(await accountHomeDiscordAuthorizeUrl(config));
+    return await accountLandingResponse(config);
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "logout"))
@@ -152,17 +153,22 @@ export async function logout(
       request_id: crypto.randomUUID(),
     });
   }
-  return clearAccountCookiesAndRedirect(config, returnTo);
+  return clearAccountCookiesAndRedirect(returnTo);
 }
 
-async function accountHomeDiscordAuthorizeUrl(
+async function accountLandingResponse(
   config: AccountConfig,
-): Promise<string> {
+): Promise<Response> {
   const state = await createAuthState(config.navigation.ACCOUNT_URL, config);
   if (!state) {
     throw new Error("ACCOUNT_URL is not allowed as return_to");
   }
-  return (
-    redirectToDiscordAuthorize(state, config).headers.get("location") ?? ""
+  const authorizeUrl =
+    redirectToDiscordAuthorize(state, config).headers.get("location") ?? "";
+  const response = accountLandingPage(authorizeUrl);
+  response.headers.append(
+    "set-cookie",
+    createCookie(authStateCookieName, state, 600),
   );
+  return response;
 }

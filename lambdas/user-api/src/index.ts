@@ -31,6 +31,7 @@ export async function handler(
       tableName: config.tableName,
       discordGuildIds: config.discord.guildIds,
       discordBotToken: config.discord.botToken,
+      otpHashSecret: config.internalHmac.secret,
       dynamodb: config.dynamodb,
     };
     return await handleUserApiRequest(event, context, config.internalHmac);

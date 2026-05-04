@@ -1,5 +1,6 @@
 import { createExecutionContext } from "cloudflare:test";
 import { afterEach, expect, test, vi } from "vitest";
+import { hmacSha256Base64Url } from "../../shared/src/crypto.js";
 import { createCsrfToken } from "../../shared/src/csrf.js";
 import {
   appSessionCookieName,
@@ -13,6 +14,10 @@ import {
   authStateCookieName,
   parseAuthState,
 } from "../../workers/account/src/security/authState.js";
+import {
+  createOtpState,
+  otpStateCookieName,
+} from "../../workers/account/src/security/otpState.js";
 import type { Env } from "../../workers/account/src/types.js";
 
 const assets: R2Bucket = {
@@ -176,14 +181,26 @@ test("Account Worker token endpoint maps consumed auth code failures to 401", as
 
   const response = await fetchAccount("https://auth.example.com/token", {
     body: JSON.stringify({ app_id: "hub", code: "bad-code" }),
-    headers: {
-      "content-type": "application/json",
-    },
+    headers: await tokenHeaders("hub", "bad-code"),
     method: "POST",
   });
 
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "invalid_auth_code" });
+});
+
+test("Account Worker token endpoint rejects invalid app signatures", async () => {
+  const response = await fetchAccount("https://auth.example.com/token", {
+    body: JSON.stringify({ app_id: "hub", code: "auth-code" }),
+    headers: {
+      "content-type": "application/json",
+      "x-app-token-signature": "invalid",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "invalid_app_signature" });
 });
 
 test("Account Worker token endpoint rejects unknown apps before User API", async () => {
@@ -449,6 +466,9 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   expect(body).toContain("OTP認証");
   expect(body).toContain('name="app_id" value="hub"');
   expect(body).toContain('name="remember_me" value="1" checked');
+  expect(response.headers.get("set-cookie")).toContain(
+    `${otpStateCookieName}=`,
+  );
   expect(calls).toContain("/api/v10/oauth2/token");
   expect(calls).toContain("/api/v10/users/@me");
   expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
@@ -532,6 +552,7 @@ test("Account Worker OTP success returns to authorize for app callbacks", async 
       otp: "123456",
       return_to: "https://app.example.com/_auth/callback",
     }),
+    headers: await otpHeaders("challenge-id"),
     method: "POST",
   });
   const location = new URL(response.headers.get("location") ?? "");
@@ -543,6 +564,22 @@ test("Account Worker OTP success returns to authorize for app callbacks", async 
   expect(location.searchParams.get("return_to")).toBe(
     "https://app.example.com/_auth/callback",
   );
+});
+
+test("Account Worker OTP rejects requests without the browser challenge state", async () => {
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      challenge_id: "challenge-id",
+      otp: "123456",
+    }),
+    method: "POST",
+  });
+
+  expect(response.status).toBe(401);
+  expect(response.headers.get("set-cookie")).toContain(
+    `${otpStateCookieName}=`,
+  );
+  expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
 });
 
 test("Account Worker OTP success does not use app_id for non-callback return_to values", async () => {
@@ -574,6 +611,7 @@ test("Account Worker OTP success does not use app_id for non-callback return_to 
       otp: "123456",
       return_to: "https://app.example.com/",
     }),
+    headers: await otpHeaders("challenge-id"),
     method: "POST",
   });
 
@@ -610,6 +648,7 @@ test("Account Worker OTP success ignores tampered app_id and return_to form fiel
       otp: "123456",
       return_to: "https://evil.example.com/callback",
     }),
+    headers: await otpHeaders("challenge-id"),
     method: "POST",
   });
   const location = new URL(response.headers.get("location") ?? "");
@@ -659,6 +698,7 @@ test("Account Worker OTP success creates account and remember cookies when remem
       remember_me: "1",
       return_to: "https://app.example.com/",
     }),
+    headers: await otpHeaders("challenge-id"),
     method: "POST",
   });
   const setCookie = response.headers.get("set-cookie") ?? "";
@@ -703,6 +743,7 @@ test("Account Worker OTP success skips remember token creation when remember_me 
       otp: "123456",
       return_to: "https://app.example.com/",
     }),
+    headers: await otpHeaders("challenge-id"),
     method: "POST",
   });
   const setCookie = response.headers.get("set-cookie") ?? "";
@@ -777,6 +818,28 @@ async function createAccountCsrfToken(
     origin: "https://account.example.com",
     secret: env.CSRF_HMAC_SECRET,
   });
+}
+
+async function tokenHeaders(
+  appId: string,
+  code: string,
+): Promise<Record<string, string>> {
+  return {
+    "content-type": "application/json",
+    "x-app-token-signature": await hmacSha256Base64Url(
+      "app-session-secret",
+      `${appId}.${code}`,
+    ),
+  };
+}
+
+async function otpHeaders(
+  challengeId: string,
+): Promise<Record<string, string>> {
+  const state = await createOtpState(challengeId, testAccountConfig());
+  return {
+    cookie: `${otpStateCookieName}=${encodeURIComponent(state)}`,
+  };
 }
 
 async function createCallbackState(appId?: string): Promise<string> {

@@ -15,7 +15,7 @@ export type AuthState = {
   return_to: string;
 };
 
-export const authStateCookieName = "__Secure-org_auth_state";
+export const authStateCookieName = "__Host-org_auth_state";
 
 export async function createAuthState(
   returnToValue: string | null,

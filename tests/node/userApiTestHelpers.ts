@@ -46,6 +46,12 @@ export function createUserApiContext(items: DynamoItem[] = []): {
       return {};
     }
     const values = input.ExpressionAttributeValues as Record<string, unknown>;
+    if (
+      input.ConditionExpression === "token_hash = :old_token_hash" &&
+      current.token_hash !== values[":old_token_hash"]
+    ) {
+      throw new Error("ConditionalCheckFailed");
+    }
     if (":token_hash" in values) {
       current.token_hash = values[":token_hash"];
     }
@@ -73,6 +79,7 @@ export function createUserApiContext(items: DynamoItem[] = []): {
       tableName: "test-table",
       discordGuildIds: [],
       discordBotToken: "discord-bot-token",
+      otpHashSecret: "otp-hash-secret",
       dynamodb: DynamoDBDocumentClient.from(
         new DynamoDBClient({
           credentials: {

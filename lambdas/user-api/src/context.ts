@@ -16,5 +16,6 @@ export type UserApiContext = {
   tableName: string;
   discordGuildIds: string[];
   discordBotToken: string;
+  otpHashSecret: string;
   dynamodb: DynamoDBDocumentClient;
 };

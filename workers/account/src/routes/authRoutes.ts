@@ -1,4 +1,8 @@
-import { randomBase64Url } from "../../../../shared/src/crypto.js";
+import {
+  hmacSha256Base64Url,
+  randomBase64Url,
+} from "../../../../shared/src/crypto.js";
+import { timingSafeEqual } from "../../../../shared/src/encoding.js";
 import {
   appSessionCookieName,
   createCookie,
@@ -23,6 +27,11 @@ import {
   createAuthState,
   parseAuthState,
 } from "../security/authState.js";
+import {
+  createOtpState,
+  otpStateCookieName,
+  verifyOtpState,
+} from "../security/otpState.js";
 import { requireSession } from "../security/session.js";
 import { createAccountSessionResponse } from "../services/accountSessionCookie.js";
 import { sendDiscordOtp } from "../services/discordOtp.js";
@@ -59,7 +68,7 @@ export async function authorize(
     }
     return appendSetCookie(
       redirectToDiscordAuthorize(state, config),
-      createCookie(authStateCookieName, state, 600, config.domainName),
+      createCookie(authStateCookieName, state, 600),
     );
   }
   const active = await verifyCurrentMemberUser(session.discord_id, config);
@@ -92,8 +101,17 @@ export async function token(
   if (typeof appId !== "string" || typeof code !== "string") {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
-  if (!findApp(config, appId)) {
+  const app = findApp(config, appId);
+  if (!app?.sessionVerifySecret) {
     return Response.json({ error: "unknown_app" }, { status: 403 });
+  }
+  const signature = request.headers.get("x-app-token-signature");
+  const expectedSignature = await hmacSha256Base64Url(
+    app.sessionVerifySecret,
+    `${appId}.${code}`,
+  );
+  if (!signature || !timingSafeEqual(signature, expectedSignature)) {
+    return Response.json({ error: "invalid_app_signature" }, { status: 401 });
   }
   try {
     return Response.json(
@@ -132,30 +150,29 @@ export async function callback(
   const stateValue = url.searchParams.get("state");
   const state = await parseAuthState(stateValue, config);
   if (!code || !state) {
-    return callbackResponse(authFailedPage(config), config);
+    return callbackResponse(authFailedPage(config));
   }
   if (
-    state.app_id &&
     getSingleCookie(request.headers.get("cookie"), authStateCookieName) !==
-      stateValue
+    stateValue
   ) {
-    return callbackResponse(authFailedPage(config), config);
+    return callbackResponse(authFailedPage(config));
   }
 
   const discordResult = await fetchDiscordOAuthResult(code, config);
   if (!discordResult) {
-    return callbackResponse(authFailedPage(config), config);
+    return callbackResponse(authFailedPage(config));
   }
   const guildMember = await fetchDiscordGuildMember(
     discordResult.accessToken,
     config,
   );
   if (!guildMember) {
-    return callbackResponse(inactiveAccountPage(config), config);
+    return callbackResponse(inactiveAccountPage(config));
   }
   const active = await verifyCurrentMemberUser(discordResult.user.id, config);
   if (!active) {
-    return callbackResponse(inactiveAccountPage(config), config);
+    return callbackResponse(inactiveAccountPage(config));
   }
 
   const challengeId = randomBase64Url(24);
@@ -174,19 +191,24 @@ export async function callback(
     config,
   );
   if (!otpResult.ok) {
-    return callbackResponse(otpDeliveryFailedPage(config), config);
+    return callbackResponse(otpDeliveryFailedPage(config));
   }
-  return callbackResponse(
+  const response = callbackResponse(
     otpPage(challengeId, state.return_to, state.app_id),
-    config,
   );
+  response.headers.append(
+    "set-cookie",
+    createCookie(
+      otpStateCookieName,
+      await createOtpState(challengeId, config),
+      600,
+    ),
+  );
+  return response;
 }
 
-function callbackResponse(response: Response, config: AccountConfig): Response {
-  return appendSetCookie(
-    response,
-    deleteCookie(authStateCookieName, config.domainName),
-  );
+function callbackResponse(response: Response): Response {
+  return appendSetCookie(response, deleteCookie(authStateCookieName));
 }
 
 function appendSetCookie(response: Response, value: string): Response {
@@ -207,8 +229,15 @@ export async function otp(
   const challengeId = String(form.get("challenge_id") ?? "");
   const otpCode = String(form.get("otp") ?? "");
   const rememberMe = form.get("remember_me") === "1";
-  if (!/^[0-9]{6}$/.test(otpCode)) {
-    return authFailedPage(config);
+  if (
+    !/^[0-9]{6}$/.test(otpCode) ||
+    !(await verifyOtpState({
+      challengeId,
+      config,
+      value: getSingleCookie(request.headers.get("cookie"), otpStateCookieName),
+    }))
+  ) {
+    return clearOtpState(authFailedPage(config));
   }
   try {
     const result = await callUserApi<{
@@ -221,9 +250,9 @@ export async function otp(
     });
     const active = await verifyActiveUser(result.discord_id, config);
     if (!active) {
-      return inactiveAccountPage(config);
+      return clearOtpState(inactiveAccountPage(config));
     }
-    return await createAccountSessionResponse(
+    const response = await createAccountSessionResponse(
       active.user,
       postOtpReturnTo({
         appId: result.app_id ?? "",
@@ -232,12 +261,18 @@ export async function otp(
         returnTo: accountReturnTo(result.return_to, config),
       }),
     );
+    response.headers.append("set-cookie", deleteCookie(otpStateCookieName));
+    return response;
   } catch (error) {
     if (error instanceof UserApiError && error.status === 401) {
-      return authFailedPage(config);
+      return clearOtpState(authFailedPage(config));
     }
     throw error;
   }
+}
+
+function clearOtpState(response: Response): Response {
+  return appendSetCookie(response, deleteCookie(otpStateCookieName));
 }
 
 function postOtpReturnTo(input: {

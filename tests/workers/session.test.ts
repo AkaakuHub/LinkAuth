@@ -58,7 +58,7 @@ test("Session cookie rejects duplicate cookie values", () => {
 });
 
 test("Session cookie is Secure, HttpOnly, and SameSite=Lax", () => {
-  expect(createCookie("sid", "value", 60, "example.com")).toBe(
-    "sid=value; Max-Age=60; Path=/; Domain=.example.com; HttpOnly; Secure; SameSite=Lax",
+  expect(createCookie("sid", "value", 60)).toBe(
+    "sid=value; Max-Age=60; Path=/; HttpOnly; Secure; SameSite=Lax",
   );
 });

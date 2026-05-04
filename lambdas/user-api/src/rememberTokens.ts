@@ -65,19 +65,25 @@ export async function rotateRememberToken(
   if (!user) {
     return json(401, { error: "inactive_user" });
   }
-  await context.dynamodb.send(
-    new UpdateCommand({
-      TableName: context.tableName,
-      Key: rememberKey(discordId, tokenId),
-      UpdateExpression:
-        "SET token_hash = :token_hash, last_used_at = :last_used_at, expires_at = :expires_at",
-      ExpressionAttributeValues: {
-        ":token_hash": newTokenHash,
-        ":last_used_at": new Date().toISOString(),
-        ":expires_at": requireNumber(body, "expires_at"),
-      },
-    }),
-  );
+  try {
+    await context.dynamodb.send(
+      new UpdateCommand({
+        TableName: context.tableName,
+        Key: rememberKey(discordId, tokenId),
+        UpdateExpression:
+          "SET token_hash = :token_hash, last_used_at = :last_used_at, expires_at = :expires_at",
+        ConditionExpression: "token_hash = :old_token_hash",
+        ExpressionAttributeValues: {
+          ":old_token_hash": oldTokenHash,
+          ":token_hash": newTokenHash,
+          ":last_used_at": new Date().toISOString(),
+          ":expires_at": requireNumber(body, "expires_at"),
+        },
+      }),
+    );
+  } catch {
+    return json(401, { error: "invalid_remember_token" });
+  }
   return json(200, { user });
 }
 

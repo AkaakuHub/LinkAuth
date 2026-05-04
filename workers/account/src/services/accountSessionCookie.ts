@@ -34,7 +34,7 @@ export async function createAccountSessionResponse(
   const headers = new Headers({ location: input.returnTo });
   headers.append(
     "set-cookie",
-    createCookie(sessionCookieName, session, 86_400, input.config.domainName),
+    createCookie(sessionCookieName, session, 86_400),
   );
   if (input.rememberMe) {
     const tokenId = randomBase64Url(16);
@@ -48,35 +48,18 @@ export async function createAccountSessionResponse(
     });
     headers.append(
       "set-cookie",
-      createCookie(
-        rememberCookieName,
-        rememberValue,
-        15_552_000,
-        input.config.domainName,
-      ),
+      createCookie(rememberCookieName, rememberValue, 15_552_000),
     );
   } else {
-    headers.append(
-      "set-cookie",
-      deleteCookie(rememberCookieName, input.config.domainName),
-    );
+    headers.append("set-cookie", deleteCookie(rememberCookieName));
   }
   return new Response(null, { status: 302, headers });
 }
 
-export function clearAccountCookiesAndRedirect(
-  config: AccountConfig,
-  redirectUrl: string,
-): Response {
+export function clearAccountCookiesAndRedirect(redirectUrl: string): Response {
   const headers = noStoreHeaders();
   headers.set("location", redirectUrl);
-  headers.append(
-    "set-cookie",
-    deleteCookie(sessionCookieName, config.domainName),
-  );
-  headers.append(
-    "set-cookie",
-    deleteCookie(rememberCookieName, config.domainName),
-  );
+  headers.append("set-cookie", deleteCookie(sessionCookieName));
+  headers.append("set-cookie", deleteCookie(rememberCookieName));
   return new Response(null, { status: 302, headers });
 }

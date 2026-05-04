@@ -46,6 +46,38 @@ test("Internal signature rejects body tampering", async () => {
   ).toBe(false);
 });
 
+test("Internal signature rejects path tampering", async () => {
+  const { context } = createUserApiContext();
+  const event = await signedEvent({
+    method: "POST",
+    path: "/users/active",
+    query: "",
+    body,
+    timestamp,
+  });
+  event.rawPath = "/remember/delete";
+
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    false,
+  );
+});
+
+test("Internal signature rejects query tampering", async () => {
+  const { context } = createUserApiContext();
+  const event = await signedEvent({
+    method: "POST",
+    path: "/users/active",
+    query: "a=1",
+    body,
+    timestamp,
+  });
+  event.rawQueryString = "a=2";
+
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    false,
+  );
+});
+
 test("Internal signature rejects an old timestamp", async () => {
   const { context } = createUserApiContext();
   const event = await signedEvent({
