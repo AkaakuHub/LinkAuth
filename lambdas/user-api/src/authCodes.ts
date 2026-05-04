@@ -1,4 +1,4 @@
-import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import type { UserApiContext, UserProfile } from "./context.js";
 import { httpError, type JsonBody, json } from "./http.js";
@@ -44,14 +44,14 @@ export async function consumeAuthCode(
 ): Promise<APIGatewayProxyStructuredResultV2> {
   const appId = requireString(body, "app_id");
   const code = requireString(body, "code");
+  const now = Math.floor(Date.now() / 1000);
   const result = await context.dynamodb.send(
-    new DeleteCommand({
+    new GetCommand({
       TableName: context.tableName,
       Key: authCodeKey(code),
-      ReturnValues: "ALL_OLD",
     }),
   );
-  const item = result.Attributes as AuthCodeItem | undefined;
+  const item = result.Item as AuthCodeItem | undefined;
   if (
     !item ||
     item.app_id !== appId ||
@@ -59,8 +59,23 @@ export async function consumeAuthCode(
     typeof item.display_name !== "string" ||
     (item.role !== "user" && item.role !== "admin") ||
     typeof item.expires_at !== "number" ||
-    item.expires_at <= Math.floor(Date.now() / 1000)
+    item.expires_at <= now
   ) {
+    return json(401, { error: "invalid_auth_code" });
+  }
+  try {
+    await context.dynamodb.send(
+      new DeleteCommand({
+        TableName: context.tableName,
+        Key: authCodeKey(code),
+        ConditionExpression: "app_id = :app_id AND expires_at > :now",
+        ExpressionAttributeValues: {
+          ":app_id": appId,
+          ":now": now,
+        },
+      }),
+    );
+  } catch {
     return json(401, { error: "invalid_auth_code" });
   }
   return json(200, {

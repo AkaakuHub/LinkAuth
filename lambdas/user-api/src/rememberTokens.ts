@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+import type { QueryCommandOutput } from "@aws-sdk/lib-dynamodb";
 import {
   DeleteCommand,
   GetCommand,
@@ -7,7 +9,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import type { UserApiContext } from "./context.js";
-import { type JsonBody, json } from "./http.js";
+import { httpError, type JsonBody, json } from "./http.js";
 import { rememberKey } from "./keys.js";
 import { getActiveUser } from "./users.js";
 import { requireNumber, requireString } from "./validation.js";
@@ -17,6 +19,10 @@ export async function putRememberToken(
   body: JsonBody,
 ): Promise<void> {
   const discordId = requireString(body, "discord_id");
+  const user = await getActiveUser(context, discordId, false);
+  if (!user) {
+    throw httpError(401, "inactive_user");
+  }
   await context.dynamodb.send(
     new PutCommand({
       TableName: context.tableName,
@@ -58,7 +64,8 @@ export async function rotateRememberToken(
     typeof item.discord_id !== "string" ||
     typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
-    item.token_hash !== oldTokenHash
+    typeof item.token_hash !== "string" ||
+    !safeEqual(item.token_hash, oldTokenHash)
   ) {
     await deleteRememberToken(context, tokenId);
     return json(401, { error: "invalid_remember_token" });
@@ -105,18 +112,31 @@ export async function deleteAllRememberTokens(
   context: UserApiContext,
   discordId: string,
 ): Promise<void> {
-  const result = await context.dynamodb.send(
-    new QueryCommand({
-      TableName: context.tableName,
-      IndexName: "gsi1",
-      KeyConditionExpression: "gsi1pk = :pk AND begins_with(gsi1sk, :remember)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${discordId}`,
-        ":remember": "REMEMBER#",
-      },
-    }),
-  );
-  for (const item of result.Items ?? []) {
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const result: QueryCommandOutput = await context.dynamodb.send(
+      new QueryCommand({
+        TableName: context.tableName,
+        IndexName: "gsi1",
+        KeyConditionExpression:
+          "gsi1pk = :pk AND begins_with(gsi1sk, :remember)",
+        ExpressionAttributeValues: {
+          ":pk": `USER#${discordId}`,
+          ":remember": "REMEMBER#",
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+    await deleteRememberTokenItems(context, result.Items ?? []);
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+}
+
+async function deleteRememberTokenItems(
+  context: UserApiContext,
+  items: Record<string, unknown>[],
+): Promise<void> {
+  for (const item of items) {
     await context.dynamodb.send(
       new DeleteCommand({
         TableName: context.tableName,
@@ -124,4 +144,13 @@ export async function deleteAllRememberTokens(
       }),
     );
   }
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }

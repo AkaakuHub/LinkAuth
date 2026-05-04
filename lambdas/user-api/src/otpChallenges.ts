@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import type { UserApiContext } from "./context.js";
@@ -28,7 +28,7 @@ export async function putOtpChallenge(
         challenge_id: challengeId,
         discord_id: requireString(body, "discord_id"),
         ...optionalStringItem(body, "app_id"),
-        return_to: requireString(body, "return_to"),
+        return_to: requireReturnTo(body),
         otp_hash: hashOtp(context.otpHashSecret, challengeId, otp),
         created_at: new Date().toISOString(),
         expires_at: requireNumber(body, "expires_at"),
@@ -60,7 +60,7 @@ export async function consumeOtpChallenge(
     typeof item.otp_hash !== "string" ||
     typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
-    item.otp_hash !== hashOtp(context.otpHashSecret, challengeId, otp)
+    !safeEqual(item.otp_hash, hashOtp(context.otpHashSecret, challengeId, otp))
   ) {
     return json(401, { error: "invalid_otp" });
   }
@@ -74,12 +74,37 @@ export async function consumeOtpChallenge(
   });
 }
 
+function requireReturnTo(body: JsonBody): string {
+  const value = requireString(body, "return_to");
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) {
+      throw httpError(400, "invalid_return_to");
+    }
+    return url.toString();
+  } catch (error) {
+    if (error instanceof Error && "statusCode" in error) {
+      throw error;
+    }
+    throw httpError(400, "invalid_return_to");
+  }
+}
+
 function requireOtp(body: JsonBody, key: string): string {
   const value = requireString(body, key);
   if (!/^[0-9]{6}$/.test(value)) {
     throw httpError(400, `invalid_${key}`);
   }
   return value;
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }
 
 function hashOtp(secret: string, challengeId: string, otp: string): string {

@@ -102,3 +102,17 @@ test("OTP challenge rejects malformed codes at creation", async () => {
     }),
   ).rejects.toThrow("invalid_otp");
 });
+
+test("OTP challenge rejects credentialed return_to values at creation", async () => {
+  const { context } = createUserApiContext();
+
+  await expect(
+    putOtpChallenge(context, {
+      challenge_id: "challenge",
+      discord_id: "123456789",
+      otp: "123456",
+      return_to: "https://user:pass@app.example.com/",
+      expires_at: nowSeconds + 300,
+    }),
+  ).rejects.toThrow("invalid_return_to");
+});

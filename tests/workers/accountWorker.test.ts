@@ -490,6 +490,22 @@ test("Account Worker callback rejects app auth states without the browser state 
   expect(response.status).toBe(401);
 });
 
+test("Account Worker callback rejects mismatched browser state cookies", async () => {
+  const state = await createCallbackState("hub");
+  const otherState = await createCallbackState("hub");
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(otherState)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
+});
+
 test("Account Worker callback rejects Discord users outside the configured guilds", async () => {
   const state = await createCallbackState("hub");
   const calls: string[] = [];
@@ -773,6 +789,23 @@ test("Account Worker restores an account session with a valid remember cookie", 
   expect(rememberRotateBody?.expires_at).toBeGreaterThanOrEqual(
     Math.floor(Date.now() / 1000) + 15_552_000 - 1,
   );
+});
+
+test("Account Worker clears remember cookies that cannot restore a session", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({ error: "invalid_remember_token" }, { status: 401 }),
+  );
+
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${rememberCookieName}=remember-id.invalid-token`,
+    },
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+
+  expect(response.status).toBe(200);
+  expect(setCookie).toContain(`${rememberCookieName}=`);
+  expect(setCookie).toContain("Max-Age=0");
 });
 
 test("Account Worker OTP success skips remember token creation when remember_me is off", async () => {

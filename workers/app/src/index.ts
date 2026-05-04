@@ -109,10 +109,12 @@ async function startLogin(
     String(form.get("return_to") ?? ""),
     new URL("/", request.url),
   );
-  const state = await createAppAuthState({ secret: config.session.secret });
+  const state = await createAppAuthState({
+    returnTo,
+    secret: config.session.secret,
+  });
   const callbackUrl = new URL("/_auth/callback", request.url);
   callbackUrl.searchParams.set("state", state);
-  callbackUrl.searchParams.set("return_to", returnTo);
   const authorizeUrl = new URL("/authorize", config.navigation.AUTH_BASE_URL);
   authorizeUrl.searchParams.set("app_id", config.appId);
   authorizeUrl.searchParams.set("return_to", callbackUrl.toString());
@@ -135,14 +137,12 @@ async function authCallback(
     request.headers.get("cookie"),
     appAuthStateCookieName(config.appId),
   );
-  if (
-    !code ||
-    !(await verifyAppAuthState({
-      expected: state,
-      secret: config.session.secret,
-      value: cookieState,
-    }))
-  ) {
+  const appState = await verifyAppAuthState({
+    expected: state,
+    secret: config.session.secret,
+    value: cookieState,
+  });
+  if (!code || !appState) {
     return clearAppAuthState(appAuthFailedPage(url), config);
   }
   const tokenUrl = new URL("/token", config.navigation.AUTH_BASE_URL);
@@ -190,7 +190,9 @@ async function authCallback(
     },
     config.session.secret,
   );
-  const headers = new Headers({ location: appReturnTo(url) });
+  const headers = new Headers({
+    location: safeAppReturnTo(appState.return_to, new URL("/", url.origin)),
+  });
   headers.append(
     "set-cookie",
     createCookie(appSessionCookieName(config.appId), session, 3_600),
@@ -230,14 +232,6 @@ function appAuthFailedPage(url: URL): Response {
     })}</div>`,
     401,
   );
-}
-
-function appReturnTo(url: URL): string {
-  const value = url.searchParams.get("return_to");
-  if (!value) {
-    return new URL("/", url.origin).toString();
-  }
-  return safeAppReturnTo(value, new URL("/", url.origin));
 }
 
 function appReturnToUrl(request: Request): string {

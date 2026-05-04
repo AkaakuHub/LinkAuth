@@ -33,6 +33,18 @@ test("User API handler returns not_found for signed unknown paths", async () => 
   expect(parseJsonResponse(response)).toEqual({ error: "not_found" });
 });
 
+test("User API handler rejects signed non-POST requests", async () => {
+  const { context } = createUserApiContext();
+  const event = await createEvent("/remember/delete", {}, "GET");
+
+  const response = await handleUserApiRequest(event, context, internalHmac);
+
+  expect(response.statusCode).toBe(405);
+  expect(parseJsonResponse(response)).toEqual({
+    error: "method_not_allowed",
+  });
+});
+
 test("User API handler rejects signed nonce replay", async () => {
   const { context } = createUserApiContext();
   const event = await createEvent("/unknown", {});
@@ -86,12 +98,13 @@ test("User API handler returns active users through the signed boundary", async 
 async function createEvent(
   path: string,
   body: Record<string, unknown>,
+  method = "POST",
 ): Promise<APIGatewayProxyEventV2> {
   const rawBody = new TextEncoder().encode(JSON.stringify(body));
   const headers = await createInternalHeaders({
     body: rawBody,
     kid: internalHmac.kid,
-    method: "POST",
+    method,
     nonce: "nonce",
     path,
     query: new URLSearchParams(),
@@ -110,19 +123,19 @@ async function createEvent(
       domainName: "user-api.example.com",
       domainPrefix: "user-api",
       http: {
-        method: "POST",
+        method,
         path,
         protocol: "HTTP/1.1",
         sourceIp: "127.0.0.1",
         userAgent: "vitest",
       },
       requestId: "request",
-      routeKey: "POST /{proxy+}",
+      routeKey: `${method} /{proxy+}`,
       stage: "$default",
       time: "01/Jan/2026:00:00:00 +0000",
       timeEpoch: Date.now(),
     },
-    routeKey: "POST /{proxy+}",
+    routeKey: `${method} /{proxy+}`,
     version: "2.0",
   };
 }

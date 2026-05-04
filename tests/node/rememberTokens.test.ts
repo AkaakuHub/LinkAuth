@@ -65,18 +65,18 @@ test("Remember token rejects and deletes a mismatched token", async () => {
 });
 
 test("Remember token rejects disabled users", async () => {
-  const { context } = createUserApiContext([
-    {
-      ...activeUser,
-      status: "disabled",
-    },
-  ]);
+  const { context, items } = createUserApiContext([activeUser]);
   await putRememberToken(context, {
     discord_id: "123456789",
     token_id: "remember-id",
     token_hash: "old-hash",
     expires_at: nowSeconds + 300,
   });
+  const user = items.get("USER#123456789\nPROFILE");
+  if (!user) {
+    throw new Error("Active user is missing");
+  }
+  user.status = "disabled";
 
   const response = await rotateRememberToken(context, {
     token_id: "remember-id",
@@ -87,6 +87,24 @@ test("Remember token rejects disabled users", async () => {
 
   expect(response.statusCode).toBe(401);
   expect(parseJsonResponse(response)).toEqual({ error: "inactive_user" });
+});
+
+test("Remember token creation rejects inactive users", async () => {
+  const { context } = createUserApiContext([
+    {
+      ...activeUser,
+      status: "deleted",
+    },
+  ]);
+
+  await expect(
+    putRememberToken(context, {
+      discord_id: "123456789",
+      token_id: "remember-id",
+      token_hash: "old-hash",
+      expires_at: nowSeconds + 300,
+    }),
+  ).rejects.toThrow("inactive_user");
 });
 
 test("Remember token rejects and deletes expired tokens", async () => {
@@ -175,4 +193,34 @@ test("Remember token delete-all removes only remember tokens for the user", asyn
   expect(items.has("REMEMBER#two\nREMEMBER")).toBe(false);
   expect(items.has("USER#123456789\nPROFILE")).toBe(true);
   expect(items.has("REMEMBER#other\nREMEMBER")).toBe(true);
+});
+
+test("Remember token delete-all removes every query page", async () => {
+  const { context, items, setQueryPageSize } = createUserApiContext([
+    activeUser,
+    {
+      pk: "REMEMBER#one",
+      sk: "REMEMBER",
+      discord_id: "123456789",
+      gsi1pk: "USER#123456789",
+      gsi1sk: "REMEMBER#one",
+      token_hash: "hash-one",
+      token_id: "one",
+    },
+    {
+      pk: "REMEMBER#two",
+      sk: "REMEMBER",
+      discord_id: "123456789",
+      gsi1pk: "USER#123456789",
+      gsi1sk: "REMEMBER#two",
+      token_hash: "hash-two",
+      token_id: "two",
+    },
+  ]);
+  setQueryPageSize(1);
+
+  await deleteAllRememberTokens(context, "123456789");
+
+  expect(items.has("REMEMBER#one\nREMEMBER")).toBe(false);
+  expect(items.has("REMEMBER#two\nREMEMBER")).toBe(false);
 });

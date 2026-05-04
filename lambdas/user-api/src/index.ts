@@ -55,6 +55,9 @@ export async function handleUserApiRequest(
   if (!(await verifyInternalSignature(event, rawBody, internalHmac, context))) {
     return json(401, { error: "invalid_signature" });
   }
+  if (event.requestContext.http.method !== "POST") {
+    return json(405, { error: "method_not_allowed" });
+  }
 
   const path = event.rawPath;
   const body = parseBody(rawBody);

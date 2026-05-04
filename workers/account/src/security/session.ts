@@ -1,6 +1,7 @@
 import { randomBase64Url } from "../../../../shared/src/crypto.js";
 import {
   createCookie,
+  deleteCookie,
   getSingleCookie,
   rememberCookieName,
   sessionCookieName,
@@ -50,6 +51,22 @@ export function appendSessionCookies(
   for (const cookie of session.setCookies) {
     headers.append("set-cookie", cookie);
   }
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
+}
+
+export function appendRememberCookieDeletion(
+  request: Request,
+  response: Response,
+): Response {
+  if (!getSingleCookie(request.headers.get("cookie"), rememberCookieName)) {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  headers.append("set-cookie", deleteCookie(rememberCookieName));
   return new Response(response.body, {
     headers,
     status: response.status,

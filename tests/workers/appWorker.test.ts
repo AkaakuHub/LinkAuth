@@ -7,6 +7,7 @@ import {
 import {
   appAuthStateCookieName,
   createAppAuthState,
+  verifyAppAuthState,
 } from "../../workers/app/src/authState.js";
 import worker from "../../workers/app/src/index.js";
 
@@ -55,7 +56,9 @@ test("App Worker starts login by redirecting to the account authorize endpoint",
   expect(callbackUrl.origin).toBe("https://app.example.com");
   expect(callbackUrl.pathname).toBe("/_auth/callback");
   expect(callbackUrl.searchParams.get("state")).toBeTruthy();
-  expect(callbackUrl.searchParams.get("return_to")).toBe(
+  expect(callbackUrl.searchParams.get("return_to")).toBeNull();
+  await expectAppStateReturnTo(
+    callbackUrl.searchParams.get("state"),
     "https://app.example.com/dashboard",
   );
   expect(response.headers.get("set-cookie")).toContain(
@@ -73,7 +76,8 @@ test("App Worker login falls back to the app root for cross-origin return_to val
 
   const location = new URL(response.headers.get("location") ?? "");
   const callbackUrl = new URL(location.searchParams.get("return_to") ?? "");
-  expect(callbackUrl.searchParams.get("return_to")).toBe(
+  await expectAppStateReturnTo(
+    callbackUrl.searchParams.get("state"),
     "https://app.example.com/",
   );
 });
@@ -88,7 +92,8 @@ test("App Worker login falls back to the app root for credentialed return_to val
 
   const location = new URL(response.headers.get("location") ?? "");
   const callbackUrl = new URL(location.searchParams.get("return_to") ?? "");
-  expect(callbackUrl.searchParams.get("return_to")).toBe(
+  await expectAppStateReturnTo(
+    callbackUrl.searchParams.get("state"),
     "https://app.example.com/",
   );
 });
@@ -107,6 +112,7 @@ test("App Worker rejects callback requests when token exchange fails", async () 
   );
 
   const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
     secret: env.APP_SESSION_HMAC_SECRET,
   });
   const response = await fetchApp(appCallbackUrl("bad-code", state), {
@@ -135,6 +141,7 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
     },
   );
   const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
     secret: env.APP_SESSION_HMAC_SECRET,
   });
 
@@ -159,6 +166,7 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
 
 test("App Worker rejects callback requests without an auth code", async () => {
   const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
     secret: env.APP_SESSION_HMAC_SECRET,
   });
   const response = await fetchApp(
@@ -184,6 +192,7 @@ test("App Worker callback falls back to the app root for cross-origin return_to 
     }),
   );
   const state = await createAppAuthState({
+    returnTo: "https://app.example.com/",
     secret: env.APP_SESSION_HMAC_SECRET,
   });
 
@@ -198,6 +207,36 @@ test("App Worker callback falls back to the app root for cross-origin return_to 
 
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe("https://app.example.com/");
+});
+
+test("App Worker callback ignores tampered return_to query values", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({
+      user: {
+        discord_id: "123456789",
+        display_name: "Akaaku",
+        role: "admin",
+      },
+    }),
+  );
+  const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
+    secret: env.APP_SESSION_HMAC_SECRET,
+  });
+
+  const response = await fetchApp(
+    `https://app.example.com/_auth/callback?code=auth-code&state=${encodeURIComponent(state)}&return_to=https%3A%2F%2Fapp.example.com%2Fsettings`,
+    {
+      headers: {
+        cookie: `${appAuthStateCookieName("hub")}=${encodeURIComponent(state)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/dashboard",
+  );
 });
 
 test("App Worker returns the current user with a valid app session", async () => {
@@ -264,6 +303,18 @@ function appCallbackUrl(code: string, state: string): string {
   const url = new URL("https://app.example.com/_auth/callback");
   url.searchParams.set("code", code);
   url.searchParams.set("state", state);
-  url.searchParams.set("return_to", "https://app.example.com/dashboard#secret");
   return url.toString();
+}
+
+async function expectAppStateReturnTo(
+  state: string | null,
+  returnTo: string,
+): Promise<void> {
+  expect(state).toBeTruthy();
+  const parsed = await verifyAppAuthState({
+    expected: state,
+    secret: env.APP_SESSION_HMAC_SECRET,
+    value: state,
+  });
+  expect(parsed).toEqual({ return_to: returnTo });
 }

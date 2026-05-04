@@ -24,6 +24,15 @@ test("Callback URL matching rejects origin mismatch", () => {
   ).toBe(false);
 });
 
+test("Callback URL matching rejects credentials in the URL", () => {
+  expect(
+    matchesCallbackUrl(
+      "https://user:pass@app.example.com/_auth/callback",
+      callbackUrl,
+    ),
+  ).toBe(false);
+});
+
 test("Callback URL matching rejects malformed URLs", () => {
   expect(matchesCallbackUrl("not a url", callbackUrl)).toBe(false);
 });

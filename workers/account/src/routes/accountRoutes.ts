@@ -10,7 +10,11 @@ import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
 import { isWebp512 } from "../media/webp.js";
 import { authStateCookieName, createAuthState } from "../security/authState.js";
 import { verifyFormCsrf, verifyHeaderCsrf } from "../security/csrf.js";
-import { appendSessionCookies, requireSession } from "../security/session.js";
+import {
+  appendRememberCookieDeletion,
+  appendSessionCookies,
+  requireSession,
+} from "../security/session.js";
 import { clearAccountCookiesAndRedirect } from "../services/accountSessionCookie.js";
 import { verifyActiveUser } from "../services/userDirectory.js";
 import { inactiveAccountPage } from "../views/accountErrorPage.js";
@@ -24,7 +28,10 @@ export async function accountHome(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return await accountLandingResponse(config);
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
   }
   const active = await verifyActiveUser(session.discord_id, config);
   if (!active) {
@@ -48,7 +55,10 @@ export async function updateProfile(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return await accountLandingResponse(config);
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "profile"))
@@ -72,7 +82,10 @@ export async function updateAvatar(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return await accountLandingResponse(config);
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
   }
   if (
     !(await verifyHeaderCsrf(
@@ -112,7 +125,10 @@ export async function deleteAccount(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return await accountLandingResponse(config);
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "delete"))
@@ -135,7 +151,10 @@ export async function logout(
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
-    return await accountLandingResponse(config);
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
   }
   if (
     !(await verifyFormCsrf(request, url, config, session.discord_id, "logout"))

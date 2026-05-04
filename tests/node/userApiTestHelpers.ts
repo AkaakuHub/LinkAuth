@@ -16,8 +16,10 @@ type DynamoItem = Record<string, unknown> & { pk: string; sk: string };
 export function createUserApiContext(items: DynamoItem[] = []): {
   context: UserApiContext;
   items: Map<string, DynamoItem>;
+  setQueryPageSize: (pageSize: number | null) => void;
 } {
   const storage = new Map(items.map((item) => [itemKey(item), { ...item }]));
+  let queryPageSize: number | null = null;
   const dynamodbMock = mockClient(DynamoDBDocumentClient);
   dynamodbMock.reset();
   dynamodbMock.on(PutCommand).callsFake((input) => {
@@ -36,6 +38,18 @@ export function createUserApiContext(items: DynamoItem[] = []): {
   dynamodbMock.on(DeleteCommand).callsFake((input) => {
     const key = input.Key as { pk: string; sk: string };
     const value = storage.get(itemKey(key));
+    const values = input.ExpressionAttributeValues as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      input.ConditionExpression === "app_id = :app_id AND expires_at > :now" &&
+      (value?.app_id !== values?.[":app_id"] ||
+        typeof value?.expires_at !== "number" ||
+        typeof values?.[":now"] !== "number" ||
+        value.expires_at <= values[":now"])
+    ) {
+      throw new Error("ConditionalCheckFailed");
+    }
     storage.delete(itemKey(key));
     return { Attributes: value };
   });
@@ -65,23 +79,50 @@ export function createUserApiContext(items: DynamoItem[] = []): {
   });
   dynamodbMock.on(QueryCommand).callsFake((input) => {
     const values = input.ExpressionAttributeValues as Record<string, string>;
-    if (input.IndexName === "gsi1") {
+    const startKey = input.ExclusiveStartKey as
+      | { pk: string; sk: string }
+      | undefined;
+    const afterStartKey = (items: DynamoItem[]): DynamoItem[] => {
+      if (!startKey) {
+        return items;
+      }
+      const startIndex = items.findIndex(
+        (item) => itemKey(item) === itemKey(startKey),
+      );
+      return startIndex >= 0 ? items.slice(startIndex + 1) : items;
+    };
+    const paginate = (items: DynamoItem[]) => {
+      const pageItems = queryPageSize
+        ? afterStartKey(items).slice(0, queryPageSize)
+        : afterStartKey(items);
+      const lastItem = pageItems.at(-1);
       return {
-        Items: [...storage.values()].filter(
+        Items: pageItems,
+        LastEvaluatedKey:
+          queryPageSize &&
+          lastItem &&
+          afterStartKey(items).length > pageItems.length
+            ? { pk: lastItem.pk, sk: lastItem.sk }
+            : undefined,
+      };
+    };
+    if (input.IndexName === "gsi1") {
+      return paginate(
+        [...storage.values()].filter(
           (item) =>
             item.gsi1pk === values[":pk"] &&
             typeof item.gsi1sk === "string" &&
             item.gsi1sk.startsWith(values[":remember"] ?? ""),
         ),
-      };
+      );
     }
-    return {
-      Items: [...storage.values()].filter(
+    return paginate(
+      [...storage.values()].filter(
         (item) =>
           item.pk === values[":pk"] &&
           item.sk.startsWith(values[":remember"] ?? ""),
       ),
-    };
+    );
   });
 
   return {
@@ -101,6 +142,9 @@ export function createUserApiContext(items: DynamoItem[] = []): {
       ),
     },
     items: storage,
+    setQueryPageSize(pageSize: number | null): void {
+      queryPageSize = pageSize;
+    },
   };
 }
 

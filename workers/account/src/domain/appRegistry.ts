@@ -15,6 +15,8 @@ export function matchesCallbackUrl(
     const valueUrl = new URL(value);
     const appCallbackUrl = new URL(callbackUrl);
     return (
+      !valueUrl.username &&
+      !valueUrl.password &&
       valueUrl.origin === appCallbackUrl.origin &&
       valueUrl.pathname === appCallbackUrl.pathname
     );

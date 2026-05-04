@@ -65,6 +65,32 @@ test("Auth code rejects a different app_id", async () => {
   expect(parseJsonResponse(response)).toEqual({ error: "invalid_auth_code" });
 });
 
+test("Auth code is not consumed by a different app_id", async () => {
+  const { context } = createUserApiContext();
+  await putAuthCode(context, {
+    app_id: "hub",
+    code: "auth-code",
+    user: {
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      role: "user",
+    },
+    expires_at: nowSeconds + 300,
+  });
+
+  const wrongAppResponse = await consumeAuthCode(context, {
+    app_id: "other",
+    code: "auth-code",
+  });
+  const correctAppResponse = await consumeAuthCode(context, {
+    app_id: "hub",
+    code: "auth-code",
+  });
+
+  expect(wrongAppResponse.statusCode).toBe(401);
+  expect(correctAppResponse.statusCode).toBe(200);
+});
+
 test("Auth code rejects expired codes", async () => {
   const { context } = createUserApiContext();
   await putAuthCode(context, {

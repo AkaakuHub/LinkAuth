@@ -12,6 +12,8 @@ OTPは平文では保存しません。
 
 user-apiは`challenge_id`とOTPをHMAC-SHA-256でハッシュ化し、DynamoDBに`otp_hash`として保存します。
 
+`return_to`は絶対URLのみ受け付けます。userinfo付きURLは拒否します。
+
 ## 消費方法
 
 OTP検証時は、最初にDynamoDBからchallengeを削除します。

@@ -31,7 +31,11 @@ import {
   otpStateCookieName,
   verifyOtpState,
 } from "../security/otpState.js";
-import { appendSessionCookies, requireSession } from "../security/session.js";
+import {
+  appendRememberCookieDeletion,
+  appendSessionCookies,
+  requireSession,
+} from "../security/session.js";
 import { createAccountSessionResponse } from "../services/accountSessionCookie.js";
 import { sendDiscordOtp } from "../services/discordOtp.js";
 import {
@@ -66,7 +70,10 @@ export async function authorize(
       return authFailedPage(config);
     }
     return appendSetCookie(
-      redirectToDiscordAuthorize(state, config),
+      appendRememberCookieDeletion(
+        request,
+        redirectToDiscordAuthorize(state, config),
+      ),
       createCookie(authStateCookieName, state, 600),
     );
   }
@@ -151,9 +158,15 @@ export async function callback(
   if (!code || !state) {
     return callbackResponse(authFailedPage(config));
   }
+  const authStateValue = stateValue;
+  if (!authStateValue) {
+    return callbackResponse(authFailedPage(config));
+  }
   if (
-    getSingleCookie(request.headers.get("cookie"), authStateCookieName) !==
-    stateValue
+    !timingSafeEqual(
+      getSingleCookie(request.headers.get("cookie"), authStateCookieName) ?? "",
+      authStateValue,
+    )
   ) {
     return callbackResponse(authFailedPage(config));
   }
@@ -339,7 +352,10 @@ export async function sessionVerify(
   const session = await requireSession(request, config);
   return session
     ? appendSessionCookies(Response.json({ ok: true }), session)
-    : Response.json({ error: "unauthorized" }, { status: 401 });
+    : appendRememberCookieDeletion(
+        request,
+        Response.json({ error: "unauthorized" }, { status: 401 }),
+      );
 }
 
 export async function me(
@@ -356,5 +372,8 @@ export async function me(
       );
     }
   }
-  return Response.json({ error: "unauthorized" }, { status: 401 });
+  return appendRememberCookieDeletion(
+    request,
+    Response.json({ error: "unauthorized" }, { status: 401 }),
+  );
 }
