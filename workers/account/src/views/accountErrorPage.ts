@@ -30,7 +30,7 @@ export function otpDeliveryFailedPage(config: AccountConfig): Response {
   return accountErrorPage(config, {
     title: "認証コードを送信できませんでした",
     description:
-      "DiscordのDMへ認証コードを送信できませんでした。DiscordのDM設定、対象サーバーへの参加状態、Botの参加状態を確認してください。",
+      "DiscordのDMへ認証コードを送信できませんでした。対象サーバーからのDM受信設定、Botのブロック状態、Discordの一時的な障害を確認してください。",
   });
 }
 
