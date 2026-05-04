@@ -15,6 +15,8 @@ export type AuthState = {
   return_to: string;
 };
 
+export const authStateCookieName = "__Secure-org_auth_state";
+
 export async function createAuthState(
   returnToValue: string | null,
   config: AccountConfig,

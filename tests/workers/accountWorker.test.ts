@@ -9,7 +9,10 @@ import {
 } from "../../shared/src/session.js";
 import type { AccountConfig } from "../../workers/account/src/accountConfig.js";
 import worker from "../../workers/account/src/index.js";
-import { parseAuthState } from "../../workers/account/src/security/authState.js";
+import {
+  authStateCookieName,
+  parseAuthState,
+} from "../../workers/account/src/security/authState.js";
 import type { Env } from "../../workers/account/src/types.js";
 
 const assets: R2Bucket = {
@@ -92,6 +95,9 @@ test("Account Worker redirects unauthenticated authorize requests to Discord", a
   expect(location.origin).toBe("https://discord.com");
   expect(location.pathname).toBe("/api/v10/oauth2/authorize");
   expect(location.searchParams.get("client_id")).toBe("discord-client-id");
+  expect(response.headers.get("set-cookie")).toContain(
+    `${authStateCookieName}=`,
+  );
   const state = await parseAuthState(
     location.searchParams.get("state"),
     testAccountConfig(),
@@ -178,6 +184,27 @@ test("Account Worker token endpoint maps consumed auth code failures to 401", as
 
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "invalid_auth_code" });
+});
+
+test("Account Worker token endpoint rejects unknown apps before User API", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const response = await fetchAccount("https://auth.example.com/token", {
+    body: JSON.stringify({ app_id: "unknown", code: "auth-code" }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: "unknown_app" });
+  expect(calls).toEqual([]);
 });
 
 test("Account Worker session verify rejects missing account sessions", async () => {
@@ -393,6 +420,8 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
       if (url.pathname === "/otp-challenge/create") {
         const body = decodeJsonBody(init);
         expect(body.discord_id).toBe("123456789");
+        expect(body.app_id).toBe("hub");
+        expect(body.return_to).toBe("https://app.example.com/_auth/callback");
         expect(body.otp).toMatch(/^[0-9]{6}$/);
         return Response.json({ ok: true });
       }
@@ -408,6 +437,11 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
 
   const response = await fetchAccount(
     `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
   );
   const body = await response.text();
 
@@ -422,6 +456,16 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   expect(calls).toContain("/otp-challenge/create");
   expect(calls).toContain("/api/v10/users/@me/channels");
   expect(calls).toContain("/api/v10/channels/dm-channel/messages");
+});
+
+test("Account Worker callback rejects app auth states without the browser state cookie", async () => {
+  const state = await createCallbackState("hub");
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+  );
+
+  expect(response.status).toBe(401);
 });
 
 test("Account Worker callback rejects Discord users outside the configured guilds", async () => {
@@ -444,6 +488,11 @@ test("Account Worker callback rejects Discord users outside the configured guild
 
   const response = await fetchAccount(
     `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
   );
   const body = await response.text();
 
@@ -463,7 +512,11 @@ test("Account Worker OTP success returns to authorize for app callbacks", async 
         const body = decodeJsonBody(init);
         expect(body.challenge_id).toBe("challenge-id");
         expect(body.otp).toBe("123456");
-        return Response.json({ discord_id: "123456789" });
+        return Response.json({
+          app_id: "hub",
+          discord_id: "123456789",
+          return_to: "https://app.example.com/_auth/callback",
+        });
       }
       if (url.pathname === "/users/verify-active") {
         return Response.json({ user: activeUser });
@@ -501,7 +554,11 @@ test("Account Worker OTP success does not use app_id for non-callback return_to 
         const body = decodeJsonBody(init);
         expect(body.challenge_id).toBe("challenge-id");
         expect(body.otp).toBe("123456");
-        return Response.json({ discord_id: "123456789" });
+        return Response.json({
+          app_id: "hub",
+          discord_id: "123456789",
+          return_to: "https://app.example.com/",
+        });
       }
       if (url.pathname === "/users/verify-active") {
         return Response.json({ user: activeUser });
@@ -524,6 +581,48 @@ test("Account Worker OTP success does not use app_id for non-callback return_to 
   expect(response.headers.get("location")).toBe("https://app.example.com/");
 });
 
+test("Account Worker OTP success ignores tampered app_id and return_to form fields", async () => {
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === "/otp-challenge/consume") {
+        const body = decodeJsonBody(init);
+        expect(body.challenge_id).toBe("challenge-id");
+        expect(body.otp).toBe("123456");
+        return Response.json({
+          app_id: "hub",
+          discord_id: "123456789",
+          return_to: "https://app.example.com/_auth/callback",
+        });
+      }
+      if (url.pathname === "/users/verify-active") {
+        return Response.json({ user: activeUser });
+      }
+      return Response.json({ error: "not_found" }, { status: 404 });
+    },
+  );
+
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      app_id: "unknown",
+      challenge_id: "challenge-id",
+      otp: "123456",
+      return_to: "https://evil.example.com/callback",
+    }),
+    method: "POST",
+  });
+  const location = new URL(response.headers.get("location") ?? "");
+
+  expect(response.status).toBe(302);
+  expect(location.origin).toBe("https://auth.example.com");
+  expect(location.pathname).toBe("/authorize");
+  expect(location.searchParams.get("app_id")).toBe("hub");
+  expect(location.searchParams.get("return_to")).toBe(
+    "https://app.example.com/_auth/callback",
+  );
+});
+
 test("Account Worker OTP success creates account and remember cookies when remember_me is on", async () => {
   const calls: string[] = [];
   vi.stubGlobal(
@@ -535,7 +634,10 @@ test("Account Worker OTP success creates account and remember cookies when remem
         const body = decodeJsonBody(init);
         expect(body.challenge_id).toBe("challenge-id");
         expect(body.otp).toBe("123456");
-        return Response.json({ discord_id: "123456789" });
+        return Response.json({
+          discord_id: "123456789",
+          return_to: "https://app.example.com/",
+        });
       }
       if (url.pathname === "/users/verify-active") {
         return Response.json({ user: activeUser });
@@ -583,7 +685,10 @@ test("Account Worker OTP success skips remember token creation when remember_me 
         const body = decodeJsonBody(init);
         expect(body.challenge_id).toBe("challenge-id");
         expect(body.otp).toBe("123456");
-        return Response.json({ discord_id: "123456789" });
+        return Response.json({
+          discord_id: "123456789",
+          return_to: "https://app.example.com/",
+        });
       }
       if (url.pathname === "/users/verify-active") {
         return Response.json({ user: activeUser });

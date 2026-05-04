@@ -26,6 +26,10 @@ type MockState = {
     string,
     { discord_id: string; display_name: string; role: "user" | "admin" }
   >;
+  otpChallenge: {
+    app_id?: string;
+    return_to: string;
+  } | null;
   lastOtp: string | null;
   rememberCreateCount: number;
 };
@@ -114,6 +118,7 @@ async function startAuthFlowServers(): Promise<
 > {
   const state: MockState = {
     authCodes: new Map(),
+    otpChallenge: null,
     lastOtp: null,
     rememberCreateCount: 0,
   };
@@ -244,14 +249,18 @@ async function startMockServer(state: MockState): Promise<TestServer> {
     }
     if (url.pathname === "/otp-challenge/create") {
       const body = (await request.json()) as {
+        app_id?: unknown;
         challenge_id?: unknown;
         discord_id?: unknown;
         otp?: unknown;
+        return_to?: unknown;
       };
       if (
         typeof body.challenge_id !== "string" ||
         body.discord_id !== user.discord_id ||
-        typeof body.otp !== "string"
+        typeof body.otp !== "string" ||
+        body.app_id !== "hub" ||
+        typeof body.return_to !== "string"
       ) {
         return Response.json(
           { error: "invalid_otp_challenge" },
@@ -259,12 +268,19 @@ async function startMockServer(state: MockState): Promise<TestServer> {
         );
       }
       state.lastOtp = body.otp;
+      state.otpChallenge = {
+        app_id: body.app_id,
+        return_to: body.return_to,
+      };
       return Response.json({ ok: true });
     }
     if (url.pathname === "/otp-challenge/consume") {
       const body = (await request.json()) as { otp?: unknown };
-      return body.otp === state.lastOtp
-        ? Response.json({ discord_id: user.discord_id })
+      return body.otp === state.lastOtp && state.otpChallenge
+        ? Response.json({
+            ...state.otpChallenge,
+            discord_id: user.discord_id,
+          })
         : Response.json({ error: "invalid_otp" }, { status: 401 });
     }
     if (url.pathname === "/remember/create") {

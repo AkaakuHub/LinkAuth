@@ -8,6 +8,8 @@ import { requireNumber, requireString } from "./validation.js";
 
 type OtpChallengeItem = {
   discord_id?: string;
+  app_id?: string;
+  return_to?: string;
   otp_hash?: string;
   expires_at?: number;
 };
@@ -25,6 +27,8 @@ export async function putOtpChallenge(
         ...otpChallengeKey(challengeId),
         challenge_id: challengeId,
         discord_id: requireString(body, "discord_id"),
+        ...optionalStringItem(body, "app_id"),
+        return_to: requireString(body, "return_to"),
         otp_hash: await hashOtp(otp),
         created_at: new Date().toISOString(),
         expires_at: requireNumber(body, "expires_at"),
@@ -52,6 +56,7 @@ export async function consumeOtpChallenge(
   if (
     !item ||
     typeof item.discord_id !== "string" ||
+    typeof item.return_to !== "string" ||
     typeof item.otp_hash !== "string" ||
     typeof item.expires_at !== "number" ||
     item.expires_at <= Math.floor(Date.now() / 1000) ||
@@ -59,7 +64,14 @@ export async function consumeOtpChallenge(
   ) {
     return json(401, { error: "invalid_otp" });
   }
-  return json(200, { discord_id: item.discord_id });
+  if (item.app_id !== undefined && typeof item.app_id !== "string") {
+    return json(401, { error: "invalid_otp" });
+  }
+  return json(200, {
+    discord_id: item.discord_id,
+    ...(item.app_id ? { app_id: item.app_id } : {}),
+    return_to: item.return_to,
+  });
 }
 
 function requireOtp(body: JsonBody, key: string): string {
@@ -72,4 +84,12 @@ function requireOtp(body: JsonBody, key: string): string {
 
 async function hashOtp(otp: string): Promise<string> {
   return createHash("sha256").update(otp, "utf8").digest("hex");
+}
+
+function optionalStringItem(
+  body: JsonBody,
+  key: string,
+): Record<string, string> {
+  const value = body[key];
+  return typeof value === "string" && value.length > 0 ? { [key]: value } : {};
 }

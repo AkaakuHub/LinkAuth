@@ -15,7 +15,9 @@ test("OTP challenge accepts the correct six digit code once before expiration", 
   await putOtpChallenge(context, {
     challenge_id: "challenge",
     discord_id: "123456789",
+    app_id: "hub",
     otp: "123456",
+    return_to: "https://app.example.com/_auth/callback",
     expires_at: nowSeconds + 300,
   });
 
@@ -30,7 +32,9 @@ test("OTP challenge accepts the correct six digit code once before expiration", 
 
   expect(firstResponse.statusCode).toBe(200);
   expect(parseJsonResponse(firstResponse)).toEqual({
+    app_id: "hub",
     discord_id: "123456789",
+    return_to: "https://app.example.com/_auth/callback",
   });
   expect(secondResponse.statusCode).toBe(401);
 });
@@ -41,6 +45,7 @@ test("OTP challenge rejects a wrong code and consumes the challenge", async () =
     challenge_id: "challenge",
     discord_id: "123456789",
     otp: "123456",
+    return_to: "https://app.example.com/",
     expires_at: nowSeconds + 300,
   });
 
@@ -63,6 +68,7 @@ test("OTP challenge rejects expired challenges", async () => {
     challenge_id: "challenge",
     discord_id: "123456789",
     otp: "123456",
+    return_to: "https://app.example.com/",
     expires_at: nowSeconds - 1,
   });
 

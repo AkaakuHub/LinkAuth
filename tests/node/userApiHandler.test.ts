@@ -33,6 +33,28 @@ test("User API handler returns not_found for signed unknown paths", async () => 
   expect(parseJsonResponse(response)).toEqual({ error: "not_found" });
 });
 
+test("User API handler rejects signed nonce replay", async () => {
+  const { context } = createUserApiContext();
+  const event = await createEvent("/unknown", {});
+
+  const firstResponse = await handleUserApiRequest(
+    event,
+    context,
+    internalHmac,
+  );
+  const secondResponse = await handleUserApiRequest(
+    event,
+    context,
+    internalHmac,
+  );
+
+  expect(firstResponse.statusCode).toBe(404);
+  expect(secondResponse.statusCode).toBe(401);
+  expect(parseJsonResponse(secondResponse)).toEqual({
+    error: "invalid_signature",
+  });
+});
+
 test("User API handler returns active users through the signed boundary", async () => {
   const { context } = createUserApiContext([
     {

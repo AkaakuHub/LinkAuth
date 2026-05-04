@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { expect, test } from "vitest";
 import { verifyInternalSignature } from "../../lambdas/user-api/src/internalAuth.js";
 import { createInternalHeaders } from "../../shared/src/internalSignature.js";
+import { createUserApiContext } from "./userApiTestHelpers.js";
 
 const config = {
   kid: "internal-key",
@@ -11,6 +12,7 @@ const body = Buffer.from(JSON.stringify({ ok: true }), "utf8");
 const timestamp = new Date().toISOString();
 
 test("Internal signature accepts a correctly signed request", async () => {
+  const { context } = createUserApiContext();
   const event = await signedEvent({
     method: "POST",
     path: "/users/active",
@@ -19,10 +21,13 @@ test("Internal signature accepts a correctly signed request", async () => {
     timestamp,
   });
 
-  expect(verifyInternalSignature(event, body, config)).toBe(true);
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    true,
+  );
 });
 
 test("Internal signature rejects body tampering", async () => {
+  const { context } = createUserApiContext();
   const event = await signedEvent({
     method: "POST",
     path: "/users/active",
@@ -32,11 +37,17 @@ test("Internal signature rejects body tampering", async () => {
   });
 
   expect(
-    verifyInternalSignature(event, Buffer.from('{"ok":false}'), config),
+    await verifyInternalSignature(
+      event,
+      Buffer.from('{"ok":false}'),
+      config,
+      context,
+    ),
   ).toBe(false);
 });
 
 test("Internal signature rejects an old timestamp", async () => {
+  const { context } = createUserApiContext();
   const event = await signedEvent({
     method: "POST",
     path: "/users/active",
@@ -45,7 +56,27 @@ test("Internal signature rejects an old timestamp", async () => {
     timestamp: new Date(Date.now() - 300_001).toISOString(),
   });
 
-  expect(verifyInternalSignature(event, body, config)).toBe(false);
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    false,
+  );
+});
+
+test("Internal signature rejects nonce replay", async () => {
+  const { context } = createUserApiContext();
+  const event = await signedEvent({
+    method: "POST",
+    path: "/users/active",
+    query: "",
+    body,
+    timestamp,
+  });
+
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    true,
+  );
+  expect(await verifyInternalSignature(event, body, config, context)).toBe(
+    false,
+  );
 });
 
 async function signedEvent(input: {

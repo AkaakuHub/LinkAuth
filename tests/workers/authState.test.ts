@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { AccountConfig } from "../../workers/account/src/accountConfig.js";
 import {
   createAuthState,
@@ -59,6 +59,22 @@ test("Auth state rejects tampered signatures", async () => {
   const tamperedState = `${state.slice(0, -1)}x`;
 
   expect(await parseAuthState(tamperedState, config)).toBeNull();
+});
+
+test("Auth state rejects expired values", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+  try {
+    const state = await createAuthState(
+      "https://app.example.com/callback",
+      config,
+    );
+    vi.setSystemTime(new Date("2026-01-01T00:10:01.000Z"));
+
+    expect(await parseAuthState(state, config)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("Auth state rejects disallowed return_to values", async () => {

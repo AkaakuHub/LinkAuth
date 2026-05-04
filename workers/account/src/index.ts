@@ -48,7 +48,7 @@ async function handleAccountRequest(
     return sessionVerify(request, url, config);
   }
   if (url.pathname === "/callback") {
-    return callback(url, config);
+    return callback(request, url, config);
   }
   if (url.pathname === "/me") {
     return me(request, config);

@@ -1,5 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
+import type { UserApiContext } from "./context.js";
 import { getHeader } from "./http.js";
 
 type InternalHmacConfig = {
@@ -7,11 +9,12 @@ type InternalHmacConfig = {
   secret: string;
 };
 
-export function verifyInternalSignature(
+export async function verifyInternalSignature(
   event: APIGatewayProxyEventV2,
   rawBody: Buffer,
   config: InternalHmacConfig,
-): boolean {
+  context: UserApiContext,
+): Promise<boolean> {
   const kid = getHeader(event.headers, "x-internal-key-id");
   const timestamp = getHeader(event.headers, "x-internal-timestamp");
   const nonce = getHeader(event.headers, "x-internal-nonce");
@@ -49,7 +52,10 @@ export function verifyInternalSignature(
   const expectedSignature = createHmac("sha256", config.secret)
     .update(canonicalRequest)
     .digest("hex");
-  return safeEqual(signature, expectedSignature);
+  if (!safeEqual(signature, expectedSignature)) {
+    return false;
+  }
+  return await consumeNonce(context, config.kid, nonce);
 }
 
 function canonicalizeInternalRequest(
@@ -96,4 +102,29 @@ function safeEqual(left: string, right: string): boolean {
     leftBuffer.length === rightBuffer.length &&
     timingSafeEqual(leftBuffer, rightBuffer)
   );
+}
+
+async function consumeNonce(
+  context: UserApiContext,
+  kid: string,
+  nonce: string,
+): Promise<boolean> {
+  try {
+    await context.dynamodb.send(
+      new PutCommand({
+        TableName: context.tableName,
+        Item: {
+          pk: `INTERNAL_NONCE#${kid}`,
+          sk: `NONCE#${nonce}`,
+          created_at: new Date().toISOString(),
+          expires_at: Math.floor(Date.now() / 1000) + 300,
+        },
+        ConditionExpression:
+          "attribute_not_exists(pk) AND attribute_not_exists(sk)",
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
