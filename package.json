@@ -54,6 +54,7 @@
     "@tabler/icons": "3.41.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cropperjs": "1.6.2",
     "tailwind-merge": "^3.5.0",
     "tweetnacl": "^1.0.3"
   }

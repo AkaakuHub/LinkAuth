@@ -86,7 +86,7 @@ test("Account Worker HTML responses include browser security headers", async () 
   const response = await fetchAccount("https://auth.example.com/");
 
   expect(response.headers.get("content-security-policy")).toBe(
-    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data: blob: https: http://localhost:*; script-src 'self'; style-src 'self' 'unsafe-inline'",
   );
   expect(response.headers.get("referrer-policy")).toBe("same-origin");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
@@ -280,6 +280,16 @@ test("Account Worker session verify rejects unknown app ids", async () => {
 });
 
 test("Account Worker session verify accepts a valid app session cookie", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({
+      user: {
+        ...activeUser,
+        display_name: "Current Akaaku",
+        icon_key: "icons/123456789/avatar.webp",
+        icon_source: "r2",
+      },
+    }),
+  );
   const session = await createAppSession("hub");
   const response = await fetchAccount(
     "https://auth.example.com/session/verify?app_id=hub",
@@ -294,8 +304,11 @@ test("Account Worker session verify accepts a valid app session cookie", async (
   expect(await response.json()).toEqual({
     user: {
       discord_id: "123456789",
-      display_name: "Akaaku",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
       role: "admin",
+      status: "active",
     },
   });
 });
@@ -984,6 +997,38 @@ test("Account Worker restores an account session with a valid remember cookie", 
   expect(rememberRotateBody?.expires_at).toBeGreaterThanOrEqual(
     Math.floor(Date.now() / 1000) + 15_552_000 - 1,
   );
+});
+
+test("Account Worker account page renders the current icon", async () => {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/users/verify-active") {
+      return Response.json({
+        user: {
+          ...activeUser,
+          icon_key: "icons/123456789/avatar.webp",
+          icon_source: "r2",
+        },
+      });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+  const session = await createAccountSession();
+
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain('src="/assets/icons/123456789/avatar.webp"');
+  expect(body).toContain("data-avatar-input");
+  expect(body).toContain("data-avatar-cropper-dialog");
+  expect(body).not.toContain("Discord ID");
+  expect(body).not.toContain("権限");
+  expect(body).not.toContain("状態");
 });
 
 test("Account Worker clears remember cookies that cannot restore a session", async () => {

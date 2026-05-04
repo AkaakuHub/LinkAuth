@@ -10,6 +10,8 @@ type AuthCodeItem = {
   discord_id?: string;
   display_name?: string;
   role?: "user" | "admin";
+  icon_source?: "discord" | "r2" | "none";
+  icon_key?: string;
   expires_at?: number;
 };
 
@@ -29,6 +31,7 @@ export async function putAuthCode(
         discord_id: user.discord_id,
         display_name: user.display_name,
         role: user.role,
+        ...optionalUserIcon(user),
         created_at: new Date().toISOString(),
         expires_at: requireNumber(body, "expires_at"),
       },
@@ -83,13 +86,21 @@ export async function consumeAuthCode(
       discord_id: item.discord_id,
       display_name: item.display_name,
       role: item.role,
+      ...(item.icon_source ? { icon_source: item.icon_source } : {}),
+      ...(item.icon_key ? { icon_key: item.icon_key } : {}),
     },
   });
 }
 
-function requireUser(
-  body: JsonBody,
-): Pick<UserProfile, "discord_id" | "display_name" | "role"> {
+type AuthCodeUser = Pick<
+  UserProfile,
+  "discord_id" | "display_name" | "role"
+> & {
+  icon_source?: "discord" | "r2" | "none";
+  icon_key?: string;
+};
+
+function requireUser(body: JsonBody): AuthCodeUser {
   const value = body.user;
   if (!value || typeof value !== "object") {
     throw httpError(400, "invalid_user");
@@ -106,5 +117,20 @@ function requireUser(
     discord_id: user.discord_id,
     display_name: user.display_name,
     role: user.role,
+    ...optionalUserIcon(user),
+  };
+}
+
+function optionalUserIcon(user: Record<string, unknown>): {
+  icon_source?: "discord" | "r2" | "none";
+  icon_key?: string;
+} {
+  const iconSource = user.icon_source;
+  const iconKey = user.icon_key;
+  return {
+    ...(iconSource === "discord" || iconSource === "r2" || iconSource === "none"
+      ? { icon_source: iconSource }
+      : {}),
+    ...(typeof iconKey === "string" ? { icon_key: iconKey } : {}),
   };
 }

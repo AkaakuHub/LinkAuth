@@ -1,7 +1,10 @@
+import Cropper from "cropperjs";
+
 setupPageCacheRefresh();
 setupHistoryBackLink();
 setupDeleteConfirmation();
 setupProfileForm();
+setupAvatarUpload();
 setupOtpInput();
 
 function setupPageCacheRefresh(): void {
@@ -55,16 +58,14 @@ function setupProfileForm(): void {
       !elements.input.checkValidity();
   };
   const openEditor = () => {
-    elements.view.classList.add("hidden");
-    elements.editor.classList.remove("hidden");
+    elements.form.classList.remove("hidden");
     elements.input.focus();
     elements.input.select();
     updateSubmitState();
   };
   const closeEditor = () => {
     elements.input.value = initialValue;
-    elements.editor.classList.add("hidden");
-    elements.view.classList.remove("hidden");
+    elements.form.classList.add("hidden");
     updateSubmitState();
   };
   const updateUrlBeforeSubmit = () => {
@@ -79,11 +80,112 @@ function setupProfileForm(): void {
     elements.submit.replaceChildren("保存中");
   };
 
-  elements.edit.addEventListener("click", openEditor);
+  elements.editTrigger.addEventListener("click", openEditor);
   elements.cancel.addEventListener("click", closeEditor);
   elements.input.addEventListener("input", updateSubmitState);
   form.addEventListener("submit", updateUrlBeforeSubmit);
   updateSubmitState();
+}
+
+function setupAvatarUpload(): void {
+  const input = document.querySelector("[data-avatar-input]");
+  const csrfToken = document.querySelector("[data-avatar-csrf]");
+  const status = document.querySelector("[data-avatar-status]");
+  const dialog = document.querySelector("[data-avatar-cropper-dialog]");
+  const image = document.querySelector("[data-avatar-cropper-image]");
+  const save = document.querySelector("[data-avatar-cropper-save]");
+  const cancel = document.querySelector("[data-avatar-cropper-cancel]");
+  if (
+    !(input instanceof HTMLInputElement) ||
+    !(csrfToken instanceof HTMLInputElement) ||
+    !(status instanceof HTMLElement) ||
+    !(dialog instanceof HTMLDialogElement) ||
+    !(image instanceof HTMLImageElement) ||
+    !(save instanceof HTMLButtonElement) ||
+    !(cancel instanceof HTMLButtonElement)
+  ) {
+    return;
+  }
+
+  let cropper: Cropper | null = null;
+  let imageUrl: string | null = null;
+
+  const closeCropper = () => {
+    cropper?.destroy();
+    cropper = null;
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+      imageUrl = null;
+    }
+    dialog.close();
+    input.value = "";
+  };
+
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    status.textContent = "";
+    cropper?.destroy();
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+    }
+    imageUrl = URL.createObjectURL(file);
+    image.addEventListener(
+      "load",
+      () => {
+        cropper = new Cropper(image, {
+          aspectRatio: 1,
+          autoCropArea: 1,
+          background: false,
+          viewMode: 1,
+        });
+      },
+      { once: true },
+    );
+    image.src = imageUrl;
+    dialog.showModal();
+  });
+
+  save.addEventListener("click", async () => {
+    if (!cropper) {
+      return;
+    }
+    status.textContent = "更新中";
+    input.disabled = true;
+    save.disabled = true;
+    try {
+      const canvas = cropper.getCroppedCanvas({
+        height: 512,
+        imageSmoothingQuality: "high",
+        width: 512,
+      });
+      const blob = await canvasToWebp(canvas);
+      const response = await fetch("/avatar", {
+        method: "POST",
+        headers: {
+          "content-type": "image/webp",
+          "x-csrf-token": csrfToken.value,
+        },
+        body: blob,
+      });
+      if (!response.ok) {
+        status.textContent = "更新できませんでした";
+        return;
+      }
+      window.location.reload();
+    } catch {
+      status.textContent = "更新できませんでした";
+    } finally {
+      input.disabled = false;
+      save.disabled = false;
+      closeCropper();
+    }
+  });
+
+  cancel.addEventListener("click", closeCropper);
+  dialog.addEventListener("cancel", closeCropper);
 }
 
 function setupOtpInput(): void {
@@ -104,30 +206,41 @@ function setupOtpInput(): void {
 }
 
 function profileFormElements(form: HTMLFormElement): {
-  view: HTMLElement;
-  editor: HTMLElement;
+  form: HTMLFormElement;
   input: HTMLInputElement;
   submit: HTMLButtonElement;
-  edit: HTMLButtonElement;
+  editTrigger: HTMLButtonElement;
   cancel: HTMLButtonElement;
 } | null {
-  const view = form.querySelector("[data-profile-view]");
-  const editor = form.querySelector("[data-profile-editor]");
   const input = form.querySelector("[data-profile-input]");
   const submit = form.querySelector("[data-profile-submit]");
-  const edit = form.querySelector("[data-profile-edit]");
+  const editTrigger = document.querySelector("[data-profile-edit-trigger]");
   const cancel = form.querySelector("[data-profile-cancel]");
 
   if (
-    !(view instanceof HTMLElement) ||
-    !(editor instanceof HTMLElement) ||
     !(input instanceof HTMLInputElement) ||
     !(submit instanceof HTMLButtonElement) ||
-    !(edit instanceof HTMLButtonElement) ||
+    !(editTrigger instanceof HTMLButtonElement) ||
     !(cancel instanceof HTMLButtonElement)
   ) {
     return null;
   }
 
-  return { view, editor, input, submit, edit, cancel };
+  return { form, input, submit, editTrigger, cancel };
+}
+
+function canvasToWebp(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error("webp conversion failed"));
+      },
+      "image/webp",
+      0.9,
+    );
+  });
 }

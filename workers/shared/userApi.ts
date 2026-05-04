@@ -9,6 +9,7 @@ export type User = {
   status: "active" | "disabled" | "deleted";
   icon_source?: "discord" | "r2" | "none";
   icon_key?: string;
+  discord_avatar_hash?: string | null;
   created_at?: string;
 };
 

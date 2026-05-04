@@ -24,7 +24,12 @@ type TestServer = {
 type MockState = {
   authCodes: Map<
     string,
-    { discord_id: string; display_name: string; role: "user" | "admin" }
+    {
+      discord_id: string;
+      display_name: string;
+      role: "user" | "admin";
+      status: "active";
+    }
   >;
   otpChallenge: {
     app_id?: string;
@@ -38,6 +43,7 @@ const user = {
   discord_id: "123456789",
   display_name: "Akaaku",
   role: "admin",
+  status: "active",
 } as const;
 
 test("App login completes through Discord OTP and creates a remember cookie by default", async ({
@@ -59,12 +65,8 @@ test("App login completes through Discord OTP and creates a remember cookie by d
   await page.getByLabel("認証コード").fill(servers.state.lastOtp ?? "");
   await page.getByRole("button", { name: "認証" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "appセッションが有効です" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Akaakuとしてこのappを利用できます。"),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
+  await expect(page.getByText("@123456789")).toBeVisible();
 
   const cookies = await page.context().cookies();
   expect(
@@ -92,9 +94,7 @@ test("App login completes without a remember cookie when remember_me is off", as
   await page.getByLabel("認証コード").fill(servers.state.lastOtp ?? "");
   await page.getByRole("button", { name: "認証" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "appセッションが有効です" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
 
   const cookies = await page.context().cookies();
   expect(

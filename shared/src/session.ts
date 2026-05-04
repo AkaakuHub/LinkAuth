@@ -13,6 +13,8 @@ export type SessionPayload = {
   app_id?: string;
   role: "user" | "admin";
   display_name: string;
+  icon_source?: "discord" | "r2" | "none";
+  icon_key?: string;
   iat: number;
   exp: number;
   kid: string;
@@ -88,6 +90,12 @@ export async function verifySessionCookie(
       (payload.app_id !== undefined && typeof payload.app_id !== "string") ||
       (payload.role !== "user" && payload.role !== "admin") ||
       typeof payload.display_name !== "string" ||
+      (payload.icon_source !== undefined &&
+        payload.icon_source !== "discord" &&
+        payload.icon_source !== "r2" &&
+        payload.icon_source !== "none") ||
+      (payload.icon_key !== undefined &&
+        typeof payload.icon_key !== "string") ||
       typeof payload.iat !== "number" ||
       typeof payload.exp !== "number" ||
       payload.kid !== header.kid ||

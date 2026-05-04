@@ -88,6 +88,10 @@ export async function authorize(
     user: {
       discord_id: active.user.discord_id,
       display_name: active.user.display_name,
+      ...(active.user.icon_source
+        ? { icon_source: active.user.icon_source }
+        : {}),
+      ...(active.user.icon_key ? { icon_key: active.user.icon_key } : {}),
       role: active.user.role,
     },
     expires_at: Math.floor(Date.now() / 1000) + 300,
@@ -341,12 +345,12 @@ export async function sessionVerify(
     if (!payload || payload.app_id !== app.appId) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
+    const active = await verifyActiveUser(payload.discord_id, config);
+    if (!active) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
     return Response.json({
-      user: {
-        discord_id: payload.discord_id,
-        display_name: payload.display_name,
-        role: payload.role,
-      },
+      user: active.user,
     });
   }
   const session = await requireSession(request, config);

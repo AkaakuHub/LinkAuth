@@ -53,7 +53,7 @@ function responseHeaders(headers?: Headers): Headers {
       "connect-src 'self'",
       "form-action 'self' https: http://localhost:*",
       "frame-ancestors 'none'",
-      "img-src 'self' data:",
+      "img-src 'self' data: blob: https: http://localhost:*",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
     ].join("; "),

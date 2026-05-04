@@ -18,6 +18,8 @@ test("Auth code can be consumed once by the same app before expiration", async (
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
       role: "admin",
     },
     expires_at: nowSeconds + 300,
@@ -37,6 +39,8 @@ test("Auth code can be consumed once by the same app before expiration", async (
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
       role: "admin",
     },
   });

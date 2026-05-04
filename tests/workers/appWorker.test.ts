@@ -274,6 +274,7 @@ test("App Worker callback ignores tampered return_to query values", async () => 
 });
 
 test("App Worker returns the current user with a valid app session", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ user: currentUser }));
   const session = await createAppSession("hub");
   const response = await fetchApp("https://app.example.com/api/me", {
     headers: {
@@ -285,10 +286,35 @@ test("App Worker returns the current user with a valid app session", async () =>
   expect(await response.json()).toEqual({
     user: {
       discord_id: "123456789",
-      display_name: "Akaaku",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
       role: "admin",
+      status: "active",
     },
   });
+});
+
+test("App Worker renders a profile page with the current icon", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ user: currentUser }));
+  const session = await createAppSession("hub");
+
+  const response = await fetchApp("https://app.example.com/", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("Current Akaaku");
+  expect(body).toContain(
+    'src="https://auth.example.com/assets/icons/123456789/avatar.webp"',
+  );
+  expect(body).toContain("設定");
+  expect(body).not.toContain("ロール");
+  expect(body).not.toContain("セッション");
+  expect(body).not.toContain(">app<");
 });
 
 test("App Worker rejects a session issued for another app", async () => {
@@ -352,3 +378,12 @@ async function expectAppStateReturnTo(
   });
   expect(parsed).toEqual({ return_to: returnTo });
 }
+
+const currentUser = {
+  discord_id: "123456789",
+  display_name: "Current Akaaku",
+  icon_key: "icons/123456789/avatar.webp",
+  icon_source: "r2",
+  role: "admin",
+  status: "active",
+} as const;
