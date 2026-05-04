@@ -45,5 +45,20 @@ export function attr(name: string, value: string | number | boolean): string {
 function responseHeaders(headers?: Headers): Headers {
   const responseHeaders = headers ?? new Headers();
   responseHeaders.set("content-type", "text/html; charset=utf-8");
+  responseHeaders.set(
+    "content-security-policy",
+    [
+      "default-src 'none'",
+      "base-uri 'none'",
+      "connect-src 'self'",
+      "form-action 'self' https: http://localhost:*",
+      "frame-ancestors 'none'",
+      "img-src 'self' data:",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+    ].join("; "),
+  );
+  responseHeaders.set("referrer-policy", "same-origin");
+  responseHeaders.set("x-content-type-options", "nosniff");
   return responseHeaders;
 }

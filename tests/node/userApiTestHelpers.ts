@@ -55,16 +55,27 @@ export function createUserApiContext(items: DynamoItem[] = []): {
   });
   dynamodbMock.on(UpdateCommand).callsFake((input) => {
     const key = input.Key as { pk: string; sk: string };
-    const current = storage.get(itemKey(key));
-    if (!current) {
-      return {};
-    }
+    const current = storage.get(itemKey(key)) ?? { ...key };
     const values = input.ExpressionAttributeValues as Record<string, unknown>;
     if (
       input.ConditionExpression === "token_hash = :old_token_hash" &&
       current.token_hash !== values[":old_token_hash"]
     ) {
       throw new Error("ConditionalCheckFailed");
+    }
+    const condition = input.ConditionExpression;
+    if (typeof condition === "string" && condition.includes("_issued_at")) {
+      const issuedAtKey = condition.includes("first_issued_at")
+        ? "first_issued_at"
+        : "second_issued_at";
+      const cutoff = values[":cutoff"];
+      if (
+        typeof current[issuedAtKey] === "number" &&
+        typeof cutoff === "number" &&
+        current[issuedAtKey] > cutoff
+      ) {
+        throw new Error("ConditionalCheckFailed");
+      }
     }
     if (":token_hash" in values) {
       current.token_hash = values[":token_hash"];
@@ -75,6 +86,26 @@ export function createUserApiContext(items: DynamoItem[] = []): {
     if (":expires_at" in values) {
       current.expires_at = values[":expires_at"];
     }
+    if (":now" in values) {
+      if (input.UpdateExpression?.includes("first_issued_at = :now")) {
+        current.first_issued_at = values[":now"];
+      }
+      if (input.UpdateExpression?.includes("second_issued_at = :now")) {
+        current.second_issued_at = values[":now"];
+      }
+    }
+    if (":challenge_id" in values) {
+      if (input.UpdateExpression?.includes("first_challenge_id")) {
+        current.first_challenge_id = values[":challenge_id"];
+      }
+      if (input.UpdateExpression?.includes("second_challenge_id")) {
+        current.second_challenge_id = values[":challenge_id"];
+      }
+    }
+    if (":updated_at" in values) {
+      current.updated_at = values[":updated_at"];
+    }
+    storage.set(itemKey(key), current);
     return {};
   });
   dynamodbMock.on(QueryCommand).callsFake((input) => {

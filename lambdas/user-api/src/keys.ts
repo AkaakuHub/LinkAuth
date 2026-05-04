@@ -16,3 +16,7 @@ export function otpChallengeKey(challengeId: string): {
 } {
   return { pk: `OTP#${challengeId}`, sk: "OTP" };
 }
+
+export function otpRateLimitKey(discordId: string): { pk: string; sk: string } {
+  return { pk: `OTP_RATE#${discordId}`, sk: "OTP_RATE" };
+}

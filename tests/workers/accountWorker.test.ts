@@ -82,6 +82,16 @@ test("Account Worker rejects authorize requests for unknown apps", async () => {
   expect(response.status).toBe(401);
 });
 
+test("Account Worker HTML responses include browser security headers", async () => {
+  const response = await fetchAccount("https://auth.example.com/");
+
+  expect(response.headers.get("content-security-policy")).toBe(
+    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'",
+  );
+  expect(response.headers.get("referrer-policy")).toBe("same-origin");
+  expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+});
+
 test("Account Worker rejects authorize requests with a mismatched callback URL", async () => {
   const response = await fetchAccount(
     "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2Fother",

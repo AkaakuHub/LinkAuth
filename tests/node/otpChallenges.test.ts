@@ -116,3 +116,65 @@ test("OTP challenge rejects credentialed return_to values at creation", async ()
     }),
   ).rejects.toThrow("invalid_return_to");
 });
+
+test("OTP challenge allows two issues for the same user per minute", async () => {
+  const { context } = createUserApiContext();
+
+  await putOtpChallenge(context, {
+    challenge_id: "challenge-1",
+    discord_id: "123456789",
+    otp: "123456",
+    return_to: "https://app.example.com/",
+    expires_at: nowSeconds + 300,
+  });
+  await putOtpChallenge(context, {
+    challenge_id: "challenge-2",
+    discord_id: "123456789",
+    otp: "123456",
+    return_to: "https://app.example.com/",
+    expires_at: nowSeconds + 300,
+  });
+
+  await expect(
+    putOtpChallenge(context, {
+      challenge_id: "challenge-3",
+      discord_id: "123456789",
+      otp: "123456",
+      return_to: "https://app.example.com/",
+      expires_at: nowSeconds + 300,
+    }),
+  ).rejects.toThrow("otp_rate_limited");
+});
+
+test("OTP challenge rate limit is per user", async () => {
+  const { context } = createUserApiContext();
+
+  await putOtpChallenge(context, {
+    challenge_id: "challenge-1",
+    discord_id: "123456789",
+    otp: "123456",
+    return_to: "https://app.example.com/",
+    expires_at: nowSeconds + 300,
+  });
+  await putOtpChallenge(context, {
+    challenge_id: "challenge-2",
+    discord_id: "123456789",
+    otp: "123456",
+    return_to: "https://app.example.com/",
+    expires_at: nowSeconds + 300,
+  });
+  await putOtpChallenge(context, {
+    challenge_id: "challenge-3",
+    discord_id: "987654321",
+    otp: "123456",
+    return_to: "https://app.example.com/",
+    expires_at: nowSeconds + 300,
+  });
+
+  const response = await consumeOtpChallenge(context, {
+    challenge_id: "challenge-3",
+    otp: "123456",
+  });
+
+  expect(response.statusCode).toBe(200);
+});
