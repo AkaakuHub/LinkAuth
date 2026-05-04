@@ -332,6 +332,32 @@ test("Account Worker profile update rejects missing CSRF tokens", async () => {
   expect(response.status).toBe(403);
 });
 
+test("Account Worker profile update rejects origin mismatches", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    return Response.json({ ok: true });
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("profile");
+
+  const response = await fetchAccount("https://account.example.com/profile", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      display_name: "Akaaku",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://evil.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(calls).toEqual([]);
+});
+
 test("Account Worker profile update accepts a valid CSRF token", async () => {
   const calls: string[] = [];
   vi.stubGlobal(
@@ -371,6 +397,85 @@ test("Account Worker profile update accepts a valid CSRF token", async () => {
     "https://account.example.com/?return_to=https%3A%2F%2Fapp.example.com%2F",
   );
   expect(calls).toEqual(["/users/update-profile"]);
+});
+
+test("Account Worker avatar update rejects origin mismatches", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    return Response.json({ ok: true });
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("avatar");
+
+  const response = await fetchAccount("https://account.example.com/avatar", {
+    body: new Uint8Array(),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://evil.example.com",
+      "x-csrf-token": csrfToken,
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(calls).toEqual([]);
+});
+
+test("Account Worker delete rejects origin mismatches", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    return Response.json({ ok: true });
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("delete");
+
+  const response = await fetchAccount("https://account.example.com/delete", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      return_to: "https://app.example.com/",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://evil.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(calls).toEqual([]);
+});
+
+test("Account Worker logout rejects origin mismatches", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    return Response.json({ ok: true });
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("logout");
+
+  const response = await fetchAccount("https://account.example.com/logout", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      return_to: "https://app.example.com/",
+    }),
+    headers: {
+      cookie: [
+        `${sessionCookieName}=${encodeURIComponent(session)}`,
+        `${rememberCookieName}=remember-id.random-token`,
+      ].join("; "),
+      origin: "https://evil.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(calls).toEqual([]);
 });
 
 test("Account Worker logout deletes the remember token and clears account cookies", async () => {
