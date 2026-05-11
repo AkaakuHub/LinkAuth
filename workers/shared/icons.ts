@@ -3,7 +3,7 @@ import tablerNodes from "../../node_modules/@tabler/icons/tabler-nodes-outline.j
 };
 import { attr, escapeHtml } from "./html.js";
 
-type IconName =
+export type IconName =
   | "alert-triangle"
   | "apps"
   | "arrow-left"

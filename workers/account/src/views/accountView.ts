@@ -1,5 +1,6 @@
 import { attr, escapeHtml } from "../../../shared/html.js";
 import { icon } from "../../../shared/icons.js";
+import { avatarAssetUrl, profileAvatar } from "../../../shared/profileUi.js";
 import { button, card, textInput } from "../../../shared/ui.js";
 import type { User } from "../../../shared/userApi.js";
 import type { AccountTokens } from "../security/accountTokens.js";
@@ -21,21 +22,50 @@ export function accountView({
       returnTo,
       showBackLink,
     },
-  )}</header><input type="hidden" name="avatar_csrf_token"${attr("value", tokens.avatar)} data-avatar-csrf>${card(
+  )}</header><input type="hidden" name="avatar_csrf_token"${attr("value", tokens.avatar)} data-avatar-csrf>${accountProfileCard(
     {
-      className: "overflow-hidden p-0",
-      children: `<div class="h-36 bg-haze"></div><div class="grid gap-5 px-5 pb-5"><div class="-mt-14 flex flex-wrap items-end justify-between gap-4"><div class="grid gap-3">${avatarEditor(
-        user,
-      )}<div class="grid gap-1"><h1 class="text-3xl font-semibold leading-tight text-ink">${escapeHtml(user.display_name)}</h1><p class="text-sm text-muted">@${escapeHtml(user.discord_id)}</p></div></div>${button(
-        {
-          type: "button",
-          variant: "secondary",
-          attributes: " data-profile-edit-trigger",
-          children: `${icon("pencil")}編集`,
-        },
-      )}</div>${profileForm({ user, tokens, escapedReturnTo })}</div>${avatarCropperDialog()}<script src="/account-client.js" defer></script>`,
+      user,
+      tokens,
+      escapedReturnTo,
     },
-  )}${card({
+  )}${accountActions({
+    tokens,
+    escapedReturnTo,
+  })}</div>`;
+}
+
+function accountProfileCard({
+  user,
+  tokens,
+  escapedReturnTo,
+}: {
+  user: User;
+  tokens: AccountTokens;
+  escapedReturnTo: string;
+}): string {
+  return card({
+    className: "overflow-hidden p-0",
+    children: `<div class="h-36 bg-haze"></div><div class="grid gap-5 px-5 pb-5"><div class="-mt-14 flex flex-wrap items-end justify-between gap-4"><div class="grid gap-3">${avatarEditor(
+      user,
+    )}<div class="grid gap-1"><h1 class="text-3xl font-semibold leading-tight text-ink">${escapeHtml(user.display_name)}</h1><p class="text-sm text-muted">@${escapeHtml(user.discord_id)}</p></div></div>${button(
+      {
+        type: "button",
+        variant: "secondary",
+        attributes: " data-profile-edit-trigger",
+        children: `${icon("pencil")}編集`,
+      },
+    )}</div>${profileForm({ user, tokens, escapedReturnTo })}</div>${avatarCropperDialog()}<script src="/account-client.js" defer></script>`,
+  });
+}
+
+function accountActions({
+  tokens,
+  escapedReturnTo,
+}: {
+  tokens: AccountTokens;
+  escapedReturnTo: string;
+}): string {
+  return card({
     className: "flex flex-wrap items-center justify-between gap-4",
     children: `<div class="grid gap-1"><h2 class="text-base font-semibold text-ink">アカウント操作</h2><p class="text-sm text-muted">ログアウトまたはアカウント削除を行います。</p></div><div class="flex flex-wrap gap-2"><form method="post" action="/logout"><input type="hidden" name="csrf_token"${attr("value", tokens.logout)}><input type="hidden" name="return_to" value="${escapedReturnTo}">${button(
       {
@@ -50,7 +80,7 @@ export function accountView({
         children: `${icon("trash")}削除`,
       },
     )}</form></div>`,
-  })}</div>`;
+  });
 }
 
 function backLink({
@@ -93,11 +123,10 @@ function profileForm({
 }
 
 function avatarEditor(user: User): string {
-  const avatarUrl = avatarUrlFromUser(user);
-  const avatar =
-    avatarUrl !== null
-      ? `<img class="h-28 w-28 rounded-full border-4 border-panel bg-panel object-cover shadow-sm"${attr("src", avatarUrl)}${attr("alt", `${user.display_name}のアイコン`)}>`
-      : `<div class="grid h-28 w-28 place-items-center rounded-full border-4 border-panel bg-primary text-3xl font-semibold text-primary-foreground shadow-sm" aria-hidden="true">${escapeHtml(profileInitial(user.display_name))}</div>`;
+  const avatar = profileAvatar({
+    avatarUrl: avatarAssetUrl(user.icon_source, user.icon_key),
+    displayName: user.display_name,
+  });
   return `<div class="grid gap-2">${avatar}<label class="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-line bg-panel px-4 text-sm font-semibold text-ink transition-colors hover:bg-haze focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">${icon("pencil")}アイコン変更<input class="hidden" type="file" accept="image/*" data-avatar-input></label><p class="text-sm text-muted" data-avatar-status></p></div>`;
 }
 
@@ -114,19 +143,4 @@ function avatarCropperDialog(): string {
     attributes: " data-avatar-cropper-save",
     children: `${icon("check")}保存`,
   })}</div></div></dialog>`;
-}
-
-function avatarUrlFromUser(user: User): string | null {
-  if (user.icon_source !== "r2" || !user.icon_key) {
-    return null;
-  }
-  return `/assets/${encodeAssetKey(user.icon_key)}`;
-}
-
-function encodeAssetKey(key: string): string {
-  return key.split("/").map(encodeURIComponent).join("/");
-}
-
-function profileInitial(displayName: string): string {
-  return displayName.trim().slice(0, 1).toUpperCase() || "?";
 }

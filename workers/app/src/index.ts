@@ -7,9 +7,11 @@ import {
   signSessionCookie,
   verifySessionCookie,
 } from "../../../shared/src/session.js";
+import { authPanel, authShell } from "../../shared/authUi.js";
 import { attr, escapeHtml, page } from "../../shared/html.js";
 import { icon } from "../../shared/icons.js";
-import { card, linkButton } from "../../shared/ui.js";
+import { avatarAssetUrl, profileAvatar } from "../../shared/profileUi.js";
+import { button, linkButton } from "../../shared/ui.js";
 import type { User } from "../../shared/userApi.js";
 import { type AppConfig, withAppConfig } from "./appConfig.js";
 import {
@@ -78,10 +80,22 @@ async function handleAppRequest(
 function loginPage(request: Request): Response {
   return page(
     "App Login",
-    `<div class="grid flex-1 place-items-center">${card({
-      className: "grid w-full max-w-lg gap-5",
-      children: `<div class="grid gap-3"><p class="inline-flex items-center gap-2 text-sm font-semibold text-primary">${icon("apps")}App</p><div class="grid gap-1"><h1 class="text-3xl font-semibold leading-tight text-ink">appにログイン</h1><p class="text-sm leading-7 text-muted">認証基盤で本人確認して、このapp用のセッションを発行します。</p></div></div><form action="/login" method="post"><input type="hidden" name="return_to"${attr("value", appReturnToUrl(request))}><button class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" type="submit">${icon("login-2")}認証して続行</button></form>`,
-    })}</div>`,
+    authShell(
+      authPanel({
+        iconName: "apps",
+        label: "Sample App",
+        title: "appにログイン",
+        description:
+          "LinkAuthで本人確認し、このapp用のセッションを発行します。",
+        children: `<form action="/login" method="post"><input type="hidden" name="return_to"${attr("value", appReturnToUrl(request))}>${button(
+          {
+            type: "submit",
+            className: "w-full",
+            children: `${icon("login-2")}認証して続行`,
+          },
+        )}</form>`,
+      }),
+    ),
   );
 }
 
@@ -252,13 +266,12 @@ function appHeader(accountUrl: URL): string {
 }
 
 function appAvatar(user: User, config: AppConfig): string {
-  const avatarUrl = avatarUrlFromIcon(user.icon_source, user.icon_key, {
-    baseUrl: config.accountUrl,
+  return profileAvatar({
+    avatarUrl: avatarAssetUrl(user.icon_source, user.icon_key, {
+      baseUrl: config.accountUrl,
+    }),
+    displayName: user.display_name,
   });
-  if (avatarUrl) {
-    return `<img class="h-28 w-28 rounded-full border-4 border-panel bg-panel object-cover shadow-sm"${attr("src", avatarUrl)}${attr("alt", `${user.display_name}のアイコン`)}>`;
-  }
-  return `<div class="grid h-28 w-28 place-items-center rounded-full border-4 border-panel bg-primary text-3xl font-semibold text-primary-foreground shadow-sm" aria-hidden="true">${escapeHtml(profileInitial(user.display_name))}</div>`;
 }
 
 async function fetchCurrentUser(
@@ -312,28 +325,6 @@ function parseCurrentUser(value: unknown): User | null {
   };
 }
 
-function avatarUrlFromIcon(
-  iconSource: "discord" | "r2" | "none" | undefined,
-  iconKey: string | undefined,
-  options: { baseUrl: string },
-): string | null {
-  if (iconSource !== "r2" || !iconKey) {
-    return null;
-  }
-  return new URL(
-    `/assets/${encodeAssetKey(iconKey)}`,
-    options.baseUrl,
-  ).toString();
-}
-
-function encodeAssetKey(key: string): string {
-  return key.split("/").map(encodeURIComponent).join("/");
-}
-
-function profileInitial(displayName: string): string {
-  return displayName.trim().slice(0, 1).toUpperCase() || "?";
-}
-
 function clearAppAuthState(response: Response, config: AppConfig): Response {
   const headers = new Headers(response.headers);
   headers.append(
@@ -350,16 +341,22 @@ function clearAppAuthState(response: Response, config: AppConfig): Response {
 function appAuthFailedPage(url: URL): Response {
   return page(
     "App認証に失敗しました",
-    `<div class="grid flex-1 place-items-center">${card({
-      className: "grid w-full max-w-lg gap-5",
-      children: `<div class="grid gap-2"><p class="inline-flex items-center gap-2 text-sm font-semibold text-danger">${icon("alert-triangle")}認証できません</p><h1 class="text-3xl font-semibold leading-tight text-ink">app認証に失敗しました</h1><p class="text-sm leading-7 text-muted">認証リクエストが無効、期限切れ、またはすでに使用済みです。もう一度ログインしてください。</p></div>${linkButton(
-        {
+    authShell(
+      authPanel({
+        iconName: "alert-triangle",
+        label: "認証できません",
+        title: "app認証に失敗しました",
+        description:
+          "認証リクエストが無効、期限切れ、またはすでに使用済みです。もう一度ログインしてください。",
+        tone: "danger",
+        children: linkButton({
           href: new URL("/login", url.origin).toString(),
+          className: "w-full",
           variant: "secondary",
           children: `${icon("home")}ログイン画面へ戻る`,
-        },
-      )}`,
-    })}</div>`,
+        }),
+      }),
+    ),
     401,
   );
 }

@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 const buttonVariants = cva(
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-45",
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-45",
   {
     variants: {
       variant: {
@@ -79,7 +79,7 @@ export function textInput({
   className?: string;
   attributes?: string;
 }): string {
-  return `<input class="${cn("h-11 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/20", className)}"${attributes}>`;
+  return `<input class="${cn("h-12 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/20", className)}"${attributes}>`;
 }
 
 export function field({
