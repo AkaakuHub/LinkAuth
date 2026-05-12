@@ -31,6 +31,7 @@ export async function createOtpChallenge(
   },
 ): Promise<void> {
   const nowSeconds = Math.floor(Date.now() / 1000);
+  const otp = validateOtp(input.otp);
   await consumeOtpIssueQuota(
     config,
     input.discordId,
@@ -48,11 +49,7 @@ export async function createOtpChallenge(
       input.discordId,
       input.appId ?? null,
       validateReturnTo(input.returnTo),
-      await hashOtp(
-        config.internal.otpHashSecret,
-        input.challengeId,
-        input.otp,
-      ),
+      await hashOtp(config.internal.otpHashSecret, input.challengeId, otp),
       new Date().toISOString(),
       input.expiresAt,
     )
@@ -179,6 +176,13 @@ async function hashOtp(
   otp: string,
 ): Promise<string> {
   return hexEncode(await hmacSha256(secret, `${challengeId}.${otp}`));
+}
+
+function validateOtp(value: string): string {
+  if (!/^[0-9]{6}$/.test(value)) {
+    throw new Error("invalid otp");
+  }
+  return value;
 }
 
 function validateReturnTo(value: string): string {
