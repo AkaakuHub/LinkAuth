@@ -10,11 +10,10 @@ await writeEnvFile("workers/account/.dev.vars", [
   "CSRF_HMAC_SECRET",
   "SESSION_KID",
   "SESSION_HMAC_SECRET",
-  "INTERNAL_HMAC_KID",
-  "INTERNAL_HMAC_SECRET",
+  "OTP_HMAC_SECRET",
   "DISCORD_CLIENT_ID",
   "DISCORD_CLIENT_SECRET",
-  "USER_API_URL",
+  "DISCORD_PUBLIC_KEY",
   ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
   "ACCOUNT_URL",
   ["AUTH_APPS", localApp.authApps],
@@ -30,20 +29,7 @@ await writeEnvFile("workers/app/.dev.vars", [
   "ACCOUNT_URL",
 ]);
 
-await writeTerraformVarsFile("infra/terraform.tfvars", [
-  ["aws_region", "AWS_REGION"],
-  ["domain_name", "PUBLIC_DOMAIN_NAME"],
-  ["cloudflare_account_id", "CLOUDFLARE_ACCOUNT_ID"],
-  ["cloudflare_zone_id", "CLOUDFLARE_ZONE_ID"],
-  ["cloudflare_api_token", "CLOUDFLARE_API_TOKEN"],
-  ["discord_public_key", "DISCORD_PUBLIC_KEY"],
-  ["discord_guild_ids", "DISCORD_GUILD_IDS"],
-  ["discord_bot_token", "DISCORD_BOT_TOKEN"],
-  ["internal_hmac_kid", "INTERNAL_HMAC_KID"],
-  ["internal_hmac_secret", "INTERNAL_HMAC_SECRET"],
-]);
-
-console.log("Synced .env.local to Worker .dev.vars files and Terraform tfvars");
+console.log("Synced .env.local to Worker .dev.vars files");
 
 type Mapping = string | [destinationKey: string, sourceKey: string];
 type ResolvedMapping = string | [destinationKey: string, value: string];
@@ -69,31 +55,11 @@ async function writeEnvFile(
   await writeFile(path, `${lines.join("\n")}\n`);
 }
 
-async function writeTerraformVarsFile(
-  path: string,
-  mappings: Array<[destinationKey: string, sourceKey: string]>,
-): Promise<void> {
-  const lines: string[] = [];
-  for (const [destinationKey, sourceKey] of mappings) {
-    const value = source.get(sourceKey);
-    if (!value) {
-      throw new Error(`${sourceKey} is required in .env.local`);
-    }
-    lines.push(`${destinationKey} = ${quoteTerraform(value)}`);
-  }
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${lines.join("\n")}\n`);
-}
-
 function quoteEnv(value: string): string {
   if (value.includes("\n") || value.includes("\r")) {
     throw new Error("env value must be single-line");
   }
   return value;
-}
-
-function quoteTerraform(value: string): string {
-  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
 function localAppDefinition(source: Map<string, string>): {

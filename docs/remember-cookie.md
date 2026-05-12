@@ -12,15 +12,13 @@ account WorkerはOTP検証成功後に、account session cookieとremember cooki
 
 remember cookieの値は`token_id.random_token`形式です。
 
-account Workerは`random_token`を平文保存せず、SHA-256でハッシュ化した`token_hash`をuser-apiの`/remember/create`へ渡します。
+account Workerは`random_token`を平文保存せず、SHA-256でハッシュ化した`token_hash`をD1へ保存します。
 
-user-apiはactiveなユーザーに対してだけremember tokenを作成します。
+remember tokenはactiveなユーザーに対してだけ作成します。
 
 remember cookieの有効期限は180日です。
 
-account session cookieが無効でremember cookieが有効な場合、account Workerは`token_id`と`random_token`のSHA-256ハッシュを使ってuser-apiの`/remember/rotate`を呼びます。
-
-user-apiは`token_id`でremember tokenを取得し、保存済みの`token_hash`と照合します。成功した場合、account Workerはaccount session cookieを再発行し、remember cookieの`random_token`を更新します。
+account session cookieが無効でremember cookieが有効な場合、account Workerは`token_id`でremember tokenを取得し、`random_token`のSHA-256ハッシュを保存済みの`token_hash`と照合します。成功した場合、account Workerはaccount session cookieを再発行し、remember cookieの`random_token`を更新します。
 
 復元に失敗したremember cookieは、未認証応答で削除します。
 
@@ -34,8 +32,8 @@ remember tokenは作成しません。
 
 ## ログアウト
 
-ログアウト時にremember cookieが存在する場合、account Workerはcookie内の`token_id`を使ってuser-apiの`/remember/delete`を呼びます。
+ログアウト時にremember cookieが存在する場合、account Workerはcookie内の`token_id`を使ってD1のremember tokenを削除します。
 
 その後、account session cookieとremember cookieを削除します。
 
-全端末ログアウトとユーザー削除では、user-apiが対象ユーザーのremember tokenを全ページ分削除します。
+全端末ログアウトとユーザー削除では、対象ユーザーのremember tokenを全件削除します。
