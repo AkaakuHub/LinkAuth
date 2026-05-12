@@ -99,6 +99,32 @@ test("App login completes without a remember cookie when remember_me is off", as
   expect(servers.state.rememberCreateCount).toBe(0);
 });
 
+test("App session is cleared after logging out from the account page", async ({
+  page,
+}) => {
+  await using servers = await startAuthFlowServers();
+
+  await page.goto(`${servers.app.origin}/login`);
+  await page.getByRole("button", { name: "認証して続行" }).click();
+  await expect(page.getByRole("heading", { name: "OTP認証" })).toBeVisible();
+  await page.getByLabel("認証コード").fill(servers.state.lastOtp ?? "");
+  await page.getByRole("button", { name: "認証" }).click();
+  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
+
+  await page.getByRole("link", { name: "設定" }).click();
+  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
+  await page.getByRole("button", { name: "ログアウト" }).click();
+
+  await expect(page).toHaveURL(`${servers.app.origin}/login`);
+  await expect(
+    page.getByRole("heading", { name: "appにログイン" }),
+  ).toBeVisible();
+  const cookies = await page.context().cookies();
+  expect(
+    cookies.some((cookie) => cookie.name === appSessionCookieName("hub")),
+  ).toBe(false);
+});
+
 async function startAuthFlowServers(): Promise<
   AsyncDisposable & {
     account: TestServer;

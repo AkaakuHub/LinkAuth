@@ -30,6 +30,9 @@ async function handleAppRequest(
   if (url.pathname === "/_auth/callback" && request.method === "GET") {
     return authCallback(request, url, config);
   }
+  if (url.pathname === "/_auth/logout" && request.method === "GET") {
+    return clearAppSession(url, config);
+  }
 
   const sessionCookie = appSessionCookieName(config.appId);
   const session = getSingleCookie(request.headers.get("cookie"), sessionCookie);
@@ -336,6 +339,21 @@ function clearAppAuthState(response: Response, config: AppConfig): Response {
     status: response.status,
     statusText: response.statusText,
   });
+}
+
+function clearAppSession(url: URL, config: AppConfig): Response {
+  const headers = new Headers({
+    location: new URL("/login", url.origin).toString(),
+  });
+  headers.append(
+    "set-cookie",
+    deleteCookie(appSessionCookieName(config.appId)),
+  );
+  headers.append(
+    "set-cookie",
+    deleteCookie(appAuthStateCookieName(config.appId)),
+  );
+  return new Response(null, { headers, status: 302 });
 }
 
 function appAuthFailedPage(url: URL): Response {

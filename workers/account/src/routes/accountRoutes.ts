@@ -13,6 +13,7 @@ import {
   updateUserAvatar,
   updateUserProfile,
 } from "../data/users.js";
+import { appLogoutUrlForReturnTo } from "../domain/appRegistry.js";
 import { normalizeDisplayName } from "../domain/displayName.js";
 import { accountReturnTo, redirectToAccountRoot } from "../domain/returnTo.js";
 import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
@@ -163,7 +164,9 @@ export async function deleteAccount(
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   await markUserDeleted(config, session.discord_id);
   await deleteAllRememberTokens(config, session.discord_id);
-  return clearAccountCookiesAndRedirect(returnTo);
+  return clearAccountCookiesAndRedirect(
+    appLogoutUrlForReturnTo(config, returnTo),
+  );
 }
 
 export async function logout(
@@ -193,7 +196,9 @@ export async function logout(
   if (tokenId) {
     await deleteRememberToken(config, tokenId);
   }
-  return clearAccountCookiesAndRedirect(returnTo);
+  return clearAccountCookiesAndRedirect(
+    appLogoutUrlForReturnTo(config, returnTo),
+  );
 }
 
 async function accountLandingResponse(

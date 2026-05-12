@@ -273,6 +273,24 @@ test("App Worker callback ignores tampered return_to query values", async () => 
   );
 });
 
+test("App Worker logout clears the app session cookie", async () => {
+  const session = await createAppSession("hub");
+  const response = await fetchApp("https://app.example.com/_auth/logout", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/login",
+  );
+  expect(setCookie).toContain(`${appSessionCookieName("hub")}=`);
+  expect(setCookie).toContain("Max-Age=0");
+  expect(setCookie).toContain(`${appAuthStateCookieName("hub")}=`);
+});
+
 test("App Worker returns the current user with a valid app session", async () => {
   vi.stubGlobal("fetch", async () => Response.json({ user: currentUser }));
   const session = await createAppSession("hub");

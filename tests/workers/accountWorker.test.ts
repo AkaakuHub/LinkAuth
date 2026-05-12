@@ -587,7 +587,9 @@ test("Account Worker logout deletes the remember token and clears account cookie
   const setCookie = response.headers.get("set-cookie") ?? "";
 
   expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("https://app.example.com/");
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/_auth/logout",
+  );
   await expectRememberTokenDeleted("remember-id");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);

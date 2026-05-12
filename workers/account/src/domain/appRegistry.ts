@@ -24,3 +24,17 @@ export function matchesCallbackUrl(
     return false;
   }
 }
+
+export function appLogoutUrlForReturnTo(
+  config: AccountConfig,
+  returnTo: string,
+): string {
+  const returnToUrl = new URL(returnTo);
+  const app = config.apps.find((definition) => {
+    const callbackUrl = new URL(definition.callbackUrl);
+    return returnToUrl.origin === callbackUrl.origin;
+  });
+  return app
+    ? new URL("/_auth/logout", returnToUrl.origin).toString()
+    : returnTo;
+}
