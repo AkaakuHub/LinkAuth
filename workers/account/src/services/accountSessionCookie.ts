@@ -6,8 +6,9 @@ import {
   sessionCookieName,
   signSessionCookie,
 } from "../../../../shared/src/session.js";
-import { callUserApi, hashToken, type User } from "../../../shared/userApi.js";
+import { hashToken, type User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { createRememberToken } from "../data/rememberTokens.js";
 import { noStoreHeaders } from "../views/accountLandingPage.js";
 
 export const accountSessionMaxAgeSeconds = 86_400;
@@ -77,11 +78,11 @@ async function createRememberCookieWithToken(input: {
   user: Pick<User, "discord_id">;
 }): Promise<string> {
   const randomToken = randomBase64Url(32);
-  await callUserApi(input.config.userApi, "/remember/create", {
-    discord_id: input.user.discord_id,
-    token_id: input.tokenId,
-    token_hash: await hashToken(randomToken),
-    expires_at: input.now + rememberMaxAgeSeconds,
+  await createRememberToken(input.config, {
+    discordId: input.user.discord_id,
+    tokenId: input.tokenId,
+    tokenHash: await hashToken(randomToken),
+    expiresAt: input.now + rememberMaxAgeSeconds,
   });
   return createCookie(
     rememberCookieName,

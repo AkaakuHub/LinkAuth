@@ -1,0 +1,190 @@
+import { hmacSha256 } from "../../../../shared/src/crypto.js";
+import { hexEncode, timingSafeEqual } from "../../../../shared/src/encoding.js";
+import type { AccountConfig } from "../accountConfig.js";
+import { DataConflictError } from "./errors.js";
+
+type OtpChallengeRow = {
+  discord_id: string;
+  app_id: string | null;
+  return_to: string;
+  otp_hash: string;
+  expires_at: number;
+};
+
+type OtpRateLimitRow = {
+  first_issued_at: number | null;
+  second_issued_at: number | null;
+};
+
+const otpIssueLimit = 2;
+const otpIssueWindowSeconds = 60;
+
+export async function createOtpChallenge(
+  config: AccountConfig,
+  input: {
+    challengeId: string;
+    discordId: string;
+    appId?: string;
+    returnTo: string;
+    otp: string;
+    expiresAt: number;
+  },
+): Promise<void> {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  await consumeOtpIssueQuota(
+    config,
+    input.discordId,
+    input.challengeId,
+    nowSeconds,
+  );
+  const result = await config.database
+    .prepare(
+      `INSERT OR IGNORE INTO otp_challenges (
+        challenge_id, discord_id, app_id, return_to, otp_hash, created_at, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      input.challengeId,
+      input.discordId,
+      input.appId ?? null,
+      validateReturnTo(input.returnTo),
+      await hashOtp(
+        config.internal.otpHashSecret,
+        input.challengeId,
+        input.otp,
+      ),
+      new Date().toISOString(),
+      input.expiresAt,
+    )
+    .run();
+  if (result.meta.changes !== 1) {
+    throw new DataConflictError("otp challenge already exists");
+  }
+}
+
+export async function consumeOtpChallenge(
+  config: AccountConfig,
+  input: { challengeId: string; otp: string },
+): Promise<{ discordId: string; appId?: string; returnTo: string } | null> {
+  const row = await config.database
+    .prepare("SELECT * FROM otp_challenges WHERE challenge_id = ?")
+    .bind(input.challengeId)
+    .first<OtpChallengeRow>();
+  await config.database
+    .prepare("DELETE FROM otp_challenges WHERE challenge_id = ?")
+    .bind(input.challengeId)
+    .run();
+  if (
+    !row ||
+    row.expires_at <= Math.floor(Date.now() / 1000) ||
+    !timingSafeEqual(
+      row.otp_hash,
+      await hashOtp(
+        config.internal.otpHashSecret,
+        input.challengeId,
+        input.otp,
+      ),
+    )
+  ) {
+    return null;
+  }
+  return {
+    discordId: row.discord_id,
+    ...(row.app_id ? { appId: row.app_id } : {}),
+    returnTo: row.return_to,
+  };
+}
+
+async function consumeOtpIssueQuota(
+  config: AccountConfig,
+  discordId: string,
+  challengeId: string,
+  nowSeconds: number,
+): Promise<void> {
+  const cutoffSeconds = nowSeconds - otpIssueWindowSeconds;
+  for (let attempt = 0; attempt < otpIssueLimit; attempt += 1) {
+    const item = await config.database
+      .prepare(
+        "SELECT first_issued_at, second_issued_at FROM otp_rate_limits WHERE discord_id = ?",
+      )
+      .bind(discordId)
+      .first<OtpRateLimitRow>();
+    if (countActiveOtpIssues(item, cutoffSeconds) >= otpIssueLimit) {
+      throw new DataConflictError("otp rate limited");
+    }
+    const slot = chooseOtpIssueSlot(item, cutoffSeconds);
+    if (!slot) {
+      throw new DataConflictError("otp rate limited");
+    }
+    const result = await config.database
+      .prepare(
+        `INSERT INTO otp_rate_limits (
+          discord_id, ${slot}_issued_at, ${slot}_challenge_id, updated_at, expires_at
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(discord_id) DO UPDATE SET
+          ${slot}_issued_at = excluded.${slot}_issued_at,
+          ${slot}_challenge_id = excluded.${slot}_challenge_id,
+          updated_at = excluded.updated_at,
+          expires_at = excluded.expires_at
+        WHERE ${slot}_issued_at IS NULL OR ${slot}_issued_at <= ?`,
+      )
+      .bind(
+        discordId,
+        nowSeconds,
+        challengeId,
+        new Date(nowSeconds * 1000).toISOString(),
+        nowSeconds + otpIssueWindowSeconds,
+        cutoffSeconds,
+      )
+      .run();
+    if (result.meta.changes === 1) {
+      return;
+    }
+  }
+  throw new DataConflictError("otp rate limited");
+}
+
+function countActiveOtpIssues(
+  item: OtpRateLimitRow | null,
+  cutoffSeconds: number,
+): number {
+  return [item?.first_issued_at, item?.second_issued_at].filter(
+    (issuedAt) => typeof issuedAt === "number" && issuedAt > cutoffSeconds,
+  ).length;
+}
+
+function chooseOtpIssueSlot(
+  item: OtpRateLimitRow | null,
+  cutoffSeconds: number,
+): "first" | "second" | null {
+  if (!isActiveOtpIssue(item?.first_issued_at, cutoffSeconds)) {
+    return "first";
+  }
+  if (!isActiveOtpIssue(item?.second_issued_at, cutoffSeconds)) {
+    return "second";
+  }
+  return null;
+}
+
+function isActiveOtpIssue(
+  issuedAt: number | null | undefined,
+  cutoffSeconds: number,
+): boolean {
+  return typeof issuedAt === "number" && issuedAt > cutoffSeconds;
+}
+
+async function hashOtp(
+  secret: string,
+  challengeId: string,
+  otp: string,
+): Promise<string> {
+  return hexEncode(await hmacSha256(secret, `${challengeId}.${otp}`));
+}
+
+function validateReturnTo(value: string): string {
+  const url = new URL(value);
+  if (url.username || url.password) {
+    throw new Error("invalid return_to");
+  }
+  return url.toString();
+}

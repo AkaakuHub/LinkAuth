@@ -16,6 +16,7 @@ import {
   sessionVerify,
   token,
 } from "./routes/authRoutes.js";
+import { discordInteraction } from "./routes/discordInteractionRoutes.js";
 
 export default withAccountConfig(handleAccountRequest);
 
@@ -34,6 +35,9 @@ async function handleAccountRequest(
   }
   if (url.pathname.startsWith("/assets/")) {
     return asset(url, config);
+  }
+  if (url.pathname === "/discord/interactions" && request.method === "POST") {
+    return discordInteraction(request, config);
   }
   if (url.pathname === "/authorize") {
     return authorize(request, url, config);

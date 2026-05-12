@@ -22,19 +22,9 @@ type TestServer = {
 };
 
 type MockState = {
-  authCodes: Map<
-    string,
-    {
-      discord_id: string;
-      display_name: string;
-      role: "user" | "admin";
-      status: "active";
-    }
-  >;
-  otpChallenge: {
-    app_id?: string;
-    return_to: string;
-  } | null;
+  authCodes: Map<string, Record<string, unknown>>;
+  users: Map<string, typeof user>;
+  otpChallenges: Map<string, Record<string, unknown>>;
   lastOtp: string | null;
   rememberCreateCount: number;
 };
@@ -118,7 +108,8 @@ async function startAuthFlowServers(): Promise<
 > {
   const state: MockState = {
     authCodes: new Map(),
-    otpChallenge: null,
+    users: new Map([[user.discord_id, user]]),
+    otpChallenges: new Map(),
     lastOtp: null,
     rememberCreateCount: 0,
   };
@@ -135,7 +126,8 @@ async function startAuthFlowServers(): Promise<
     accountEnv({
       accountOrigin,
       appOrigin: app.origin,
-      userApiOrigin: mock.origin,
+      mockOrigin: mock.origin,
+      state,
     }),
   );
   accountOrigin = account.origin;
@@ -167,7 +159,8 @@ async function startAuthFlowServers(): Promise<
 function accountEnv(input: {
   accountOrigin: string;
   appOrigin: string;
-  userApiOrigin: string;
+  mockOrigin: string;
+  state: MockState;
 }): AccountEnv {
   return {
     ACCOUNT_URL: input.accountOrigin,
@@ -181,17 +174,18 @@ function accountEnv(input: {
     ]),
     CSRF_HMAC_SECRET: "csrf-secret",
     CSRF_KID: "csrf-key",
-    DISCORD_API_BASE: `${input.userApiOrigin}/discord`,
+    DB: testD1Database(input.state),
+    DISCORD_API_BASE: `${input.mockOrigin}/discord`,
     DISCORD_BOT_TOKEN: "discord-bot-token",
     DISCORD_CLIENT_ID: "discord-client-id",
     DISCORD_CLIENT_SECRET: "discord-client-secret",
+    DISCORD_PUBLIC_KEY:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     DISCORD_GUILD_IDS: "guild",
     DOMAIN_NAME: "localhost",
-    INTERNAL_HMAC_KID: "internal-key",
-    INTERNAL_HMAC_SECRET: "internal-secret",
+    OTP_HMAC_SECRET: "otp-secret",
     SESSION_HMAC_SECRET: "account-session-secret",
     SESSION_KID: "session-key",
-    USER_API_URL: input.userApiOrigin,
   };
 }
 
@@ -227,6 +221,9 @@ async function startMockServer(state: MockState): Promise<TestServer> {
     if (url.pathname === "/discord/users/@me/guilds/guild/member") {
       return Response.json({ ok: true });
     }
+    if (url.pathname === "/discord/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
     if (url.pathname === "/discord/users/@me/channels") {
       return Response.json({ id: "dm-channel" });
     }
@@ -240,79 +237,6 @@ async function startMockServer(state: MockState): Promise<TestServer> {
         state.lastOtp = match[1];
       }
       return Response.json({ ok: true });
-    }
-    if (url.pathname === "/users/verify-current-membership") {
-      return Response.json({ user });
-    }
-    if (url.pathname === "/users/verify-active") {
-      return Response.json({ user });
-    }
-    if (url.pathname === "/otp-challenge/create") {
-      const body = (await request.json()) as {
-        app_id?: unknown;
-        challenge_id?: unknown;
-        discord_id?: unknown;
-        otp?: unknown;
-        return_to?: unknown;
-      };
-      if (
-        typeof body.challenge_id !== "string" ||
-        body.discord_id !== user.discord_id ||
-        typeof body.otp !== "string" ||
-        body.app_id !== "hub" ||
-        typeof body.return_to !== "string"
-      ) {
-        return Response.json(
-          { error: "invalid_otp_challenge" },
-          { status: 400 },
-        );
-      }
-      state.lastOtp = body.otp;
-      state.otpChallenge = {
-        app_id: body.app_id,
-        return_to: body.return_to,
-      };
-      return Response.json({ ok: true });
-    }
-    if (url.pathname === "/otp-challenge/consume") {
-      const body = (await request.json()) as { otp?: unknown };
-      return body.otp === state.lastOtp && state.otpChallenge
-        ? Response.json({
-            ...state.otpChallenge,
-            discord_id: user.discord_id,
-          })
-        : Response.json({ error: "invalid_otp" }, { status: 401 });
-    }
-    if (url.pathname === "/remember/create") {
-      state.rememberCreateCount += 1;
-      return Response.json({ ok: true });
-    }
-    if (url.pathname === "/auth-code/create") {
-      const body = (await request.json()) as {
-        app_id?: unknown;
-        code?: unknown;
-        user?: unknown;
-      };
-      if (body.app_id !== "hub" || typeof body.code !== "string") {
-        return Response.json({ error: "invalid_auth_code" }, { status: 400 });
-      }
-      state.authCodes.set(body.code, user);
-      return Response.json({ ok: true });
-    }
-    if (url.pathname === "/auth-code/consume") {
-      const body = (await request.json()) as {
-        app_id?: unknown;
-        code?: unknown;
-      };
-      const authUser =
-        body.app_id === "hub" && typeof body.code === "string"
-          ? state.authCodes.get(body.code)
-          : undefined;
-      if (!authUser || typeof body.code !== "string") {
-        return Response.json({ error: "invalid_auth_code" }, { status: 401 });
-      }
-      state.authCodes.delete(body.code);
-      return Response.json({ user: authUser });
     }
     return Response.json({ error: "not_found" }, { status: 404 });
   });
@@ -446,5 +370,132 @@ function unusedR2Bucket(): R2Bucket {
     resumeMultipartUpload(): R2MultipartUpload {
       throw new Error("R2 multipart upload is not used in auth flow E2E");
     },
+  };
+}
+
+function testD1Database(state: MockState): D1Database {
+  return {
+    batch<T = unknown>(): Promise<D1Result<T>[]> {
+      throw new Error("D1 batch is not used in auth flow E2E");
+    },
+    dump(): Promise<ArrayBuffer> {
+      throw new Error("D1 dump is not used in auth flow E2E");
+    },
+    exec(): Promise<D1ExecResult> {
+      throw new Error("D1 exec is not used in auth flow E2E");
+    },
+    prepare(query: string): D1PreparedStatement {
+      return testD1Statement(state, query);
+    },
+    withSession(): D1DatabaseSession {
+      return {
+        batch<T = unknown>(): Promise<D1Result<T>[]> {
+          throw new Error("D1 session batch is not used in auth flow E2E");
+        },
+        getBookmark(): D1SessionBookmark | null {
+          return null;
+        },
+        prepare(query: string): D1PreparedStatement {
+          return testD1Statement(state, query);
+        },
+      };
+    },
+  };
+}
+
+function testD1Statement(state: MockState, query: string): D1PreparedStatement {
+  let values: unknown[] = [];
+  return {
+    bind(...bindings: unknown[]): D1PreparedStatement {
+      values = bindings;
+      return this;
+    },
+    first<T = unknown>(): Promise<T | null> {
+      return Promise.resolve(selectD1Row(state, query, values) as T | null);
+    },
+    raw(): Promise<unknown[]> {
+      throw new Error("D1 raw is not used in auth flow E2E");
+    },
+    run<T = Record<string, unknown>>(): Promise<D1Result<T>> {
+      return Promise.resolve(
+        runD1Statement(state, query, values) as D1Result<T>,
+      );
+    },
+    all<T = unknown>(): Promise<D1Result<T>> {
+      throw new Error("D1 all is not used in auth flow E2E");
+    },
+  } as D1PreparedStatement;
+}
+
+function selectD1Row(
+  state: MockState,
+  query: string,
+  values: unknown[],
+): Record<string, unknown> | null {
+  if (query.startsWith("SELECT * FROM users WHERE discord_id = ?")) {
+    return state.users.get(String(values[0])) ?? null;
+  }
+  if (query.startsWith("SELECT * FROM auth_codes WHERE code = ?")) {
+    return state.authCodes.get(String(values[0])) ?? null;
+  }
+  if (query.startsWith("SELECT * FROM otp_challenges WHERE challenge_id = ?")) {
+    return state.otpChallenges.get(String(values[0])) ?? null;
+  }
+  if (query.startsWith("SELECT discord_id, token_hash, expires_at")) {
+    return null;
+  }
+  return null;
+}
+
+function runD1Statement(
+  state: MockState,
+  query: string,
+  values: unknown[],
+): D1Result {
+  let changes = 0;
+  if (query.includes("INSERT OR IGNORE INTO auth_codes")) {
+    state.authCodes.set(String(values[0]), {
+      app_id: values[1],
+      discord_id: String(values[2]),
+      display_name: String(values[3]),
+      role: values[4] === "admin" ? "admin" : "user",
+      icon_source: values[5],
+      icon_key: values[6],
+      expires_at: values[8],
+    });
+    changes = 1;
+  } else if (query.startsWith("DELETE FROM auth_codes")) {
+    changes = state.authCodes.delete(String(values[0])) ? 1 : 0;
+  } else if (query.includes("INSERT INTO otp_rate_limits")) {
+    changes = 1;
+  } else if (query.includes("INSERT OR IGNORE INTO otp_challenges")) {
+    state.otpChallenges.set(String(values[0]), {
+      challenge_id: values[0],
+      discord_id: values[1],
+      app_id: values[2],
+      return_to: values[3],
+      otp_hash: values[4],
+      expires_at: values[6],
+    });
+    changes = 1;
+  } else if (query.startsWith("DELETE FROM otp_challenges")) {
+    changes = state.otpChallenges.delete(String(values[0])) ? 1 : 0;
+  } else if (query.includes("INSERT OR IGNORE INTO remember_tokens")) {
+    state.rememberCreateCount += 1;
+    changes = 1;
+  }
+  return {
+    meta: {
+      changed_db: true,
+      changes,
+      duration: 0,
+      last_row_id: 0,
+      rows_read: 0,
+      rows_written: changes,
+      served_by: "test",
+      size_after: 0,
+    },
+    results: [],
+    success: true,
   };
 }

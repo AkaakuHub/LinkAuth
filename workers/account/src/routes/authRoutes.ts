@@ -11,8 +11,13 @@ import {
   verifySessionCookie,
 } from "../../../../shared/src/session.js";
 import { normalizeReturnTo } from "../../../shared/navigation.js";
-import { callUserApi, UserApiError } from "../../../shared/userApi.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { consumeAuthCode, createAuthCode } from "../data/authCodes.js";
+import { DataConflictError } from "../data/errors.js";
+import {
+  consumeOtpChallenge,
+  createOtpChallenge,
+} from "../data/otpChallenges.js";
 import { findApp, matchesCallbackUrl } from "../domain/appRegistry.js";
 import { createOtpCode } from "../domain/otpCode.js";
 import { accountReturnTo } from "../domain/returnTo.js";
@@ -82,9 +87,10 @@ export async function authorize(
     return inactiveAccountPage(config, returnTo);
   }
   const code = randomBase64Url(32);
-  await callUserApi(config.userApi, "/auth-code/create", {
-    app_id: appId,
+  await createAuthCode(config, {
+    appId: app.appId,
     code,
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
     user: {
       discord_id: active.user.discord_id,
       display_name: active.user.display_name,
@@ -94,7 +100,6 @@ export async function authorize(
       ...(active.user.icon_key ? { icon_key: active.user.icon_key } : {}),
       role: active.user.role,
     },
-    expires_at: Math.floor(Date.now() / 1000) + 300,
   });
   const callbackUrl = new URL(returnTo);
   callbackUrl.searchParams.set("code", code);
@@ -124,14 +129,12 @@ export async function token(
     return Response.json({ error: "invalid_app_signature" }, { status: 401 });
   }
   try {
-    return Response.json(
-      await callUserApi(config.userApi, "/auth-code/consume", {
-        app_id: appId,
-        code,
-      }),
-    );
+    const result = await consumeAuthCode(config, { appId, code });
+    return result
+      ? Response.json(result)
+      : Response.json({ error: "invalid_auth_code" }, { status: 401 });
   } catch (error) {
-    if (error instanceof UserApiError && error.status === 401) {
+    if (error instanceof DataConflictError) {
       return Response.json({ error: "invalid_auth_code" }, { status: 401 });
     }
     throw error;
@@ -193,13 +196,13 @@ export async function callback(
 
   const challengeId = randomBase64Url(24);
   const otpCode = createOtpCode();
-  await callUserApi(config.userApi, "/otp-challenge/create", {
-    challenge_id: challengeId,
-    discord_id: active.user.discord_id,
-    ...(state.app_id ? { app_id: state.app_id } : {}),
-    return_to: state.return_to,
+  await createOtpChallenge(config, {
+    challengeId,
+    discordId: active.user.discord_id,
+    ...(state.app_id ? { appId: state.app_id } : {}),
+    returnTo: state.return_to,
     otp: otpCode,
-    expires_at: Math.floor(Date.now() / 1000) + 300,
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
   });
   const otpResult = await sendDiscordOtp(
     active.user.discord_id,
@@ -256,31 +259,30 @@ export async function otp(
     return clearOtpState(authFailedPage(config));
   }
   try {
-    const result = await callUserApi<{
-      discord_id: string;
-      app_id?: string;
-      return_to: string;
-    }>(config.userApi, "/otp-challenge/consume", {
-      challenge_id: challengeId,
+    const result = await consumeOtpChallenge(config, {
+      challengeId,
       otp: otpCode,
     });
-    const active = await verifyActiveUser(result.discord_id, config);
+    if (!result) {
+      return clearOtpState(authFailedPage(config));
+    }
+    const active = await verifyActiveUser(result.discordId, config);
     if (!active) {
       return clearOtpState(inactiveAccountPage(config));
     }
     const response = await createAccountSessionResponse(
       active.user,
       postOtpReturnTo({
-        appId: result.app_id ?? "",
+        appId: result.appId ?? "",
         config,
         rememberMe,
-        returnTo: accountReturnTo(result.return_to, config),
+        returnTo: accountReturnTo(result.returnTo, config),
       }),
     );
     response.headers.append("set-cookie", deleteCookie(otpStateCookieName));
     return response;
   } catch (error) {
-    if (error instanceof UserApiError && error.status === 401) {
+    if (error instanceof DataConflictError) {
       return clearOtpState(authFailedPage(config));
     }
     throw error;

@@ -12,7 +12,7 @@ import { attr, escapeHtml, page } from "../../shared/html.js";
 import { icon } from "../../shared/icons.js";
 import { avatarAssetUrl, profileAvatar } from "../../shared/profileUi.js";
 import { button, linkButton } from "../../shared/ui.js";
-import type { User } from "../../shared/userApi.js";
+import type { User } from "../../shared/user.js";
 import { type AppConfig, withAppConfig } from "./appConfig.js";
 import {
   appAuthStateCookieName,

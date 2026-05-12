@@ -5,6 +5,7 @@ import type { Env } from "../../workers/account/src/types.js";
 const baseEnv = {
   ACCOUNT_URL: "https://auth.example.com",
   ASSETS: {} as R2Bucket,
+  DB: {} as D1Database,
   AUTH_APPS: JSON.stringify([
     {
       app_id: "hub",
@@ -17,13 +18,13 @@ const baseEnv = {
   DISCORD_BOT_TOKEN: "discord-bot-token",
   DISCORD_CLIENT_ID: "discord-client-id",
   DISCORD_CLIENT_SECRET: "discord-client-secret",
+  DISCORD_PUBLIC_KEY:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   DISCORD_GUILD_IDS: "guild",
   DOMAIN_NAME: "example.com",
-  INTERNAL_HMAC_KID: "internal-key",
-  INTERNAL_HMAC_SECRET: "internal-secret",
+  OTP_HMAC_SECRET: "otp-secret",
   SESSION_HMAC_SECRET: "session-secret",
   SESSION_KID: "session-key",
-  USER_API_URL: "https://user-api.example.com",
 } satisfies Env;
 
 test("Account config derives allowed return_to origins from app callback URLs", () => {

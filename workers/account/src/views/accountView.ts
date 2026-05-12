@@ -2,7 +2,7 @@ import { attr, escapeHtml } from "../../../shared/html.js";
 import { icon } from "../../../shared/icons.js";
 import { avatarAssetUrl, profileAvatar } from "../../../shared/profileUi.js";
 import { button, card, textInput } from "../../../shared/ui.js";
-import type { User } from "../../../shared/userApi.js";
+import type { User } from "../../../shared/user.js";
 import type { AccountTokens } from "../security/accountTokens.js";
 
 export function accountView({

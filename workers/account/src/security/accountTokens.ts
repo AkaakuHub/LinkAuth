@@ -1,5 +1,5 @@
 import { createCsrfToken } from "../../../../shared/src/csrf.js";
-import type { User } from "../../../shared/userApi.js";
+import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { assertSecret, requestOrigin } from "./requestContext.js";
 

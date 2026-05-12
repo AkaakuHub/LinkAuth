@@ -1,5 +1,5 @@
-import { createExecutionContext } from "cloudflare:test";
-import { afterEach, expect, test, vi } from "vitest";
+import { env as cloudflareEnv, createExecutionContext } from "cloudflare:test";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { hmacSha256Base64Url, sha256Hex } from "../../shared/src/crypto.js";
 import { createCsrfToken } from "../../shared/src/csrf.js";
 import {
@@ -8,7 +8,13 @@ import {
   sessionCookieName,
   signSessionCookie,
 } from "../../shared/src/session.js";
-import type { AccountConfig } from "../../workers/account/src/accountConfig.js";
+import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
+import { createOtpChallenge } from "../../workers/account/src/data/otpChallenges.js";
+import { createRememberToken } from "../../workers/account/src/data/rememberTokens.js";
+import {
+  d1DropSchemaStatements,
+  d1SchemaStatements,
+} from "../../workers/account/src/data/schema.js";
 import worker from "../../workers/account/src/index.js";
 import {
   authStateCookieName,
@@ -61,17 +67,23 @@ const env: Env = {
   DISCORD_BOT_TOKEN: "discord-bot-token",
   DISCORD_CLIENT_ID: "discord-client-id",
   DISCORD_CLIENT_SECRET: "discord-client-secret",
+  DISCORD_PUBLIC_KEY:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   DISCORD_GUILD_IDS: "guild",
   DOMAIN_NAME: "example.com",
-  INTERNAL_HMAC_KID: "internal-key",
-  INTERNAL_HMAC_SECRET: "internal-secret",
+  DB: cloudflareEnv.DB,
+  OTP_HMAC_SECRET: "otp-secret",
   SESSION_HMAC_SECRET: "account-session-secret",
   SESSION_KID: "account-session-key",
-  USER_API_URL: "https://user-api.example.com",
 };
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+beforeEach(async () => {
+  await resetDatabase();
+  await seedActiveUser();
 });
 
 test("Account Worker rejects authorize requests for unknown apps", async () => {
@@ -124,22 +136,7 @@ test("Account Worker redirects unauthenticated authorize requests to Discord", a
 });
 
 test("Account Worker issues an auth code for an active session", async () => {
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      const body = JSON.parse(
-        new TextDecoder().decode(init?.body as Uint8Array),
-      ) as { code?: string };
-      if (url.pathname === "/users/verify-current-membership") {
-        return Response.json({ user: activeUser });
-      }
-      if (url.pathname === "/auth-code/create" && body.code) {
-        return Response.json({ ok: true });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  stubDiscordGuildMember();
   const session = await createAccountSession();
 
   const response = await fetchAccount(
@@ -159,12 +156,9 @@ test("Account Worker issues an auth code for an active session", async () => {
 });
 
 test("Account Worker inactive authorize errors return to the app callback", async () => {
-  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
-    if (url.pathname === "/users/verify-current-membership") {
-      return Response.json({ error: "inactive_user" }, { status: 401 });
-    }
-    return Response.json({ error: "not_found" }, { status: 404 });
+  await replaceActiveUser({
+    disabledReason: "manual",
+    status: "disabled",
   });
   const session = await createAccountSession();
 
@@ -212,10 +206,6 @@ test("Account Worker token endpoint rejects malformed JSON", async () => {
 });
 
 test("Account Worker token endpoint maps consumed auth code failures to 401", async () => {
-  vi.stubGlobal("fetch", async () =>
-    Response.json({ error: "invalid_auth_code" }, { status: 401 }),
-  );
-
   const response = await fetchAccount("https://auth.example.com/token", {
     body: JSON.stringify({ app_id: "hub", code: "bad-code" }),
     headers: await tokenHeaders("hub", "bad-code"),
@@ -240,7 +230,7 @@ test("Account Worker token endpoint rejects invalid app signatures", async () =>
   expect(await response.json()).toEqual({ error: "invalid_app_signature" });
 });
 
-test("Account Worker token endpoint rejects unknown apps before User API", async () => {
+test("Account Worker token endpoint rejects unknown apps before data access", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -280,16 +270,11 @@ test("Account Worker session verify rejects unknown app ids", async () => {
 });
 
 test("Account Worker session verify accepts a valid app session cookie", async () => {
-  vi.stubGlobal("fetch", async () =>
-    Response.json({
-      user: {
-        ...activeUser,
-        display_name: "Current Akaaku",
-        icon_key: "icons/123456789/avatar.webp",
-        icon_source: "r2",
-      },
-    }),
-  );
+  await replaceActiveUser({
+    displayName: "Current Akaaku",
+    iconKey: "icons/123456789/avatar.webp",
+    iconSource: "r2",
+  });
   const session = await createAppSession("hub");
   const response = await fetchAccount(
     "https://auth.example.com/session/verify?app_id=hub",
@@ -336,7 +321,6 @@ test("Account Worker me rejects missing account sessions", async () => {
 });
 
 test("Account Worker me returns the active account user for a valid account session", async () => {
-  vi.stubGlobal("fetch", async () => Response.json({ user: activeUser }));
   const session = await createAccountSession();
 
   const response = await fetchAccount("https://auth.example.com/me", {
@@ -350,9 +334,10 @@ test("Account Worker me returns the active account user for a valid account sess
 });
 
 test("Account Worker me rejects valid sessions when the user is inactive", async () => {
-  vi.stubGlobal("fetch", async () =>
-    Response.json({ error: "inactive_user" }, { status: 401 }),
-  );
+  await replaceActiveUser({
+    disabledReason: "manual",
+    status: "disabled",
+  });
   const session = await createAccountSession();
 
   const response = await fetchAccount("https://auth.example.com/me", {
@@ -409,23 +394,6 @@ test("Account Worker profile update rejects origin mismatches", async () => {
 });
 
 test("Account Worker profile update accepts a valid CSRF token", async () => {
-  const calls: string[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      calls.push(url.pathname);
-      const body = decodeJsonBody(init);
-      if (
-        url.pathname === "/users/update-profile" &&
-        body.discord_id === "123456789" &&
-        body.display_name === "Akaaku"
-      ) {
-        return Response.json({ ok: true });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
   const session = await createAccountSession();
   const csrfToken = await createAccountCsrfToken("profile");
 
@@ -446,7 +414,71 @@ test("Account Worker profile update accepts a valid CSRF token", async () => {
   expect(response.headers.get("location")).toBe(
     "https://account.example.com/?return_to=https%3A%2F%2Fapp.example.com%2F",
   );
-  expect(calls).toEqual(["/users/update-profile"]);
+  await expectUserDisplayName("Akaaku");
+});
+
+test("Account Worker profile update normalizes display names", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("profile");
+
+  const response = await fetchAccount("https://account.example.com/profile", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      display_name: "  Current Akaaku  ",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(303);
+  await expectUserDisplayName("Current Akaaku");
+});
+
+test("Account Worker profile update rejects invalid display names", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("profile");
+
+  const response = await fetchAccount("https://account.example.com/profile", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      display_name: "",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(400);
+  await expectUserDisplayName("Akaaku");
+});
+
+test("Account Worker profile update rejects inactive users", async () => {
+  await replaceActiveUser({
+    disabledReason: "manual",
+    status: "disabled",
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("profile");
+
+  const response = await fetchAccount("https://account.example.com/profile", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      display_name: "Current Akaaku",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(401);
+  await expectUserDisplayName("Akaaku");
 });
 
 test("Account Worker avatar update rejects origin mismatches", async () => {
@@ -529,14 +561,12 @@ test("Account Worker logout rejects origin mismatches", async () => {
 });
 
 test("Account Worker logout deletes the remember token and clears account cookies", async () => {
-  const calls: Array<Record<string, unknown>> = [];
-  vi.stubGlobal(
-    "fetch",
-    async (_input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push(decodeJsonBody(init));
-      return Response.json({ ok: true });
-    },
-  );
+  await createRememberToken(testAccountConfig(), {
+    discordId: activeUser.discord_id,
+    expiresAt: Math.floor(Date.now() / 1000) + 15_552_000,
+    tokenHash: await hashTokenForTest("random-token"),
+    tokenId: "remember-id",
+  });
   const session = await createAccountSession();
   const csrfToken = await createAccountCsrfToken("logout");
 
@@ -558,11 +588,7 @@ test("Account Worker logout deletes the remember token and clears account cookie
 
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe("https://app.example.com/");
-  expect(calls).toEqual([
-    expect.objectContaining({
-      token_id: "remember-id",
-    }),
-  ]);
+  await expectRememberTokenDeleted("remember-id");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
   expect(setCookie).toContain("Max-Age=0");
@@ -571,43 +597,29 @@ test("Account Worker logout deletes the remember token and clears account cookie
 test("Account Worker callback creates an OTP challenge and renders the OTP form", async () => {
   const state = await createCallbackState("hub");
   const calls: string[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      calls.push(url.pathname);
-      if (url.pathname === "/api/v10/oauth2/token") {
-        return Response.json({ access_token: "discord-access-token" });
-      }
-      if (url.pathname === "/api/v10/users/@me") {
-        return Response.json({ id: "123456789" });
-      }
-      if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
-        return Response.json({ ok: true });
-      }
-      if (url.pathname === "/users/verify-current-membership") {
-        return Response.json({ user: activeUser });
-      }
-      if (url.pathname === "/otp-challenge/create") {
-        const body = decodeJsonBody(init);
-        expect(body.discord_id).toBe("123456789");
-        expect(body.app_id).toBe("hub");
-        expect(body.return_to).toBe("https://app.example.com/_auth/callback");
-        expect(body.otp).toMatch(/^[0-9]{6}$/);
-        expect(body.expires_at).toBeGreaterThanOrEqual(
-          Math.floor(Date.now() / 1000) + 299,
-        );
-        return Response.json({ ok: true });
-      }
-      if (url.pathname === "/api/v10/users/@me/channels") {
-        return Response.json({ id: "dm-channel" });
-      }
-      if (url.pathname === "/api/v10/channels/dm-channel/messages") {
-        return Response.json({ ok: true });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    calls.push(url.pathname);
+    if (url.pathname === "/api/v10/oauth2/token") {
+      return Response.json({ access_token: "discord-access-token" });
+    }
+    if (url.pathname === "/api/v10/users/@me") {
+      return Response.json({ id: "123456789" });
+    }
+    if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/users/@me/channels") {
+      return Response.json({ id: "dm-channel" });
+    }
+    if (url.pathname === "/api/v10/channels/dm-channel/messages") {
+      return Response.json({ ok: true });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
 
   const response = await fetchAccount(
     `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
@@ -629,40 +641,32 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   expect(calls).toContain("/api/v10/oauth2/token");
   expect(calls).toContain("/api/v10/users/@me");
   expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
-  expect(calls).toContain("/users/verify-current-membership");
-  expect(calls).toContain("/otp-challenge/create");
   expect(calls).toContain("/api/v10/users/@me/channels");
   expect(calls).toContain("/api/v10/channels/dm-channel/messages");
+  await expectOtpChallengeCount(1);
 });
 
 test("Account Worker callback shows a delivery error when Discord DM sending throws", async () => {
   const state = await createCallbackState("hub");
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/api/v10/oauth2/token") {
-        return Response.json({ access_token: "discord-access-token" });
-      }
-      if (url.pathname === "/api/v10/users/@me") {
-        return Response.json({ id: "123456789" });
-      }
-      if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
-        return Response.json({ ok: true });
-      }
-      if (url.pathname === "/users/verify-current-membership") {
-        return Response.json({ user: activeUser });
-      }
-      if (url.pathname === "/otp-challenge/create") {
-        expect(decodeJsonBody(init).discord_id).toBe("123456789");
-        return Response.json({ ok: true });
-      }
-      if (url.pathname === "/api/v10/users/@me/channels") {
-        throw new Error("discord unavailable");
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/api/v10/oauth2/token") {
+      return Response.json({ access_token: "discord-access-token" });
+    }
+    if (url.pathname === "/api/v10/users/@me") {
+      return Response.json({ id: "123456789" });
+    }
+    if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/users/@me/channels") {
+      throw new Error("discord unavailable");
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
 
   const response = await fetchAccount(
     `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
@@ -745,31 +749,14 @@ test("Account Worker callback rejects Discord users outside the configured guild
     'href="https://app.example.com/_auth/callback?state=app-state"',
   );
   expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
-  expect(calls).not.toContain("/users/verify-current-membership");
-  expect(calls).not.toContain("/otp-challenge/create");
+  await expectOtpChallengeCount(0);
 });
 
 test("Account Worker OTP success returns to authorize for app callbacks", async () => {
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/otp-challenge/consume") {
-        const body = decodeJsonBody(init);
-        expect(body.challenge_id).toBe("challenge-id");
-        expect(body.otp).toBe("123456");
-        return Response.json({
-          app_id: "hub",
-          discord_id: "123456789",
-          return_to: "https://app.example.com/_auth/callback",
-        });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await seedOtpChallenge({
+    appId: "hub",
+    returnTo: "https://app.example.com/_auth/callback",
+  });
 
   const response = await fetchAccount("https://auth.example.com/otp", {
     body: new URLSearchParams({
@@ -809,26 +796,10 @@ test("Account Worker OTP rejects requests without the browser challenge state", 
 });
 
 test("Account Worker OTP success does not use app_id for non-callback return_to values", async () => {
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/otp-challenge/consume") {
-        const body = decodeJsonBody(init);
-        expect(body.challenge_id).toBe("challenge-id");
-        expect(body.otp).toBe("123456");
-        return Response.json({
-          app_id: "hub",
-          discord_id: "123456789",
-          return_to: "https://app.example.com/",
-        });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await seedOtpChallenge({
+    appId: "hub",
+    returnTo: "https://app.example.com/",
+  });
 
   const response = await fetchAccount("https://auth.example.com/otp", {
     body: new URLSearchParams({
@@ -846,26 +817,10 @@ test("Account Worker OTP success does not use app_id for non-callback return_to 
 });
 
 test("Account Worker OTP success ignores tampered app_id and return_to form fields", async () => {
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/otp-challenge/consume") {
-        const body = decodeJsonBody(init);
-        expect(body.challenge_id).toBe("challenge-id");
-        expect(body.otp).toBe("123456");
-        return Response.json({
-          app_id: "hub",
-          discord_id: "123456789",
-          return_to: "https://app.example.com/_auth/callback",
-        });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await seedOtpChallenge({
+    appId: "hub",
+    returnTo: "https://app.example.com/_auth/callback",
+  });
 
   const response = await fetchAccount("https://auth.example.com/otp", {
     body: new URLSearchParams({
@@ -889,35 +844,9 @@ test("Account Worker OTP success ignores tampered app_id and return_to form fiel
 });
 
 test("Account Worker OTP success creates account and remember cookies when remember_me is on", async () => {
-  const calls: string[] = [];
-  const rememberCreateBodies: Record<string, unknown>[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      calls.push(url.pathname);
-      if (url.pathname === "/otp-challenge/consume") {
-        const body = decodeJsonBody(init);
-        expect(body.challenge_id).toBe("challenge-id");
-        expect(body.otp).toBe("123456");
-        return Response.json({
-          discord_id: "123456789",
-          return_to: "https://app.example.com/",
-        });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      if (url.pathname === "/remember/create") {
-        const body = decodeJsonBody(init);
-        rememberCreateBodies.push(body);
-        expect(body.discord_id).toBe("123456789");
-        expect(typeof body.token_hash).toBe("string");
-        return Response.json({ ok: true });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await seedOtpChallenge({
+    returnTo: "https://app.example.com/",
+  });
 
   const response = await fetchAccount("https://auth.example.com/otp", {
     body: new URLSearchParams({
@@ -942,43 +871,21 @@ test("Account Worker OTP success creates account and remember cookies when remem
   expect(rememberValue).not.toBeNull();
   const rememberParts = rememberValue?.split(".");
   expect(rememberParts).toHaveLength(2);
-  const rememberCreateBody = rememberCreateBodies[0];
-  expect(rememberCreateBody?.token_id).toBe(rememberParts?.[0]);
-  expect(rememberCreateBody?.token_hash).toBe(
+  await expectRememberToken(
+    rememberParts?.[0] ?? "",
     await hashTokenForTest(rememberParts?.[1] ?? ""),
   );
-  expect(rememberCreateBody).not.toHaveProperty("random_token");
-  expect(rememberCreateBody?.expires_at).toBeGreaterThanOrEqual(
-    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
-  );
-  expect(calls).toContain("/otp-challenge/consume");
-  expect(calls).toContain("/users/verify-active");
-  expect(calls).toContain("/remember/create");
 });
 
 test("Account Worker restores an account session with a valid remember cookie", async () => {
   const oldRandomToken = "old-random-token";
-  const rememberRotateBodies: Record<string, unknown>[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/remember/rotate") {
-        const body = decodeJsonBody(init);
-        rememberRotateBodies.push(body);
-        expect(body.token_id).toBe("remember-id");
-        expect(body.old_token_hash).toBe(
-          await hashTokenForTest(oldRandomToken),
-        );
-        expect(typeof body.new_token_hash).toBe("string");
-        return Response.json({ user: activeUser });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await createRememberToken(testAccountConfig(), {
+    discordId: activeUser.discord_id,
+    expiresAt: Math.floor(Date.now() / 1000) + 15_552_000,
+    tokenHash: await hashTokenForTest(oldRandomToken),
+    tokenId: "remember-id",
+  });
+  stubDiscordGuildMember();
 
   const response = await fetchAccount("https://account.example.com/", {
     headers: {
@@ -993,25 +900,13 @@ test("Account Worker restores an account session with a valid remember cookie", 
   expect(body).toContain("data-avatar-csrf");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
-  const rememberRotateBody = rememberRotateBodies[0];
-  expect(rememberRotateBody?.expires_at).toBeGreaterThanOrEqual(
-    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
-  );
+  await expectRememberTokenRotated("remember-id", oldRandomToken);
 });
 
 test("Account Worker account page renders the current icon", async () => {
-  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
-    if (url.pathname === "/users/verify-active") {
-      return Response.json({
-        user: {
-          ...activeUser,
-          icon_key: "icons/123456789/avatar.webp",
-          icon_source: "r2",
-        },
-      });
-    }
-    return Response.json({ error: "not_found" }, { status: 404 });
+  await replaceActiveUser({
+    iconKey: "icons/123456789/avatar.webp",
+    iconSource: "r2",
   });
   const session = await createAccountSession();
 
@@ -1032,10 +927,6 @@ test("Account Worker account page renders the current icon", async () => {
 });
 
 test("Account Worker clears remember cookies that cannot restore a session", async () => {
-  vi.stubGlobal("fetch", async () =>
-    Response.json({ error: "invalid_remember_token" }, { status: 401 }),
-  );
-
   const response = await fetchAccount("https://account.example.com/", {
     headers: {
       cookie: `${rememberCookieName}=remember-id.invalid-token`,
@@ -1049,27 +940,9 @@ test("Account Worker clears remember cookies that cannot restore a session", asy
 });
 
 test("Account Worker OTP success skips remember token creation when remember_me is off", async () => {
-  const calls: string[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      calls.push(url.pathname);
-      if (url.pathname === "/otp-challenge/consume") {
-        const body = decodeJsonBody(init);
-        expect(body.challenge_id).toBe("challenge-id");
-        expect(body.otp).toBe("123456");
-        return Response.json({
-          discord_id: "123456789",
-          return_to: "https://app.example.com/",
-        });
-      }
-      if (url.pathname === "/users/verify-active") {
-        return Response.json({ user: activeUser });
-      }
-      return Response.json({ error: "not_found" }, { status: 404 });
-    },
-  );
+  await seedOtpChallenge({
+    returnTo: "https://app.example.com/",
+  });
 
   const response = await fetchAccount("https://auth.example.com/otp", {
     body: new URLSearchParams({
@@ -1087,9 +960,7 @@ test("Account Worker OTP success skips remember token creation when remember_me 
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
   expect(setCookie).toContain("Max-Age=0");
-  expect(calls).toContain("/otp-challenge/consume");
-  expect(calls).toContain("/users/verify-active");
-  expect(calls).not.toContain("/remember/create");
+  await expectRememberTokenCount(0);
 });
 
 async function fetchAccount(
@@ -1190,32 +1061,8 @@ async function createCallbackState(
   return state;
 }
 
-function testAccountConfig(): AccountConfig {
-  return {
-    csrf: {
-      kid: env.CSRF_KID,
-      secret: env.CSRF_HMAC_SECRET,
-    },
-    navigation: {
-      ACCOUNT_URL: env.ACCOUNT_URL,
-      ALLOWED_RETURN_TO_ORIGINS: "https://app.example.com",
-      AUTH_BASE_URL: env.ACCOUNT_URL,
-      AUTH_CALLBACK_URL: `${env.ACCOUNT_URL}/callback`,
-    },
-  } as AccountConfig;
-}
-
-function decodeJsonBody(
-  init: RequestInit | undefined,
-): Record<string, unknown> {
-  if (!init?.body) {
-    return {};
-  }
-  const body =
-    init.body instanceof Uint8Array
-      ? new TextDecoder().decode(init.body)
-      : String(init.body);
-  return JSON.parse(body) as Record<string, unknown>;
+function testAccountConfig() {
+  return loadAccountConfig(env);
 }
 
 function rememberCookieValue(setCookie: string): string | null {
@@ -1227,9 +1074,147 @@ async function hashTokenForTest(value: string): Promise<string> {
   return await sha256Hex(new TextEncoder().encode(value));
 }
 
+function stubDiscordGuildMember(): void {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+}
+
+async function expectUserDisplayName(displayName: string): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT display_name FROM users WHERE discord_id = ?",
+  )
+    .bind(activeUser.discord_id)
+    .first<{ display_name: string }>();
+  expect(row?.display_name).toBe(displayName);
+}
+
+async function expectOtpChallengeCount(count: number): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM otp_challenges",
+  ).first<{ count: number }>();
+  expect(row?.count).toBe(count);
+}
+
+async function expectRememberToken(
+  tokenId: string,
+  tokenHash: string,
+): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT discord_id, token_hash, expires_at FROM remember_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ discord_id: string; token_hash: string; expires_at: number }>();
+  expect(row?.discord_id).toBe(activeUser.discord_id);
+  expect(row?.token_hash).toBe(tokenHash);
+  expect(row?.expires_at).toBeGreaterThanOrEqual(
+    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
+  );
+}
+
+async function expectRememberTokenRotated(
+  tokenId: string,
+  oldRandomToken: string,
+): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT token_hash, expires_at FROM remember_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ token_hash: string; expires_at: number }>();
+  expect(row?.token_hash).not.toBe(await hashTokenForTest(oldRandomToken));
+  expect(row?.expires_at).toBeGreaterThanOrEqual(
+    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
+  );
+}
+
+async function expectRememberTokenDeleted(tokenId: string): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT token_id FROM remember_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ token_id: string }>();
+  expect(row).toBeNull();
+}
+
+async function expectRememberTokenCount(count: number): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM remember_tokens",
+  ).first<{ count: number }>();
+  expect(row?.count).toBe(count);
+}
+
 const activeUser = {
   discord_id: "123456789",
   display_name: "Akaaku",
   role: "admin",
   status: "active",
 };
+
+async function resetDatabase(): Promise<void> {
+  for (const statement of d1DropSchemaStatements) {
+    await env.DB.prepare(statement).run();
+  }
+  for (const statement of d1SchemaStatements) {
+    await env.DB.prepare(statement).run();
+  }
+}
+
+async function seedActiveUser(
+  input: {
+    displayName?: string;
+    iconKey?: string;
+    iconSource?: "discord" | "r2" | "none";
+    status?: "active" | "disabled" | "deleted";
+    disabledReason?: string | null;
+  } = {},
+): Promise<void> {
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO users (
+        discord_id, display_name, role, status, guild_id, guild_member_status,
+        guild_checked_at, disabled_reason, icon_source, icon_key, created_at,
+        updated_at
+      ) VALUES (?, ?, 'admin', ?, 'guild', 'active', ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      activeUser.discord_id,
+      input.displayName ?? activeUser.display_name,
+      input.status ?? "active",
+      now,
+      input.disabledReason ?? null,
+      input.iconSource ?? null,
+      input.iconKey ?? null,
+      now,
+      now,
+    )
+    .run();
+}
+
+async function replaceActiveUser(
+  input: Parameters<typeof seedActiveUser>[0],
+): Promise<void> {
+  await env.DB.prepare("DELETE FROM users WHERE discord_id = ?")
+    .bind("123456789")
+    .run();
+  await seedActiveUser(input);
+}
+
+async function seedOtpChallenge(input: {
+  appId?: string;
+  challengeId?: string;
+  otp?: string;
+  returnTo?: string;
+}): Promise<void> {
+  await createOtpChallenge(testAccountConfig(), {
+    challengeId: input.challengeId ?? "challenge-id",
+    discordId: activeUser.discord_id,
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
+    otp: input.otp ?? "123456",
+    returnTo: input.returnTo ?? "https://app.example.com/",
+    ...(input.appId ? { appId: input.appId } : {}),
+  });
+}

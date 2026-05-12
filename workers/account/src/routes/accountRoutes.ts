@@ -3,8 +3,17 @@ import {
   getSingleCookie,
   rememberCookieName,
 } from "../../../../shared/src/session.js";
-import { callUserApi } from "../../../shared/userApi.js";
 import type { AccountConfig } from "../accountConfig.js";
+import {
+  deleteAllRememberTokens,
+  deleteRememberToken,
+} from "../data/rememberTokens.js";
+import {
+  markUserDeleted,
+  updateUserAvatar,
+  updateUserProfile,
+} from "../data/users.js";
+import { normalizeDisplayName } from "../domain/displayName.js";
 import { accountReturnTo, redirectToAccountRoot } from "../domain/returnTo.js";
 import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
 import { isWebp512 } from "../media/webp.js";
@@ -16,7 +25,10 @@ import {
   requireSession,
 } from "../security/session.js";
 import { clearAccountCookiesAndRedirect } from "../services/accountSessionCookie.js";
-import { verifyActiveUser } from "../services/userDirectory.js";
+import {
+  verifyActiveUser,
+  verifyMemberUser,
+} from "../services/userDirectory.js";
 import { inactiveAccountPage } from "../views/accountErrorPage.js";
 import { accountLandingPage } from "../views/accountLandingPage.js";
 import { accountPage } from "../views/page.js";
@@ -67,10 +79,19 @@ export async function updateProfile(
   }
   const form = await request.formData();
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
-  await callUserApi(config.userApi, "/users/update-profile", {
-    discord_id: session.discord_id,
-    display_name: String(form.get("display_name") ?? ""),
-    request_id: crypto.randomUUID(),
+  const displayName = normalizeDisplayName(
+    String(form.get("display_name") ?? ""),
+  );
+  if (!displayName) {
+    return new Response("invalid display_name", { status: 400 });
+  }
+  const active = await verifyMemberUser(session.discord_id, config);
+  if (!active) {
+    return inactiveAccountPage(config, returnTo);
+  }
+  await updateUserProfile(config, {
+    discordId: session.discord_id,
+    displayName,
   });
   return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
 }
@@ -105,15 +126,18 @@ export async function updateAvatar(
   if (body.byteLength > 10 * 1024 * 1024 || !isWebp512(body)) {
     return new Response("invalid image", { status: 400 });
   }
+  const active = await verifyMemberUser(session.discord_id, config);
+  if (!active) {
+    return inactiveAccountPage(config);
+  }
   const iconKey = `icons/${session.discord_id}/avatar.webp`;
   await config.assets.put(iconKey, body, {
     httpMetadata: { contentType: "image/webp" },
   });
-  await callUserApi(config.userApi, "/users/update-avatar", {
-    discord_id: session.discord_id,
-    icon_source: "r2",
-    icon_key: iconKey,
-    request_id: crypto.randomUUID(),
+  await updateUserAvatar(config, {
+    discordId: session.discord_id,
+    iconSource: "r2",
+    iconKey,
   });
   return appendSessionCookies(Response.json({ ok: true }), session);
 }
@@ -137,10 +161,8 @@ export async function deleteAccount(
   }
   const form = await request.formData();
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
-  await callUserApi(config.userApi, "/users/delete", {
-    discord_id: session.discord_id,
-    request_id: crypto.randomUUID(),
-  });
+  await markUserDeleted(config, session.discord_id);
+  await deleteAllRememberTokens(config, session.discord_id);
   return clearAccountCookiesAndRedirect(returnTo);
 }
 
@@ -169,10 +191,7 @@ export async function logout(
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   const tokenId = remember?.split(".")[0];
   if (tokenId) {
-    await callUserApi(config.userApi, "/remember/delete", {
-      token_id: tokenId,
-      request_id: crypto.randomUUID(),
-    });
+    await deleteRememberToken(config, tokenId);
   }
   return clearAccountCookiesAndRedirect(returnTo);
 }

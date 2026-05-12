@@ -7,12 +7,9 @@ import {
   sessionCookieName,
   verifySessionCookie,
 } from "../../../../shared/src/session.js";
-import {
-  callUserApi,
-  hashToken,
-  UserApiError,
-} from "../../../shared/userApi.js";
+import { hashToken } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { rotateRememberToken } from "../data/rememberTokens.js";
 import {
   createAccountSessionCookie,
   nowSeconds,
@@ -86,32 +83,22 @@ async function restoreRememberSession(
   }
   const randomToken = randomBase64Url(32);
   const now = nowSeconds();
-  try {
-    const result = await callUserApi<{
-      user: {
-        discord_id: string;
-        display_name: string;
-        role: "user" | "admin";
-      };
-    }>(config.userApi, "/remember/rotate", {
-      token_id: remember.tokenId,
-      old_token_hash: await hashToken(remember.randomToken),
-      new_token_hash: await hashToken(randomToken),
-      expires_at: now + rememberMaxAgeSeconds,
-    });
-    return {
-      discord_id: result.user.discord_id,
-      setCookies: [
-        await createAccountSessionCookie(result.user, config),
-        createRememberCookie(remember.tokenId, randomToken),
-      ],
-    };
-  } catch (error) {
-    if (error instanceof UserApiError && error.status === 401) {
-      return null;
-    }
-    throw error;
+  const result = await rotateRememberToken(config, {
+    tokenId: remember.tokenId,
+    oldTokenHash: await hashToken(remember.randomToken),
+    newTokenHash: await hashToken(randomToken),
+    expiresAt: now + rememberMaxAgeSeconds,
+  });
+  if (!result) {
+    return null;
   }
+  return {
+    discord_id: result.user.discord_id,
+    setCookies: [
+      await createAccountSessionCookie(result.user, config),
+      createRememberCookie(remember.tokenId, randomToken),
+    ],
+  };
 }
 
 function parseRememberCookie(

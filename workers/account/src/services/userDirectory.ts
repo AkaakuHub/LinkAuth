@@ -1,54 +1,52 @@
-import {
-  callUserApi,
-  type User,
-  UserApiError,
-} from "../../../shared/userApi.js";
+import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { getActiveUser as findActiveUser } from "../data/users.js";
 
 export async function verifyActiveUser(
   discordId: string,
   config: AccountConfig,
 ): Promise<{ user: User } | null> {
-  return await activeUser(config, "/users/verify-active", discordId);
+  const user = await findActiveUser(config, discordId, false);
+  return user ? { user } : null;
 }
 
 export async function verifyCurrentMemberUser(
   discordId: string,
   config: AccountConfig,
 ): Promise<{ user: User } | null> {
-  return await activeUser(
-    config,
-    "/users/verify-current-membership",
-    discordId,
-  );
+  return await activeMemberUser(discordId, config, "current");
+}
+
+export async function verifyMemberUser(
+  discordId: string,
+  config: AccountConfig,
+): Promise<{ user: User } | null> {
+  return await activeMemberUser(discordId, config, true);
+}
+
+async function activeMemberUser(
+  discordId: string,
+  config: AccountConfig,
+  checkGuild: boolean | "current",
+): Promise<{ user: User } | null> {
+  try {
+    const user = await findActiveUser(config, discordId, checkGuild);
+    return user ? { user } : null;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "left_guild" || error.message === "guild_check_failed")
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function getActiveUser(
   discordId: string,
   config: AccountConfig,
 ): Promise<{ user: User } | null> {
-  return await activeUser(config, "/users/get", discordId);
-}
-
-async function activeUser(
-  config: AccountConfig,
-  path:
-    | "/users/get"
-    | "/users/verify-active"
-    | "/users/verify-current-membership",
-  discordId: string,
-): Promise<{ user: User } | null> {
-  try {
-    return await callUserApi<{ user: User }>(config.userApi, path, {
-      discord_id: discordId,
-    });
-  } catch (error) {
-    if (
-      error instanceof UserApiError &&
-      (error.status === 401 || error.status === 404)
-    ) {
-      return null;
-    }
-    throw error;
-  }
+  const user = await findActiveUser(config, discordId, false);
+  return user ? { user } : null;
 }

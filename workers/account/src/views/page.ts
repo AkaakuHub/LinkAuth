@@ -1,5 +1,5 @@
 import { page } from "../../../shared/html.js";
-import type { User } from "../../../shared/userApi.js";
+import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { createAccountTokens } from "../security/accountTokens.js";
 import { noStoreHeaders } from "./accountLandingPage.js";

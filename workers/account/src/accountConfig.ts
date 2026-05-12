@@ -3,7 +3,6 @@ import type {
   AuthBaseNavigationConfig,
   AuthNavigationConfig,
 } from "../../shared/navigation.js";
-import type { UserApiConfig } from "../../shared/userApi.js";
 import type { Env } from "./types.js";
 
 const discordApiBase = "https://discord.com/api/v10";
@@ -12,10 +11,12 @@ export type AccountConfig = {
   domainName: string;
   apps: AppDefinition[];
   assets: R2Bucket;
+  database: D1Database;
   discord: {
     apiBase: string;
     clientId: string;
     clientSecret: string;
+    publicKey: string;
     botToken: string;
     guildIds: string[];
   };
@@ -27,8 +28,10 @@ export type AccountConfig = {
     kid: string;
     secret: string;
   };
+  internal: {
+    otpHashSecret: string;
+  };
   navigation: AuthNavigationConfig & AuthBaseNavigationConfig;
-  userApi: UserApiConfig;
 };
 
 export type AppDefinition = {
@@ -44,6 +47,7 @@ export function loadAccountConfig(env: Env): AccountConfig {
     domainName: requiredBinding("DOMAIN_NAME", env.DOMAIN_NAME),
     apps,
     assets: env.ASSETS,
+    database: env.DB,
     discord: {
       apiBase: env.DISCORD_API_BASE || discordApiBase,
       clientId: requiredBinding("DISCORD_CLIENT_ID", env.DISCORD_CLIENT_ID),
@@ -51,6 +55,7 @@ export function loadAccountConfig(env: Env): AccountConfig {
         "DISCORD_CLIENT_SECRET",
         env.DISCORD_CLIENT_SECRET,
       ),
+      publicKey: requiredBinding("DISCORD_PUBLIC_KEY", env.DISCORD_PUBLIC_KEY),
       botToken: requiredBinding("DISCORD_BOT_TOKEN", env.DISCORD_BOT_TOKEN),
       guildIds: parseCommaSeparatedList(
         "DISCORD_GUILD_IDS",
@@ -65,22 +70,14 @@ export function loadAccountConfig(env: Env): AccountConfig {
       kid: requiredBinding("SESSION_KID", env.SESSION_KID),
       secret: requiredBinding("SESSION_HMAC_SECRET", env.SESSION_HMAC_SECRET),
     },
+    internal: {
+      otpHashSecret: requiredBinding("OTP_HMAC_SECRET", env.OTP_HMAC_SECRET),
+    },
     navigation: {
       ACCOUNT_URL: accountUrl,
       ALLOWED_RETURN_TO_ORIGINS: appOrigins(apps),
       AUTH_BASE_URL: accountUrl,
       AUTH_CALLBACK_URL: new URL("/callback", accountUrl).toString(),
-    },
-    userApi: {
-      USER_API_URL: requiredBinding("USER_API_URL", env.USER_API_URL),
-      INTERNAL_HMAC_KID: requiredBinding(
-        "INTERNAL_HMAC_KID",
-        env.INTERNAL_HMAC_KID,
-      ),
-      INTERNAL_HMAC_SECRET: requiredBinding(
-        "INTERNAL_HMAC_SECRET",
-        env.INTERNAL_HMAC_SECRET,
-      ),
     },
   };
 }
