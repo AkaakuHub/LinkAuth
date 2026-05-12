@@ -26,7 +26,12 @@ export async function discordInteraction(
   if (!verifyDiscordSignature(request.headers, rawBody, config)) {
     return Response.json({ error: "invalid_signature" }, { status: 401 });
   }
-  const interaction = JSON.parse(rawBody) as DiscordInteraction;
+  let interaction: DiscordInteraction;
+  try {
+    interaction = JSON.parse(rawBody) as DiscordInteraction;
+  } catch {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
   if (interaction.type === 1) {
     return Response.json({ type: 1 });
   }

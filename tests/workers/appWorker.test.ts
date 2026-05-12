@@ -313,6 +313,58 @@ test("App Worker returns the current user with a valid app session", async () =>
   });
 });
 
+test("App Worker rejects account session verify failures", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({ error: "unauthorized" }, { status: 401 }),
+  );
+  const session = await createAppSession("hub");
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
+test("App Worker redirects when account session verify rejects the user", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({ error: "unauthorized" }, { status: 401 }),
+  );
+  const session = await createAppSession("hub");
+  const response = await fetchApp("https://app.example.com/", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/login",
+  );
+});
+
+test("App Worker rejects non-active users from account session verify", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({
+      user: {
+        ...currentUser,
+        status: "disabled",
+      },
+    }),
+  );
+  const session = await createAppSession("hub");
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
 test("App Worker renders a profile page with the current icon", async () => {
   vi.stubGlobal("fetch", async () => Response.json({ user: currentUser }));
   const session = await createAppSession("hub");

@@ -1,4 +1,5 @@
 import { env as cloudflareEnv, createExecutionContext } from "cloudflare:test";
+import nacl from "tweetnacl";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { hmacSha256Base64Url, sha256Hex } from "../../shared/src/crypto.js";
 import { createCsrfToken } from "../../shared/src/csrf.js";
@@ -102,6 +103,106 @@ test("Account Worker HTML responses include browser security headers", async () 
   );
   expect(response.headers.get("referrer-policy")).toBe("same-origin");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+});
+
+test("Account Worker Discord interaction rejects missing signatures", async () => {
+  const response = await fetchAccount(
+    "https://auth.example.com/discord/interactions",
+    {
+      body: JSON.stringify({ type: 1 }),
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "invalid_signature" });
+});
+
+test("Account Worker Discord interaction rejects malformed signed JSON", async () => {
+  const keyPair = nacl.sign.keyPair();
+  const body = "{";
+  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
+  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/discord/interactions",
+      {
+        body,
+        headers: signedDiscordHeaders(body, keyPair.secretKey),
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_request" });
+  } finally {
+    env.DISCORD_PUBLIC_KEY = originalPublicKey;
+  }
+});
+
+test("Account Worker Discord interaction accepts signed ping requests", async () => {
+  const keyPair = nacl.sign.keyPair();
+  const body = JSON.stringify({ type: 1 });
+  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
+  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/discord/interactions",
+      {
+        body,
+        headers: signedDiscordHeaders(body, keyPair.secretKey),
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ type: 1 });
+  } finally {
+    env.DISCORD_PUBLIC_KEY = originalPublicKey;
+  }
+});
+
+test("Account Worker Discord interaction registers signed guild members", async () => {
+  const keyPair = nacl.sign.keyPair();
+  const body = JSON.stringify({
+    type: 2,
+    guild_id: "guild",
+    data: {
+      name: "register",
+    },
+    member: {
+      user: {
+        id: "987654321",
+        username: "DiscordUser",
+        global_name: "Registered User",
+        avatar: "avatar-hash",
+      },
+    },
+  });
+  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
+  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/discord/interactions",
+      {
+        body,
+        headers: signedDiscordHeaders(body, keyPair.secretKey),
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      type: 4,
+      data: {
+        content: "登録しました。\nアカウントページ: https://auth.example.com",
+        flags: 64,
+      },
+    });
+    await expectRegisteredDiscordUser();
+  } finally {
+    env.DISCORD_PUBLIC_KEY = originalPublicKey;
+  }
 });
 
 test("Account Worker rejects authorize requests with a mismatched callback URL", async () => {
@@ -214,6 +315,44 @@ test("Account Worker token endpoint maps consumed auth code failures to 401", as
 
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "invalid_auth_code" });
+});
+
+test("Account Worker token endpoint consumes auth codes once", async () => {
+  stubDiscordGuildMember();
+  const session = await createAccountSession();
+  const authorizeResponse = await fetchAccount(
+    "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2F_auth%2Fcallback",
+    {
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+  const location = new URL(authorizeResponse.headers.get("location") ?? "");
+  const code = location.searchParams.get("code") ?? "";
+
+  const response = await fetchAccount("https://auth.example.com/token", {
+    body: JSON.stringify({ app_id: "hub", code }),
+    headers: await tokenHeaders("hub", code),
+    method: "POST",
+  });
+  const replayResponse = await fetchAccount("https://auth.example.com/token", {
+    body: JSON.stringify({ app_id: "hub", code }),
+    headers: await tokenHeaders("hub", code),
+    method: "POST",
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    user: {
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      role: "admin",
+      status: "active",
+    },
+  });
+  expect(replayResponse.status).toBe(401);
+  expect(await replayResponse.json()).toEqual({ error: "invalid_auth_code" });
 });
 
 test("Account Worker token endpoint rejects invalid app signatures", async () => {
@@ -596,6 +735,43 @@ test("Account Worker logout deletes the remember token and clears account cookie
   expect(setCookie).toContain("Max-Age=0");
 });
 
+test("Account Worker delete marks the user deleted and clears all remember tokens", async () => {
+  await createRememberToken(testAccountConfig(), {
+    discordId: activeUser.discord_id,
+    expiresAt: Math.floor(Date.now() / 1000) + 15_552_000,
+    tokenHash: await hashTokenForTest("random-token"),
+    tokenId: "remember-id",
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("delete");
+
+  const response = await fetchAccount("https://account.example.com/delete", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      return_to: "https://app.example.com/",
+    }),
+    headers: {
+      cookie: [
+        `${sessionCookieName}=${encodeURIComponent(session)}`,
+        `${rememberCookieName}=remember-id.random-token`,
+      ].join("; "),
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/_auth/logout",
+  );
+  expect(setCookie).toContain(`${sessionCookieName}=`);
+  expect(setCookie).toContain(`${rememberCookieName}=`);
+  expect(setCookie).toContain("Max-Age=0");
+  await expectUserStatus("deleted");
+  await expectRememberTokenCount(0);
+});
+
 test("Account Worker callback creates an OTP challenge and renders the OTP form", async () => {
   const state = await createCallbackState("hub");
   const calls: string[] = [];
@@ -797,6 +973,36 @@ test("Account Worker OTP rejects requests without the browser challenge state", 
   expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
 });
 
+test("Account Worker OTP consumes challenges before validating the submitted code", async () => {
+  await seedOtpChallenge({
+    returnTo: "https://app.example.com/",
+  });
+  const headers = await otpHeaders("challenge-id");
+
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      challenge_id: "challenge-id",
+      otp: "000000",
+    }),
+    headers,
+    method: "POST",
+  });
+  const replayResponse = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      challenge_id: "challenge-id",
+      otp: "123456",
+    }),
+    headers,
+    method: "POST",
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.text()).toContain("認証に失敗しました");
+  expect(replayResponse.status).toBe(401);
+  expect(await replayResponse.text()).toContain("認証に失敗しました");
+  await expectOtpChallengeCount(0);
+});
+
 test("Account Worker OTP success does not use app_id for non-callback return_to values", async () => {
   await seedOtpChallenge({
     appId: "hub",
@@ -983,6 +1189,23 @@ async function fetchAccount(
   );
 }
 
+function signedDiscordHeaders(
+  body: string,
+  secretKey: Uint8Array,
+): Record<string, string> {
+  const timestamp = "1700000000";
+  const message = new TextEncoder().encode(`${timestamp}${body}`);
+  const signature = nacl.sign.detached(message, secretKey);
+  return {
+    "x-signature-ed25519": hexEncodeBytes(signature),
+    "x-signature-timestamp": timestamp,
+  };
+}
+
+function hexEncodeBytes(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 async function createAccountSession(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return await signSessionCookie(
@@ -1095,6 +1318,17 @@ async function expectUserDisplayName(displayName: string): Promise<void> {
   expect(row?.display_name).toBe(displayName);
 }
 
+async function expectUserStatus(
+  status: "active" | "disabled" | "deleted",
+): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT status FROM users WHERE discord_id = ?",
+  )
+    .bind(activeUser.discord_id)
+    .first<{ status: string }>();
+  expect(row?.status).toBe(status);
+}
+
 async function expectOtpChallengeCount(count: number): Promise<void> {
   const row = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM otp_challenges",
@@ -1140,6 +1374,31 @@ async function expectRememberTokenDeleted(tokenId: string): Promise<void> {
     .bind(tokenId)
     .first<{ token_id: string }>();
   expect(row).toBeNull();
+}
+
+async function expectRegisteredDiscordUser(): Promise<void> {
+  const row = await env.DB.prepare(
+    "SELECT discord_id, display_name, guild_id, guild_member_status, icon_source, icon_key, status FROM users WHERE discord_id = ?",
+  )
+    .bind("987654321")
+    .first<{
+      discord_id: string;
+      display_name: string;
+      guild_id: string;
+      guild_member_status: string;
+      icon_source: string;
+      icon_key: string | null;
+      status: string;
+    }>();
+  expect(row).toEqual({
+    discord_id: "987654321",
+    display_name: "Registered User",
+    guild_id: "guild",
+    guild_member_status: "active",
+    icon_source: "discord",
+    icon_key: null,
+    status: "active",
+  });
 }
 
 async function expectRememberTokenCount(count: number): Promise<void> {

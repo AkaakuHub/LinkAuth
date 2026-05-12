@@ -313,9 +313,7 @@ function parseCurrentUser(value: unknown): User | null {
     typeof user.discord_id !== "string" ||
     typeof user.display_name !== "string" ||
     (user.role !== "user" && user.role !== "admin") ||
-    (user.status !== "active" &&
-      user.status !== "disabled" &&
-      user.status !== "deleted")
+    user.status !== "active"
   ) {
     return null;
   }
