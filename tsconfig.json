@@ -19,7 +19,6 @@
     ]
   },
   "include": [
-    "lambdas/**/*.ts",
     "local/**/*.ts",
     "playwright.config.ts",
     "tests/**/*.ts",
