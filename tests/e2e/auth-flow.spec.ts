@@ -123,6 +123,12 @@ test("App session is cleared after logging out from the account page", async ({
   expect(
     cookies.some((cookie) => cookie.name === appSessionCookieName("hub")),
   ).toBe(false);
+
+  await page.goto(servers.app.origin);
+  await expect(page).toHaveURL(`${servers.app.origin}/login`);
+  await expect(
+    page.getByRole("heading", { name: "appにログイン" }),
+  ).toBeVisible();
 });
 
 async function startAuthFlowServers(): Promise<
