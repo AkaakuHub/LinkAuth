@@ -340,6 +340,37 @@ test("App Worker returns the current user with a valid bearer token", async () =
   });
 });
 
+test("App Worker returns the current user with a personal access bearer token", async () => {
+  vi.stubGlobal(
+    "fetch",
+    async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({
+        authorization:
+          "Bearer lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+      });
+      return Response.json({ user: currentUser });
+    },
+  );
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      authorization:
+        "Bearer lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+    },
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    user: {
+      discord_id: "123456789",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
+      role: "admin",
+      status: "active",
+    },
+  });
+});
+
 test("App Worker rejects conflicting cookie and bearer session tokens", async () => {
   const session = await createAppSession("hub");
   const otherSession = await createAppSession("other");

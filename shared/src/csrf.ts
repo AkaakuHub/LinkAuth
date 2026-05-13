@@ -5,7 +5,7 @@ import {
   timingSafeEqual,
 } from "./encoding.js";
 
-export type CsrfAction = "profile" | "avatar" | "delete" | "logout";
+export type CsrfAction = "profile" | "avatar" | "delete" | "logout" | "token";
 
 type CsrfPayload = {
   typ: "csrf";

@@ -13,6 +13,13 @@ import {
   createOtpChallenge,
 } from "../../workers/account/src/data/otpChallenges.js";
 import {
+  createPersonalAccessToken,
+  deleteAllPersonalAccessTokens,
+  listPersonalAccessTokens,
+  revokePersonalAccessToken,
+  verifyPersonalAccessToken,
+} from "../../workers/account/src/data/personalAccessTokens.js";
+import {
   createRememberToken,
   deleteAllRememberTokens,
   rotateRememberToken,
@@ -513,6 +520,87 @@ test("Remember token delete-all removes only remember tokens for the user", asyn
   expect(await readUserStatus("123456789")).toBe("active");
 });
 
+test("Personal access token verifies from the raw bearer value", async () => {
+  const { token, record } = await createPersonalAccessToken(
+    testAccountConfig(),
+    {
+      discordId: "123456789",
+      name: "local curl",
+      nowSeconds: nowSeconds(),
+    },
+  );
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token,
+    scope: "session:verify",
+  });
+
+  expect(record.name).toBe("local curl");
+  expect(result?.user.discord_id).toBe("123456789");
+  expect(await readPersonalAccessTokenHash(record.tokenId)).not.toBe(token);
+  expect(await readPersonalAccessTokenLastUsedAt(record.tokenId)).toBeTruthy();
+});
+
+test("Personal access token rejects tampered raw values", async () => {
+  const { token } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    name: "local curl",
+  });
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token: `${token.slice(0, -1)}x`,
+    scope: "session:verify",
+  });
+
+  expect(result).toBeNull();
+});
+
+test("Personal access token rejects revoked values", async () => {
+  const { token, record } = await createPersonalAccessToken(
+    testAccountConfig(),
+    {
+      discordId: "123456789",
+      name: "local curl",
+    },
+  );
+  await revokePersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    tokenId: record.tokenId,
+  });
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token,
+    scope: "session:verify",
+  });
+
+  expect(result).toBeNull();
+});
+
+test("Personal access token delete-all removes only tokens for the user", async () => {
+  const own = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    name: "own",
+  });
+  await seedUser({ discordId: "987654321" });
+  const other = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "987654321",
+    name: "other",
+  });
+
+  await deleteAllPersonalAccessTokens(testAccountConfig(), "123456789");
+
+  expect(await readPersonalAccessTokenHash(own.record.tokenId)).toBeNull();
+  expect(await readPersonalAccessTokenHash(other.record.tokenId)).toBeTruthy();
+});
+
+test("Personal access token list excludes corrupt scope rows", async () => {
+  await seedPersonalAccessToken("pat-id", "123456789", "bad-hash", "not-json");
+
+  expect(
+    await listPersonalAccessTokens(testAccountConfig(), "123456789"),
+  ).toEqual([]);
+});
+
 test("Active user verification reports Discord availability failures", async () => {
   vi.stubGlobal("fetch", async () => {
     throw new Error("discord unavailable");
@@ -611,6 +699,13 @@ test("Expired auth data cleanup removes only expired transient records", async (
     tokenHash: "expired-hash",
     tokenId: "expired-remember",
   });
+  await seedPersonalAccessToken(
+    "expired-pat",
+    "123456789",
+    "expired-hash",
+    JSON.stringify(["session:verify"]),
+    now - 1,
+  );
 
   await cleanupExpiredAuthData(testAccountConfig(), now);
 
@@ -618,6 +713,7 @@ test("Expired auth data cleanup removes only expired transient records", async (
   expect(await readAuthCode("fresh-code")).toBe("fresh-code");
   expect(await readOtpHash("expired-otp")).toBeNull();
   expect(await readRememberTokenHash("expired-remember")).toBeNull();
+  expect(await readPersonalAccessTokenHash("expired-pat")).toBeNull();
 });
 
 function testAccountConfig() {
@@ -729,6 +825,24 @@ async function seedCorruptRememberToken(
     .run();
 }
 
+async function seedPersonalAccessToken(
+  tokenId: string,
+  discordId: string,
+  tokenHash: string,
+  scopes: string,
+  expiresAt = nowSeconds() + 300,
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO personal_access_tokens (
+      token_id, discord_id, name, token_hash, scopes, created_at, last_used_at,
+      expires_at, revoked_at
+    ) VALUES (?, ?, 'test', ?, ?, ?, NULL, ?, NULL)`,
+  )
+    .bind(tokenId, discordId, tokenHash, scopes, nowIso, expiresAt)
+    .run();
+}
+
 async function setUserForRegistrationReplacement(): Promise<void> {
   await env.DB.prepare(
     `UPDATE users SET
@@ -788,6 +902,28 @@ async function readRememberTokenHash(tokenId: string): Promise<string | null> {
     .bind(tokenId)
     .first<{ token_hash: string }>();
   return row?.token_hash ?? null;
+}
+
+async function readPersonalAccessTokenHash(
+  tokenId: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT token_hash FROM personal_access_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ token_hash: string }>();
+  return row?.token_hash ?? null;
+}
+
+async function readPersonalAccessTokenLastUsedAt(
+  tokenId: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT last_used_at FROM personal_access_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ last_used_at: string | null }>();
+  return row?.last_used_at ?? null;
 }
 
 async function readUserStatus(discordId: string): Promise<string | null> {

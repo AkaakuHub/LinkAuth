@@ -37,7 +37,24 @@ async function handleAppRequest(
   }
 
   const sessionCookie = appSessionCookieName(config.appId);
-  const session = getAppSessionToken(request, sessionCookie);
+  const cookieToken = getSingleCookie(
+    request.headers.get("cookie"),
+    sessionCookie,
+  );
+  const bearerToken = getBearerToken(request.headers.get("authorization"));
+  if (cookieToken && bearerToken && cookieToken !== bearerToken) {
+    return url.pathname.startsWith("/api/")
+      ? Response.json({ error: "unauthorized" }, { status: 401 })
+      : Response.redirect(new URL("/login", request.url), 302);
+  }
+  const session = bearerToken ?? cookieToken;
+  const currentUserFromBearer =
+    bearerToken && !cookieToken
+      ? await fetchCurrentUser(request, config, bearerToken)
+      : null;
+  if (currentUserFromBearer) {
+    return authenticatedResponse(request, url, config, currentUserFromBearer);
+  }
   const payload = session
     ? await verifyAuthToken(
         session,
@@ -67,6 +84,15 @@ async function handleAppRequest(
     }
     return Response.redirect(new URL("/login", request.url), 302);
   }
+  return authenticatedResponse(request, url, config, currentUser);
+}
+
+function authenticatedResponse(
+  request: Request,
+  url: URL,
+  config: AppConfig,
+  currentUser: SampleUser,
+): Response {
   if (url.pathname === "/api/me" && request.method === "GET") {
     return Response.json({ user: currentUser });
   }
@@ -274,21 +300,6 @@ async function fetchCurrentUser(
   } catch {
     return null;
   }
-}
-
-function getAppSessionToken(
-  request: Request,
-  cookieName: string,
-): string | null {
-  const cookieToken = getSingleCookie(
-    request.headers.get("cookie"),
-    cookieName,
-  );
-  const bearerToken = getBearerToken(request.headers.get("authorization"));
-  if (cookieToken && bearerToken && cookieToken !== bearerToken) {
-    return null;
-  }
-  return bearerToken ?? cookieToken;
 }
 
 function parseCurrentUser(value: unknown): SampleUser | null {

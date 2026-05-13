@@ -11,6 +11,7 @@ import {
 } from "../../shared/src/session.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
 import { createOtpChallenge } from "../../workers/account/src/data/otpChallenges.js";
+import { createPersonalAccessToken } from "../../workers/account/src/data/personalAccessTokens.js";
 import { createRememberToken } from "../../workers/account/src/data/rememberTokens.js";
 import {
   d1DropSchemaStatements,
@@ -495,7 +496,7 @@ test("Account Worker session verify accepts a valid app session cookie", async (
   });
 });
 
-test("Account Worker session verify accepts a valid bearer token", async () => {
+test("Account Worker session verify accepts a valid app bearer token", async () => {
   await replaceActiveUser({
     displayName: "Current Akaaku",
     iconKey: "icons/123456789/avatar.webp",
@@ -507,6 +508,38 @@ test("Account Worker session verify accepts a valid bearer token", async () => {
     {
       headers: {
         authorization: `Bearer ${session}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    user: {
+      discord_id: "123456789",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
+      role: "admin",
+      status: "active",
+    },
+  });
+});
+
+test("Account Worker session verify accepts a valid personal access token", async () => {
+  await replaceActiveUser({
+    displayName: "Current Akaaku",
+    iconKey: "icons/123456789/avatar.webp",
+    iconSource: "r2",
+  });
+  const { token } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    name: "local curl",
+  });
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        authorization: `Bearer ${token}`,
       },
     },
   );
@@ -539,6 +572,92 @@ test("Account Worker session verify rejects conflicting cookie and bearer sessio
 
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
+test("Account Worker renders personal access token management", async () => {
+  const session = await createAccountSession();
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("Bearer token");
+  expect(body).toContain('action="/tokens"');
+  expect(body).toContain("発行済みtokenはありません。");
+});
+
+test("Account Worker creates a personal access token from the account page", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+  const response = await fetchAccount("https://account.example.com/tokens", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      name: "local curl",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+  const body = await response.text();
+  const rawToken = body.match(
+    /lka_pat_[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{43}/,
+  )?.[0];
+
+  expect(response.status).toBe(200);
+  expect(rawToken).toBeTruthy();
+  expect(body).toContain("local curl");
+  expect(await readPersonalAccessTokenCount("123456789")).toBe(1);
+});
+
+test("Account Worker token creation rejects origin mismatches", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+  const response = await fetchAccount("https://account.example.com/tokens", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      name: "local curl",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://evil.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(403);
+  expect(await readPersonalAccessTokenCount("123456789")).toBe(0);
+});
+
+test("Account Worker revokes a personal access token from the account page", async () => {
+  const { record } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    name: "local curl",
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+
+  const response = await fetchAccount(
+    "https://account.example.com/tokens/revoke",
+    {
+      body: new URLSearchParams({
+        csrf_token: csrfToken,
+        token_id: record.tokenId,
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(303);
+  expect(await readPersonalAccessTokenRevokedAt(record.tokenId)).toBeTruthy();
 });
 
 test("Account Worker session verify rejects app sessions with the wrong app_id", async () => {
@@ -1510,7 +1629,7 @@ async function createAppSession(appId: string): Promise<string> {
 }
 
 async function createAccountCsrfToken(
-  action: "profile" | "avatar" | "delete" | "logout",
+  action: "profile" | "avatar" | "delete" | "logout" | "token",
 ): Promise<string> {
   return await createCsrfToken({
     action,
@@ -1520,6 +1639,28 @@ async function createAccountCsrfToken(
     origin: "https://account.example.com",
     secret: env.CSRF_HMAC_SECRET,
   });
+}
+
+async function readPersonalAccessTokenCount(
+  discordId: string,
+): Promise<number> {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM personal_access_tokens WHERE discord_id = ?",
+  )
+    .bind(discordId)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+async function readPersonalAccessTokenRevokedAt(
+  tokenId: string,
+): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT revoked_at FROM personal_access_tokens WHERE token_id = ?",
+  )
+    .bind(tokenId)
+    .first<{ revoked_at: string | null }>();
+  return row?.revoked_at ?? null;
 }
 
 async function tokenHeaders(

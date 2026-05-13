@@ -8,6 +8,7 @@ export type AccountTokens = {
   avatar: string;
   logout: string;
   delete: string;
+  token: string;
 };
 
 export async function createAccountTokens(
@@ -48,6 +49,14 @@ export async function createAccountTokens(
       discordId: user.discord_id,
       origin,
       action: "delete",
+      kid: config.csrf.kid,
+      secret: config.csrf.secret,
+      now,
+    }),
+    token: await createCsrfToken({
+      discordId: user.discord_id,
+      origin,
+      action: "token",
       kid: config.csrf.kid,
       secret: config.csrf.secret,
       now,

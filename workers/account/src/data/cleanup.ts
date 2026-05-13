@@ -5,6 +5,7 @@ const expiringTables = [
   "otp_challenges",
   "otp_rate_limits",
   "remember_tokens",
+  "personal_access_tokens",
 ] as const;
 
 export async function cleanupExpiredAuthData(

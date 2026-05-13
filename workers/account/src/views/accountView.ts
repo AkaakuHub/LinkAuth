@@ -3,14 +3,19 @@ import { icon } from "../../../shared/icons.js";
 import { avatarAssetUrl, profileAvatar } from "../../../shared/profileUi.js";
 import { button, card, textInput } from "../../../shared/ui.js";
 import type { User } from "../../../shared/user.js";
+import type { PersonalAccessTokenRecord } from "../data/personalAccessTokens.js";
 import type { AccountTokens } from "../security/accountTokens.js";
 
 export function accountView({
+  issuedToken,
+  personalAccessTokens,
   user,
   tokens,
   returnTo,
   showBackLink,
 }: {
+  issuedToken: string | undefined;
+  personalAccessTokens: PersonalAccessTokenRecord[];
   user: User;
   tokens: AccountTokens;
   returnTo: string;
@@ -28,7 +33,12 @@ export function accountView({
       tokens,
       escapedReturnTo,
     },
-  )}${accountActions({
+  )}${personalAccessTokenCard({
+    issuedToken,
+    personalAccessTokens,
+    tokens,
+    escapedReturnTo,
+  })}${accountActions({
     tokens,
     escapedReturnTo,
   })}</div>`;
@@ -56,6 +66,89 @@ function accountProfileCard({
       },
     )}</div>${profileForm({ user, tokens, escapedReturnTo })}</div>${avatarCropperDialog()}<script src="/account-client.js" defer></script>`,
   });
+}
+
+function personalAccessTokenCard({
+  issuedToken,
+  personalAccessTokens,
+  tokens,
+  escapedReturnTo,
+}: {
+  issuedToken: string | undefined;
+  personalAccessTokens: PersonalAccessTokenRecord[];
+  tokens: AccountTokens;
+  escapedReturnTo: string;
+}): string {
+  return card({
+    children: `<div class="grid gap-4"><div class="grid gap-1"><h2 class="text-base font-semibold text-ink">Bearer token</h2><p class="text-sm text-muted">curlやAPIから使用するtokenを管理します。発行後のtoken本体はこの画面で一度だけ表示します。</p></div>${issuedTokenPanel(
+      issuedToken,
+    )}<form class="grid gap-3 rounded-md border border-line bg-haze p-4" method="post" action="/tokens"><input type="hidden" name="csrf_token"${attr("value", tokens.token)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><div class="grid gap-2"><label class="text-sm font-semibold text-ink" for="token-name">名前</label>${textInput(
+      {
+        attributes:
+          ' id="token-name" name="name" maxlength="40" placeholder="例: local curl" required',
+      },
+    )}</div>${button({
+      type: "submit",
+      children: `${icon("check")}発行`,
+    })}</form>${personalAccessTokenList({
+      personalAccessTokens,
+      csrfToken: tokens.token,
+      escapedReturnTo,
+    })}</div>`,
+  });
+}
+
+function issuedTokenPanel(issuedToken?: string): string {
+  if (!issuedToken) {
+    return "";
+  }
+  return `<div class="grid gap-2 rounded-md border border-primary/25 bg-primary/10 p-4"><p class="text-sm font-semibold text-primary">発行済みtoken</p><code class="break-all rounded-md bg-panel p-3 text-sm text-ink">${escapeHtml(issuedToken)}</code></div>`;
+}
+
+function personalAccessTokenList({
+  personalAccessTokens,
+  csrfToken,
+  escapedReturnTo,
+}: {
+  personalAccessTokens: PersonalAccessTokenRecord[];
+  csrfToken: string;
+  escapedReturnTo: string;
+}): string {
+  const rows = personalAccessTokens.map((token) =>
+    personalAccessTokenRow({
+      token,
+      csrfToken,
+      escapedReturnTo,
+    }),
+  );
+  return `<div class="grid gap-2">${rows.length > 0 ? rows.join("") : '<p class="text-sm text-muted">発行済みtokenはありません。</p>'}</div>`;
+}
+
+function personalAccessTokenRow({
+  token,
+  csrfToken,
+  escapedReturnTo,
+}: {
+  token: PersonalAccessTokenRecord;
+  csrfToken: string;
+  escapedReturnTo: string;
+}): string {
+  const revoked = token.revokedAt !== null;
+  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3"><div class="grid gap-1"><p class="text-sm font-semibold text-ink">${escapeHtml(token.name)}</p><p class="text-xs text-muted">expires ${escapeHtml(formatUnixSeconds(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</p></div>${
+    revoked
+      ? ""
+      : `<form method="post" action="/tokens/revoke"><input type="hidden" name="csrf_token"${attr("value", csrfToken)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="token_id"${attr("value", token.tokenId)}>${button(
+          {
+            type: "submit",
+            variant: "secondary",
+            children: `${icon("trash")}失効`,
+          },
+        )}</form>`
+  }</div>`;
+}
+
+function formatUnixSeconds(value: number): string {
+  return new Date(value * 1000).toISOString().slice(0, 10);
 }
 
 function accountActions({

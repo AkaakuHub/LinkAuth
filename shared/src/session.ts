@@ -156,10 +156,7 @@ export function getBearerToken(
   if (!authorizationHeader) {
     return null;
   }
-  const match =
-    /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(
-      authorizationHeader,
-    );
+  const match = /^Bearer ([A-Za-z0-9._~+/-]+=*)$/.exec(authorizationHeader);
   return match?.[1] ?? null;
 }
 

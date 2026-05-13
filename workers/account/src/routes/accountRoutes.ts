@@ -6,6 +6,12 @@ import {
 import type { AccountConfig } from "../accountConfig.js";
 import { InactiveUserError } from "../data/errors.js";
 import {
+  createPersonalAccessToken,
+  deleteAllPersonalAccessTokens,
+  normalizePersonalAccessTokenName,
+  revokePersonalAccessToken,
+} from "../data/personalAccessTokens.js";
+import {
   deleteAllRememberTokens,
   deleteRememberToken,
 } from "../data/rememberTokens.js";
@@ -182,9 +188,73 @@ export async function deleteAccount(
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   await markUserDeleted(config, session.discord_id);
   await deleteAllRememberTokens(config, session.discord_id);
+  await deleteAllPersonalAccessTokens(config, session.discord_id);
   return clearAccountCookiesAndRedirect(
     appLogoutUrlForReturnTo(config, returnTo),
   );
+}
+
+export async function createToken(
+  request: Request,
+  url: URL,
+  config: AccountConfig,
+): Promise<Response> {
+  const session = await requireSession(request, config);
+  if (!session) {
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
+  }
+  if (
+    !(await verifyFormCsrf(request, url, config, session.discord_id, "token"))
+  ) {
+    return new Response("forbidden", { status: 403 });
+  }
+  const form = await request.formData();
+  const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  const name = normalizePersonalAccessTokenName(String(form.get("name") ?? ""));
+  if (!name) {
+    return new Response("invalid token name", { status: 400 });
+  }
+  const active = await verifyMemberUser(session.discord_id, config);
+  if (!active) {
+    return inactiveAccountPage(config, returnTo);
+  }
+  const { token } = await createPersonalAccessToken(config, {
+    discordId: session.discord_id,
+    name,
+  });
+  return appendSessionCookies(
+    await accountPage(active.user, url, config, returnTo, token),
+    session,
+  );
+}
+
+export async function revokeToken(
+  request: Request,
+  url: URL,
+  config: AccountConfig,
+): Promise<Response> {
+  const session = await requireSession(request, config);
+  if (!session) {
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
+  }
+  if (
+    !(await verifyFormCsrf(request, url, config, session.discord_id, "token"))
+  ) {
+    return new Response("forbidden", { status: 403 });
+  }
+  const form = await request.formData();
+  const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  await revokePersonalAccessToken(config, {
+    discordId: session.discord_id,
+    tokenId: String(form.get("token_id") ?? ""),
+  });
+  return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
 }
 
 export async function logout(

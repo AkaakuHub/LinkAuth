@@ -106,6 +106,13 @@ test("Session cookie rejects duplicate cookie values", () => {
 
 test("Bearer token is extracted from an Authorization header", () => {
   expect(getBearerToken("Bearer aaa.bbb.ccc")).toBe("aaa.bbb.ccc");
+  expect(
+    getBearerToken(
+      "Bearer lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+    ),
+  ).toBe(
+    "lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+  );
 });
 
 test("Bearer token rejects malformed Authorization headers", () => {

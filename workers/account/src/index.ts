@@ -3,8 +3,10 @@ import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
 import { cleanupExpiredAuthData } from "./data/cleanup.js";
 import {
   accountHome,
+  createToken,
   deleteAccount,
   logout,
+  revokeToken,
   updateAvatar,
   updateProfile,
 } from "./routes/accountRoutes.js";
@@ -66,6 +68,12 @@ async function handleAccountRequest(
   }
   if (url.pathname === "/avatar" && request.method === "POST") {
     return updateAvatar(request, url, config);
+  }
+  if (url.pathname === "/tokens" && request.method === "POST") {
+    return createToken(request, url, config);
+  }
+  if (url.pathname === "/tokens/revoke" && request.method === "POST") {
+    return revokeToken(request, url, config);
   }
   if (url.pathname === "/delete" && request.method === "POST") {
     return deleteAccount(request, url, config);

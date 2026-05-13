@@ -19,6 +19,7 @@ import {
   consumeOtpChallenge,
   createOtpChallenge,
 } from "../data/otpChallenges.js";
+import { verifyPersonalAccessToken } from "../data/personalAccessTokens.js";
 import { findApp, matchesCallbackUrl } from "../domain/appRegistry.js";
 import { createOtpCode } from "../domain/otpCode.js";
 import { accountReturnTo } from "../domain/returnTo.js";
@@ -342,10 +343,24 @@ export async function sessionVerify(
     if (!app?.sessionVerifySecret) {
       return Response.json({ error: "unknown_app" }, { status: 403 });
     }
-    const session = getAppSessionToken(
-      request,
+    const bearerToken = getBearerToken(request.headers.get("authorization"));
+    const cookieToken = getSingleCookie(
+      request.headers.get("cookie"),
       appSessionCookieName(app.appId),
     );
+    if (cookieToken && bearerToken && cookieToken !== bearerToken) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+    if (bearerToken && !cookieToken) {
+      const verified = await verifyPersonalAccessToken(config, {
+        token: bearerToken,
+        scope: "session:verify",
+      });
+      if (verified) {
+        return Response.json({ user: verified.user });
+      }
+    }
+    const session = bearerToken ?? cookieToken;
     const payload = session
       ? await verifySessionCookie(
           session,
@@ -371,21 +386,6 @@ export async function sessionVerify(
         request,
         Response.json({ error: "unauthorized" }, { status: 401 }),
       );
-}
-
-function getAppSessionToken(
-  request: Request,
-  cookieName: string,
-): string | null {
-  const cookieToken = getSingleCookie(
-    request.headers.get("cookie"),
-    cookieName,
-  );
-  const bearerToken = getBearerToken(request.headers.get("authorization"));
-  if (cookieToken && bearerToken && cookieToken !== bearerToken) {
-    return null;
-  }
-  return bearerToken ?? cookieToken;
 }
 
 export async function me(

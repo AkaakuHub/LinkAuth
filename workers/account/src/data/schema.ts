@@ -53,14 +53,28 @@ export const d1SchemaStatements = [
     last_used_at TEXT NOT NULL,
     expires_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE personal_access_tokens (
+    token_id TEXT PRIMARY KEY,
+    discord_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    scopes TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT,
+    expires_at INTEGER NOT NULL,
+    revoked_at TEXT
+  )`,
   "CREATE INDEX remember_tokens_discord_id_index ON remember_tokens(discord_id)",
+  "CREATE INDEX personal_access_tokens_discord_id_index ON personal_access_tokens(discord_id)",
   "CREATE INDEX auth_codes_expires_at_index ON auth_codes(expires_at)",
   "CREATE INDEX otp_challenges_expires_at_index ON otp_challenges(expires_at)",
   "CREATE INDEX otp_rate_limits_expires_at_index ON otp_rate_limits(expires_at)",
   "CREATE INDEX remember_tokens_expires_at_index ON remember_tokens(expires_at)",
+  "CREATE INDEX personal_access_tokens_expires_at_index ON personal_access_tokens(expires_at)",
 ];
 
 export const d1DropSchemaStatements = [
+  "DROP TABLE IF EXISTS personal_access_tokens",
   "DROP TABLE IF EXISTS remember_tokens",
   "DROP TABLE IF EXISTS otp_rate_limits",
   "DROP TABLE IF EXISTS otp_challenges",
