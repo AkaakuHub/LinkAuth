@@ -123,6 +123,12 @@ test("App session is cleared after logging out from the account page", async ({
   expect(
     cookies.some((cookie) => cookie.name === appSessionCookieName("hub")),
   ).toBe(false);
+  expect(cookies.some((cookie) => cookie.name === sessionCookieName)).toBe(
+    false,
+  );
+  expect(cookies.some((cookie) => cookie.name === rememberCookieName)).toBe(
+    false,
+  );
 
   await page.goto(servers.app.origin);
   await expect(page).toHaveURL(`${servers.app.origin}/login`);

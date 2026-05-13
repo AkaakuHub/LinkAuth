@@ -4,6 +4,7 @@ import {
   rememberCookieName,
 } from "../../../../shared/src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { InactiveUserError } from "../data/errors.js";
 import {
   deleteAllRememberTokens,
   deleteRememberToken,
@@ -90,10 +91,17 @@ export async function updateProfile(
   if (!active) {
     return inactiveAccountPage(config, returnTo);
   }
-  await updateUserProfile(config, {
-    discordId: session.discord_id,
-    displayName,
-  });
+  try {
+    await updateUserProfile(config, {
+      discordId: session.discord_id,
+      displayName,
+    });
+  } catch (error) {
+    if (error instanceof InactiveUserError) {
+      return inactiveAccountPage(config, returnTo);
+    }
+    throw error;
+  }
   return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
 }
 
@@ -135,11 +143,18 @@ export async function updateAvatar(
   await config.assets.put(iconKey, body, {
     httpMetadata: { contentType: "image/webp" },
   });
-  await updateUserAvatar(config, {
-    discordId: session.discord_id,
-    iconSource: "r2",
-    iconKey,
-  });
+  try {
+    await updateUserAvatar(config, {
+      discordId: session.discord_id,
+      iconSource: "r2",
+      iconKey,
+    });
+  } catch (error) {
+    if (error instanceof InactiveUserError) {
+      return inactiveAccountPage(config);
+    }
+    throw error;
+  }
   return appendSessionCookies(Response.json({ ok: true }), session);
 }
 

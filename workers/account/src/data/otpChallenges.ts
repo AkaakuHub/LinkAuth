@@ -1,7 +1,8 @@
 import { hmacSha256 } from "../../../../shared/src/crypto.js";
 import { hexEncode, timingSafeEqual } from "../../../../shared/src/encoding.js";
 import type { AccountConfig } from "../accountConfig.js";
-import { DataConflictError } from "./errors.js";
+import { DataConflictError, RateLimitedError } from "./errors.js";
+import { requireDataNumber, requireDataString } from "./validation.js";
 
 type OtpChallengeRow = {
   discord_id: string;
@@ -32,10 +33,11 @@ export async function createOtpChallenge(
 ): Promise<void> {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const otp = validateOtp(input.otp);
+  const challengeId = requireDataString(input.challengeId, "challenge_id");
   await consumeOtpIssueQuota(
     config,
-    input.discordId,
-    input.challengeId,
+    requireDataString(input.discordId, "discord_id"),
+    challengeId,
     nowSeconds,
   );
   const result = await config.database
@@ -45,13 +47,13 @@ export async function createOtpChallenge(
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      input.challengeId,
-      input.discordId,
+      challengeId,
+      requireDataString(input.discordId, "discord_id"),
       input.appId ?? null,
       validateReturnTo(input.returnTo),
-      await hashOtp(config.internal.otpHashSecret, input.challengeId, otp),
+      await hashOtp(config.internal.otpHashSecret, challengeId, otp),
       new Date().toISOString(),
-      input.expiresAt,
+      requireDataNumber(input.expiresAt, "expires_at"),
     )
     .run();
   if (result.meta.changes !== 1) {
@@ -63,6 +65,7 @@ export async function consumeOtpChallenge(
   config: AccountConfig,
   input: { challengeId: string; otp: string },
 ): Promise<{ discordId: string; appId?: string; returnTo: string } | null> {
+  const otp = validateOtp(input.otp);
   const row = await config.database
     .prepare(
       `DELETE FROM otp_challenges
@@ -81,11 +84,7 @@ export async function consumeOtpChallenge(
     row.expires_at <= Math.floor(Date.now() / 1000) ||
     !timingSafeEqual(
       row.otp_hash,
-      await hashOtp(
-        config.internal.otpHashSecret,
-        input.challengeId,
-        input.otp,
-      ),
+      await hashOtp(config.internal.otpHashSecret, input.challengeId, otp),
     )
   ) {
     return null;
@@ -112,11 +111,11 @@ async function consumeOtpIssueQuota(
       .bind(discordId)
       .first<OtpRateLimitRow>();
     if (countActiveOtpIssues(item, cutoffSeconds) >= otpIssueLimit) {
-      throw new DataConflictError("otp rate limited");
+      throw new RateLimitedError("otp rate limited");
     }
     const slot = chooseOtpIssueSlot(item, cutoffSeconds);
     if (!slot) {
-      throw new DataConflictError("otp rate limited");
+      throw new RateLimitedError("otp rate limited");
     }
     const result = await config.database
       .prepare(
@@ -143,7 +142,7 @@ async function consumeOtpIssueQuota(
       return;
     }
   }
-  throw new DataConflictError("otp rate limited");
+  throw new RateLimitedError("otp rate limited");
 }
 
 function countActiveOtpIssues(

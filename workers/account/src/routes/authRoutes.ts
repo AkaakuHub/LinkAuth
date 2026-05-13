@@ -13,7 +13,7 @@ import {
 import { normalizeReturnTo } from "../../../shared/navigation.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { consumeAuthCode, createAuthCode } from "../data/authCodes.js";
-import { DataConflictError } from "../data/errors.js";
+import { DataConflictError, RateLimitedError } from "../data/errors.js";
 import {
   consumeOtpChallenge,
   createOtpChallenge,
@@ -51,6 +51,7 @@ import {
   authFailedPage,
   inactiveAccountPage,
   otpDeliveryFailedPage,
+  otpRateLimitedPage,
 } from "../views/accountErrorPage.js";
 import { otpPage } from "../views/otpPage.js";
 
@@ -196,14 +197,21 @@ export async function callback(
 
   const challengeId = randomBase64Url(24);
   const otpCode = createOtpCode();
-  await createOtpChallenge(config, {
-    challengeId,
-    discordId: active.user.discord_id,
-    ...(state.app_id ? { appId: state.app_id } : {}),
-    returnTo: state.return_to,
-    otp: otpCode,
-    expiresAt: Math.floor(Date.now() / 1000) + 300,
-  });
+  try {
+    await createOtpChallenge(config, {
+      challengeId,
+      discordId: active.user.discord_id,
+      ...(state.app_id ? { appId: state.app_id } : {}),
+      returnTo: state.return_to,
+      otp: otpCode,
+      expiresAt: Math.floor(Date.now() / 1000) + 300,
+    });
+  } catch (error) {
+    if (error instanceof RateLimitedError) {
+      return callbackResponse(otpRateLimitedPage(config, state.return_to));
+    }
+    throw error;
+  }
   const otpResult = await sendDiscordOtp(
     active.user.discord_id,
     otpCode,

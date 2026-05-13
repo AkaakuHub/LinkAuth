@@ -35,6 +35,22 @@ export function authFailedPage(
   });
 }
 
+export function otpRateLimitedPage(
+  config: AccountConfig,
+  returnTo?: string,
+): Response {
+  return accountErrorPage(
+    config,
+    {
+      title: "認証コードの発行回数が多すぎます",
+      description:
+        "短時間に認証コードを複数回発行したため、しばらく待ってからもう一度ログインしてください。",
+      returnTo,
+    },
+    429,
+  );
+}
+
 export function otpDeliveryFailedPage(
   config: AccountConfig,
   returnTo?: string,
@@ -50,6 +66,7 @@ export function otpDeliveryFailedPage(
 function accountErrorPage(
   config: AccountConfig,
   content: { title: string; description: string; returnTo: string | undefined },
+  status = 401,
 ): Response {
   const headers = noStoreHeaders();
   headers.append("set-cookie", deleteCookie(sessionCookieName));
@@ -74,7 +91,7 @@ function accountErrorPage(
         }),
       }),
     ),
-    401,
+    status,
     headers,
   );
 }

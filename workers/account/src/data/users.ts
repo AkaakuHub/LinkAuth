@@ -1,5 +1,6 @@
 import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { InactiveUserError } from "./errors.js";
 import { userFromRow } from "./rows.js";
 
 type MembershipResult = "active" | "left" | "unavailable" | "failed";
@@ -55,6 +56,7 @@ export async function updateUserProfile(
   config: AccountConfig,
   input: { discordId: string; displayName: string },
 ): Promise<void> {
+  await requireActiveUser(config, input.discordId);
   await config.database
     .prepare(
       "UPDATE users SET display_name = ?, updated_at = ? WHERE discord_id = ?",
@@ -71,6 +73,7 @@ export async function updateUserAvatar(
     iconKey: string;
   },
 ): Promise<void> {
+  await requireActiveUser(config, input.discordId);
   await config.database
     .prepare(
       "UPDATE users SET icon_source = ?, icon_key = ?, updated_at = ? WHERE discord_id = ?",
@@ -82,6 +85,17 @@ export async function updateUserAvatar(
       input.discordId,
     )
     .run();
+}
+
+async function requireActiveUser(
+  config: AccountConfig,
+  discordId: string,
+): Promise<User> {
+  const user = await getActiveUser(config, discordId, true);
+  if (!user) {
+    throw new InactiveUserError();
+  }
+  return user;
 }
 
 export async function markUserDeleted(

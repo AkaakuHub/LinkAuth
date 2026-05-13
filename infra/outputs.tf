@@ -6,6 +6,10 @@ output "account_worker_service_name" {
   value = var.account_worker_service_name
 }
 
+output "account_cleanup_cron" {
+  value = var.account_cleanup_cron
+}
+
 output "d1_database_id" {
   value = cloudflare_d1_database.auth.id
 }

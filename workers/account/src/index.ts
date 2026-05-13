@@ -1,5 +1,6 @@
 import { accountClientScript } from "./accountClientGenerated.js";
 import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
+import { cleanupExpiredAuthData } from "./data/cleanup.js";
 import {
   accountHome,
   deleteAccount,
@@ -18,7 +19,7 @@ import {
 } from "./routes/authRoutes.js";
 import { discordInteraction } from "./routes/discordInteractionRoutes.js";
 
-export default withAccountConfig(handleAccountRequest);
+export default withAccountConfig(handleAccountRequest, handleScheduled);
 
 async function handleAccountRequest(
   request: Request,
@@ -73,4 +74,14 @@ async function handleAccountRequest(
     return logout(request, url, config);
   }
   return new Response("not found", { status: 404 });
+}
+
+async function handleScheduled(
+  controller: ScheduledController,
+  config: AccountConfig,
+): Promise<void> {
+  await cleanupExpiredAuthData(
+    config,
+    Math.floor(controller.scheduledTime / 1000),
+  );
 }

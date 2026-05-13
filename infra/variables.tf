@@ -30,6 +30,11 @@ variable "account_worker_hostname" {
   default = null
 }
 
+variable "account_cleanup_cron" {
+  type    = string
+  default = "0 * * * *"
+}
+
 variable "r2_bucket_location" {
   type    = string
   default = "apac"

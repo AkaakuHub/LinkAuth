@@ -3,6 +3,7 @@ import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { DataConflictError } from "./errors.js";
 import { getActiveUser } from "./users.js";
+import { requireDataNumber, requireDataString } from "./validation.js";
 
 type RememberTokenRow = {
   discord_id: string;
@@ -30,12 +31,12 @@ export async function createRememberToken(
       ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      input.tokenId,
-      input.discordId,
-      input.tokenHash,
+      requireDataString(input.tokenId, "token_id"),
+      requireDataString(input.discordId, "discord_id"),
+      requireDataString(input.tokenHash, "token_hash"),
       new Date().toISOString(),
       new Date().toISOString(),
-      input.expiresAt,
+      requireDataNumber(input.expiresAt, "expires_at"),
     )
     .run();
   if (result.meta.changes !== 1) {

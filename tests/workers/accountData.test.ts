@@ -7,6 +7,7 @@ import {
   consumeAuthCode,
   createAuthCode,
 } from "../../workers/account/src/data/authCodes.js";
+import { cleanupExpiredAuthData } from "../../workers/account/src/data/cleanup.js";
 import {
   consumeOtpChallenge,
   createOtpChallenge,
@@ -23,6 +24,8 @@ import {
 import {
   getActiveUser,
   registerDiscordUser,
+  updateUserAvatar,
+  updateUserProfile,
 } from "../../workers/account/src/data/users.js";
 import type { Env } from "../../workers/account/src/types.js";
 
@@ -226,6 +229,33 @@ test("OTP challenge rejects expired challenges", async () => {
   });
 
   expect(result).toBeNull();
+});
+
+test("OTP challenge rejects malformed codes at consumption without consuming the challenge", async () => {
+  await createOtpChallenge(testAccountConfig(), {
+    challengeId: "challenge",
+    discordId: "123456789",
+    expiresAt: nowSeconds() + 300,
+    otp: "123456",
+    returnTo: "https://app.example.com/",
+  });
+
+  await expect(
+    consumeOtpChallenge(testAccountConfig(), {
+      challengeId: "challenge",
+      otp: "abcdef",
+    }),
+  ).rejects.toThrow("invalid otp");
+
+  expect(
+    await consumeOtpChallenge(testAccountConfig(), {
+      challengeId: "challenge",
+      otp: "123456",
+    }),
+  ).toEqual({
+    discordId: "123456789",
+    returnTo: "https://app.example.com/",
+  });
 });
 
 test("OTP challenge rejects corrupt non-numeric expiration values", async () => {
@@ -493,6 +523,33 @@ test("Active user verification reports Discord availability failures", async () 
   ).rejects.toThrow("discord_unavailable");
 });
 
+test("Profile update rejects inactive users at the data boundary", async () => {
+  await setUserStatus("123456789", "disabled", "manual");
+
+  await expect(
+    updateUserProfile(testAccountConfig(), {
+      discordId: "123456789",
+      displayName: "Current Akaaku",
+    }),
+  ).rejects.toThrow("inactive user");
+
+  expect(await readUserDisplayName("123456789")).toBe("Akaaku");
+});
+
+test("Avatar update rejects inactive users at the data boundary", async () => {
+  await setUserStatus("123456789", "deleted", null);
+
+  await expect(
+    updateUserAvatar(testAccountConfig(), {
+      discordId: "123456789",
+      iconKey: "icons/123456789/avatar.webp",
+      iconSource: "r2",
+    }),
+  ).rejects.toThrow("inactive user");
+
+  expect(await readUserIconKey("123456789")).toBeNull();
+});
+
 test("Discord registration replaces existing user state like the old PutCommand", async () => {
   await setUserForRegistrationReplacement();
 
@@ -517,6 +574,50 @@ test("Discord registration replaces existing user state like the old PutCommand"
     role: "user",
     status: "active",
   });
+});
+
+test("Expired auth data cleanup removes only expired transient records", async () => {
+  const now = nowSeconds();
+  await createAuthCode(testAccountConfig(), {
+    appId: "hub",
+    code: "expired-code",
+    expiresAt: now - 1,
+    user: {
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      role: "user",
+    },
+  });
+  await createAuthCode(testAccountConfig(), {
+    appId: "hub",
+    code: "fresh-code",
+    expiresAt: now + 300,
+    user: {
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      role: "user",
+    },
+  });
+  await createOtpChallenge(testAccountConfig(), {
+    challengeId: "expired-otp",
+    discordId: "123456789",
+    expiresAt: now - 1,
+    otp: "123456",
+    returnTo: "https://app.example.com/",
+  });
+  await createRememberToken(testAccountConfig(), {
+    discordId: "123456789",
+    expiresAt: now - 1,
+    tokenHash: "expired-hash",
+    tokenId: "expired-remember",
+  });
+
+  await cleanupExpiredAuthData(testAccountConfig(), now);
+
+  expect(await readAuthCode("expired-code")).toBeNull();
+  expect(await readAuthCode("fresh-code")).toBe("fresh-code");
+  expect(await readOtpHash("expired-otp")).toBeNull();
+  expect(await readRememberTokenHash("expired-remember")).toBeNull();
 });
 
 function testAccountConfig() {
@@ -696,4 +797,29 @@ async function readUserStatus(discordId: string): Promise<string | null> {
     .bind(discordId)
     .first<{ status: string }>();
   return row?.status ?? null;
+}
+
+async function readUserDisplayName(discordId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT display_name FROM users WHERE discord_id = ?",
+  )
+    .bind(discordId)
+    .first<{ display_name: string }>();
+  return row?.display_name ?? null;
+}
+
+async function readUserIconKey(discordId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT icon_key FROM users WHERE discord_id = ?",
+  )
+    .bind(discordId)
+    .first<{ icon_key: string | null }>();
+  return row?.icon_key ?? null;
+}
+
+async function readAuthCode(code: string): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT code FROM auth_codes WHERE code = ?")
+    .bind(code)
+    .first<{ code: string }>();
+  return row?.code ?? null;
 }

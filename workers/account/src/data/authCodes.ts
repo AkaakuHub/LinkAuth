@@ -1,6 +1,7 @@
 import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { DataConflictError } from "./errors.js";
+import { requireDataNumber, requireDataString } from "./validation.js";
 
 type AuthCodeUser = Pick<User, "discord_id" | "display_name" | "role"> & {
   icon_source?: "discord" | "r2" | "none";
@@ -34,15 +35,15 @@ export async function createAuthCode(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      input.code,
-      input.appId,
-      input.user.discord_id,
-      input.user.display_name,
+      requireDataString(input.code, "code"),
+      requireDataString(input.appId, "app_id"),
+      requireDataString(input.user.discord_id, "discord_id"),
+      requireDataString(input.user.display_name, "display_name"),
       input.user.role,
       input.user.icon_source ?? null,
       input.user.icon_key ?? null,
       new Date().toISOString(),
-      input.expiresAt,
+      requireDataNumber(input.expiresAt, "expires_at"),
     )
     .run();
   if (result.meta.changes !== 1) {
@@ -62,9 +63,16 @@ export async function consumeAuthCode(
   if (
     !row ||
     row.app_id !== input.appId ||
+    typeof row.discord_id !== "string" ||
+    typeof row.display_name !== "string" ||
     typeof row.expires_at !== "number" ||
     row.expires_at <= now ||
-    (row.role !== "user" && row.role !== "admin")
+    (row.role !== "user" && row.role !== "admin") ||
+    (row.icon_source !== null &&
+      row.icon_source !== "discord" &&
+      row.icon_source !== "r2" &&
+      row.icon_source !== "none") ||
+    (row.icon_key !== null && typeof row.icon_key !== "string")
   ) {
     return null;
   }

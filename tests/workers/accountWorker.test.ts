@@ -389,6 +389,30 @@ test("Account Worker token endpoint rejects unknown apps before data access", as
   expect(calls).toEqual([]);
 });
 
+test("Account Worker token endpoint rejects apps without a session verify secret", async () => {
+  const originalAuthApps = env.AUTH_APPS;
+  env.AUTH_APPS = JSON.stringify([
+    {
+      app_id: "hub",
+      callback_url: "https://app.example.com/_auth/callback",
+    },
+  ]);
+  try {
+    const response = await fetchAccount("https://auth.example.com/token", {
+      body: JSON.stringify({ app_id: "hub", code: "auth-code" }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "unknown_app" });
+  } finally {
+    env.AUTH_APPS = originalAuthApps;
+  }
+});
+
 test("Account Worker session verify rejects missing account sessions", async () => {
   const response = await fetchAccount(
     "https://auth.example.com/session/verify",
@@ -405,6 +429,26 @@ test("Account Worker session verify rejects unknown app ids", async () => {
 
   expect(response.status).toBe(403);
   expect(await response.json()).toEqual({ error: "unknown_app" });
+});
+
+test("Account Worker session verify rejects apps without a session verify secret", async () => {
+  const originalAuthApps = env.AUTH_APPS;
+  env.AUTH_APPS = JSON.stringify([
+    {
+      app_id: "hub",
+      callback_url: "https://app.example.com/_auth/callback",
+    },
+  ]);
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/session/verify?app_id=hub",
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "unknown_app" });
+  } finally {
+    env.AUTH_APPS = originalAuthApps;
+  }
 });
 
 test("Account Worker session verify accepts a valid app session cookie", async () => {
@@ -969,6 +1013,57 @@ test("Account Worker callback rejects Discord users outside the configured guild
   );
   expect(calls).toContain("/api/v10/users/@me/guilds/guild/member");
   await expectOtpChallengeCount(0);
+});
+
+test("Account Worker callback returns 429 when OTP issue quota is exhausted", async () => {
+  await createOtpChallenge(testAccountConfig(), {
+    challengeId: "challenge-1",
+    discordId: "123456789",
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
+    otp: "123456",
+    returnTo: "https://app.example.com/",
+  });
+  await createOtpChallenge(testAccountConfig(), {
+    challengeId: "challenge-2",
+    discordId: "123456789",
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
+    otp: "123456",
+    returnTo: "https://app.example.com/",
+  });
+  const state = await createCallbackState("hub");
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/api/v10/oauth2/token") {
+      return Response.json({ access_token: "discord-access-token" });
+    }
+    if (url.pathname === "/api/v10/users/@me") {
+      return Response.json({ id: "123456789" });
+    }
+    if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
+  );
+  const body = await response.text();
+
+  expect(response.status).toBe(429);
+  expect(body).toContain("認証コードの発行回数が多すぎます");
+  expect(response.headers.get("set-cookie")).not.toContain(
+    `${otpStateCookieName}=`,
+  );
+  await expectOtpChallengeCount(2);
 });
 
 test("Account Worker OTP success returns to authorize for app callbacks", async () => {

@@ -17,6 +17,8 @@
     "dev:assets": "tsx local/watchDevAssets.ts",
     "dev:env": "tsx local/syncDevEnv.ts",
     "dev:seed": "tsx local/seedD1.ts",
+    "d1:migrations:apply": "wrangler d1 migrations apply org-auth --remote --config workers/account/wrangler.toml",
+    "d1:migrations:list": "wrangler d1 migrations list org-auth --remote --config workers/account/wrangler.toml",
     "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787 --inspector-port 0 --live-reload",
     "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789 --inspector-port 0 --live-reload",
     "knip": "knip",
