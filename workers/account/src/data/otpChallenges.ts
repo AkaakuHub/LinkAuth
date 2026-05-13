@@ -64,15 +64,20 @@ export async function consumeOtpChallenge(
   input: { challengeId: string; otp: string },
 ): Promise<{ discordId: string; appId?: string; returnTo: string } | null> {
   const row = await config.database
-    .prepare("SELECT * FROM otp_challenges WHERE challenge_id = ?")
+    .prepare(
+      `DELETE FROM otp_challenges
+      WHERE challenge_id = ?
+      RETURNING discord_id, app_id, return_to, otp_hash, expires_at`,
+    )
     .bind(input.challengeId)
     .first<OtpChallengeRow>();
-  await config.database
-    .prepare("DELETE FROM otp_challenges WHERE challenge_id = ?")
-    .bind(input.challengeId)
-    .run();
   if (
     !row ||
+    typeof row.discord_id !== "string" ||
+    (row.app_id !== null && typeof row.app_id !== "string") ||
+    typeof row.return_to !== "string" ||
+    typeof row.otp_hash !== "string" ||
+    typeof row.expires_at !== "number" ||
     row.expires_at <= Math.floor(Date.now() / 1000) ||
     !timingSafeEqual(
       row.otp_hash,
@@ -186,9 +191,13 @@ function validateOtp(value: string): string {
 }
 
 function validateReturnTo(value: string): string {
-  const url = new URL(value);
-  if (url.username || url.password) {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) {
+      throw new Error("invalid return_to");
+    }
+    return url.toString();
+  } catch {
     throw new Error("invalid return_to");
   }
-  return url.toString();
 }

@@ -473,6 +473,12 @@ function selectD1Row(
   if (query.startsWith("SELECT * FROM otp_challenges WHERE challenge_id = ?")) {
     return state.otpChallenges.get(String(values[0])) ?? null;
   }
+  if (query.startsWith("DELETE FROM otp_challenges")) {
+    const challengeId = String(values[0]);
+    const row = state.otpChallenges.get(challengeId) ?? null;
+    state.otpChallenges.delete(challengeId);
+    return row;
+  }
   if (query.startsWith("SELECT discord_id, token_hash, expires_at")) {
     return null;
   }

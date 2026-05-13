@@ -60,13 +60,16 @@ export async function rotateRememberToken(
     .first<RememberTokenRow>();
   if (
     !row ||
+    typeof row.discord_id !== "string" ||
+    typeof row.token_hash !== "string" ||
+    typeof row.expires_at !== "number" ||
     row.expires_at <= Math.floor(Date.now() / 1000) ||
     !timingSafeEqual(row.token_hash, input.oldTokenHash)
   ) {
     await deleteRememberToken(config, input.tokenId);
     return null;
   }
-  const user = await getActiveUser(config, row.discord_id, true);
+  const user = await getRememberTokenUser(config, row.discord_id);
   if (!user) {
     return null;
   }
@@ -105,4 +108,21 @@ export async function deleteAllRememberTokens(
     .prepare("DELETE FROM remember_tokens WHERE discord_id = ?")
     .bind(discordId)
     .run();
+}
+
+async function getRememberTokenUser(
+  config: AccountConfig,
+  discordId: string,
+): Promise<User | null> {
+  try {
+    return await getActiveUser(config, discordId, true);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "left_guild" || error.message === "guild_check_failed")
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }

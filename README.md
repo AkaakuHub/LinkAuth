@@ -12,6 +12,8 @@
 
 必要な値は`.env.local.example`を見て、`.env.local`に設定します。ローカルWorker用のsecretは`.env.local`から生成します。
 
+`AUTH_APPS`の各appには`session_verify_secret`が必要です。この値はapp Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
+
 ## ローカル確認
 
 初回は`.env.local`を作成します。内容は`.env.local.example`を見てください。
@@ -67,4 +69,55 @@ Discord OAuth2をローカルと本番の両方で試す場合は、Discord Deve
 ```txt
 http://localhost:8787/callback
 https://account.<your-domain>/callback
+```
+
+## Cloudflare設定
+
+Terraformで管理するCloudflareリソースは次です。
+
+- D1 database: `org-auth`
+- R2 bucket: `org-auth-assets`
+- account Worker custom domain: `account.<domain>`
+
+初回は`infra/terraform.tfvars.example`を`infra/terraform.tfvars`へ写して、Cloudflareの値を設定します。
+
+```powershell
+Copy-Item infra/terraform.tfvars.example infra/terraform.tfvars
+pnpm tf:init
+pnpm tf:validate
+terraform -chdir=infra apply
+```
+
+TerraformはWorkerのsecretを管理しません。Terraform stateにsecret値を残さないためです。Workerコードのdeployとsecret/vars設定はWranglerで行います。
+
+account WorkerのD1 bindingは`workers/account/wrangler.toml`の`database_id`へ実際のD1 database IDを設定してからデプロイします。リポジトリ内の`00000000-0000-0000-0000-000000000000`はプレースホルダーです。
+
+D1 database IDはTerraform apply後に出る`d1_database_id`です。
+
+account Workerには次のsecret/varsを設定します。
+
+```txt
+ACCOUNT_URL
+AUTH_APPS
+CSRF_HMAC_SECRET
+CSRF_KID
+DISCORD_BOT_TOKEN
+DISCORD_CLIENT_ID
+DISCORD_CLIENT_SECRET
+DISCORD_GUILD_IDS
+DISCORD_PUBLIC_KEY
+DOMAIN_NAME
+OTP_HMAC_SECRET
+SESSION_HMAC_SECRET
+SESSION_KID
+```
+
+app Workerには次のsecret/varsを設定します。
+
+```txt
+ACCOUNT_URL
+APP_ID
+APP_SESSION_HMAC_SECRET
+DOMAIN_NAME
+SESSION_KID
 ```

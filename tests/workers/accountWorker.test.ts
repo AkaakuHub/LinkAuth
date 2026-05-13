@@ -348,7 +348,6 @@ test("Account Worker token endpoint consumes auth codes once", async () => {
       discord_id: "123456789",
       display_name: "Akaaku",
       role: "admin",
-      status: "active",
     },
   });
   expect(replayResponse.status).toBe(401);
@@ -452,6 +451,28 @@ test("Account Worker session verify rejects app sessions with the wrong app_id",
   expect(await response.json()).toEqual({ error: "unauthorized" });
 });
 
+test("Account Worker session verify rejects users that left the Discord guild", async () => {
+  await replaceActiveUser({
+    disabledReason: "left_guild",
+    guildCheckedAt: new Date(0).toISOString(),
+    status: "disabled",
+  });
+  stubDiscordGuildMissing();
+  const session = await createAppSession("hub");
+
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
 test("Account Worker me rejects missing account sessions", async () => {
   const response = await fetchAccount("https://auth.example.com/me");
 
@@ -477,6 +498,25 @@ test("Account Worker me rejects valid sessions when the user is inactive", async
     disabledReason: "manual",
     status: "disabled",
   });
+  const session = await createAccountSession();
+
+  const response = await fetchAccount("https://auth.example.com/me", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
+test("Account Worker me rejects users that left the Discord guild", async () => {
+  await replaceActiveUser({
+    disabledReason: "left_guild",
+    guildCheckedAt: new Date(0).toISOString(),
+    status: "disabled",
+  });
+  stubDiscordGuildMissing();
   const session = await createAccountSession();
 
   const response = await fetchAccount("https://auth.example.com/me", {
@@ -862,6 +902,7 @@ test("Account Worker callback shows a delivery error when Discord DM sending thr
   expect(response.headers.get("set-cookie")).not.toContain(
     `${otpStateCookieName}=`,
   );
+  await expectOtpChallengeCount(1);
 });
 
 test("Account Worker callback rejects app auth states without the browser state cookie", async () => {
@@ -1134,6 +1175,26 @@ test("Account Worker account page renders the current icon", async () => {
   expect(body).not.toContain("状態");
 });
 
+test("Account Worker account page rejects users that left the Discord guild", async () => {
+  await replaceActiveUser({
+    disabledReason: "left_guild",
+    guildCheckedAt: new Date(0).toISOString(),
+    status: "disabled",
+  });
+  stubDiscordGuildMissing();
+  const session = await createAccountSession();
+
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("利用資格がありません");
+});
+
 test("Account Worker clears remember cookies that cannot restore a session", async () => {
   const response = await fetchAccount("https://account.example.com/", {
     headers: {
@@ -1143,6 +1204,35 @@ test("Account Worker clears remember cookies that cannot restore a session", asy
   const setCookie = response.headers.get("set-cookie") ?? "";
 
   expect(response.status).toBe(200);
+  expect(setCookie).toContain(`${rememberCookieName}=`);
+  expect(setCookie).toContain("Max-Age=0");
+});
+
+test("Account Worker clears remember cookies when the remembered user left the guild", async () => {
+  const oldRandomToken = "old-random-token";
+  await createRememberToken(testAccountConfig(), {
+    discordId: activeUser.discord_id,
+    expiresAt: Math.floor(Date.now() / 1000) + 15_552_000,
+    tokenHash: await hashTokenForTest(oldRandomToken),
+    tokenId: "remember-id",
+  });
+  await replaceActiveUser({
+    disabledReason: "left_guild",
+    guildCheckedAt: new Date(0).toISOString(),
+    status: "disabled",
+  });
+  stubDiscordGuildMissing();
+
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${rememberCookieName}=remember-id.${oldRandomToken}`,
+    },
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("Discordでログイン");
   expect(setCookie).toContain(`${rememberCookieName}=`);
   expect(setCookie).toContain("Max-Age=0");
 });
@@ -1169,6 +1259,32 @@ test("Account Worker OTP success skips remember token creation when remember_me 
   expect(setCookie).toContain(`${rememberCookieName}=`);
   expect(setCookie).toContain("Max-Age=0");
   await expectRememberTokenCount(0);
+});
+
+test("Account Worker OTP rejects users that left the Discord guild", async () => {
+  await replaceActiveUser({
+    disabledReason: "left_guild",
+    guildCheckedAt: new Date(0).toISOString(),
+    status: "disabled",
+  });
+  stubDiscordGuildMissing();
+  await seedOtpChallenge({
+    returnTo: "https://app.example.com/",
+  });
+
+  const response = await fetchAccount("https://auth.example.com/otp", {
+    body: new URLSearchParams({
+      challenge_id: "challenge-id",
+      otp: "123456",
+      return_to: "https://app.example.com/",
+    }),
+    headers: await otpHeaders("challenge-id"),
+    method: "POST",
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("利用資格がありません");
 });
 
 async function fetchAccount(
@@ -1309,6 +1425,16 @@ function stubDiscordGuildMember(): void {
   });
 }
 
+function stubDiscordGuildMissing(): void {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+}
+
 async function expectUserDisplayName(displayName: string): Promise<void> {
   const row = await env.DB.prepare(
     "SELECT display_name FROM users WHERE discord_id = ?",
@@ -1429,6 +1555,7 @@ async function seedActiveUser(
     displayName?: string;
     iconKey?: string;
     iconSource?: "discord" | "r2" | "none";
+    guildCheckedAt?: string;
     status?: "active" | "disabled" | "deleted";
     disabledReason?: string | null;
   } = {},
@@ -1445,7 +1572,7 @@ async function seedActiveUser(
       activeUser.discord_id,
       input.displayName ?? activeUser.display_name,
       input.status ?? "active",
-      now,
+      input.guildCheckedAt ?? now,
       input.disabledReason ?? null,
       input.iconSource ?? null,
       input.iconKey ?? null,

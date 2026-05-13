@@ -20,7 +20,10 @@ import {
   d1DropSchemaStatements,
   d1SchemaStatements,
 } from "../../workers/account/src/data/schema.js";
-import { getActiveUser } from "../../workers/account/src/data/users.js";
+import {
+  getActiveUser,
+  registerDiscordUser,
+} from "../../workers/account/src/data/users.js";
 import type { Env } from "../../workers/account/src/types.js";
 
 const assets = {} as R2Bucket;
@@ -85,7 +88,6 @@ test("Auth code can be consumed once by the same app before expiration", async (
       icon_key: "icons/123456789/avatar.webp",
       icon_source: "r2",
       role: "admin",
-      status: "active",
     },
   });
   expect(secondResult).toBeNull();
@@ -118,7 +120,6 @@ test("Auth code rejects a different app_id without consuming the code", async ()
       discord_id: "123456789",
       display_name: "Akaaku",
       role: "user",
-      status: "active",
     },
   });
 });
@@ -138,6 +139,17 @@ test("Auth code rejects expired codes", async () => {
   const result = await consumeAuthCode(testAccountConfig(), {
     appId: "hub",
     code: "auth-code",
+  });
+
+  expect(result).toBeNull();
+});
+
+test("Auth code rejects corrupt non-numeric expiration values", async () => {
+  await seedCorruptAuthCode("bad-expiration");
+
+  const result = await consumeAuthCode(testAccountConfig(), {
+    appId: "hub",
+    code: "bad-expiration",
   });
 
   expect(result).toBeNull();
@@ -216,6 +228,18 @@ test("OTP challenge rejects expired challenges", async () => {
   expect(result).toBeNull();
 });
 
+test("OTP challenge rejects corrupt non-numeric expiration values", async () => {
+  await seedCorruptOtpChallenge("bad-expiration");
+
+  const result = await consumeOtpChallenge(testAccountConfig(), {
+    challengeId: "bad-expiration",
+    otp: "123456",
+  });
+
+  expect(result).toBeNull();
+  expect(await readOtpHash("bad-expiration")).toBeNull();
+});
+
 test("OTP challenge rejects malformed codes at creation", async () => {
   await expect(
     createOtpChallenge(testAccountConfig(), {
@@ -236,6 +260,18 @@ test("OTP challenge rejects credentialed return_to values at creation", async ()
       expiresAt: nowSeconds() + 300,
       otp: "123456",
       returnTo: "https://user:pass@app.example.com/",
+    }),
+  ).rejects.toThrow("invalid return_to");
+});
+
+test("OTP challenge rejects malformed return_to values at creation", async () => {
+  await expect(
+    createOtpChallenge(testAccountConfig(), {
+      challengeId: "challenge",
+      discordId: "123456789",
+      expiresAt: nowSeconds() + 300,
+      otp: "123456",
+      returnTo: "not-a-url",
     }),
   ).rejects.toThrow("invalid return_to");
 });
@@ -365,6 +401,29 @@ test("Remember token rejects disabled users", async () => {
   expect(result).toBeNull();
 });
 
+test("Remember token rejects users that left the Discord guild", async () => {
+  await createRememberToken(testAccountConfig(), {
+    discordId: "123456789",
+    expiresAt: nowSeconds() + 300,
+    tokenHash: "old-hash",
+    tokenId: "remember-id",
+  });
+  await setUserStatus("123456789", "disabled", "left_guild");
+  vi.stubGlobal("fetch", async () => {
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const result = await rotateRememberToken(testAccountConfig(), {
+    expiresAt: nowSeconds() + 600,
+    newTokenHash: "new-hash",
+    oldTokenHash: "old-hash",
+    tokenId: "remember-id",
+  });
+
+  expect(result).toBeNull();
+  expect(await readRememberTokenHash("remember-id")).toBe("old-hash");
+});
+
 test("Remember token creation rejects inactive users", async () => {
   await setUserStatus("123456789", "deleted", null);
 
@@ -385,6 +444,20 @@ test("Remember token rejects and deletes expired tokens", async () => {
     tokenHash: "old-hash",
     tokenId: "remember-id",
   });
+
+  const result = await rotateRememberToken(testAccountConfig(), {
+    expiresAt: nowSeconds() + 600,
+    newTokenHash: "new-hash",
+    oldTokenHash: "old-hash",
+    tokenId: "remember-id",
+  });
+
+  expect(result).toBeNull();
+  expect(await readRememberTokenHash("remember-id")).toBeNull();
+});
+
+test("Remember token rejects non-numeric expiration values and deletes the token", async () => {
+  await seedCorruptRememberToken("remember-id", "123456789", "old-hash");
 
   const result = await rotateRememberToken(testAccountConfig(), {
     expiresAt: nowSeconds() + 600,
@@ -418,6 +491,32 @@ test("Active user verification reports Discord availability failures", async () 
   await expect(
     getActiveUser(testAccountConfig(), "123456789", "current"),
   ).rejects.toThrow("discord_unavailable");
+});
+
+test("Discord registration replaces existing user state like the old PutCommand", async () => {
+  await setUserForRegistrationReplacement();
+
+  await registerDiscordUser(testAccountConfig(), {
+    avatarHash: "avatar-hash",
+    discordId: "123456789",
+    discordUsername: "DiscordUser",
+    displayName: "Registered User",
+    guildId: "guild",
+  });
+
+  expect(await readUserForRegistrationReplacement("123456789")).toEqual({
+    deleted_at: null,
+    disabled_reason: null,
+    discord_avatar_hash: "avatar-hash",
+    discord_username: "DiscordUser",
+    display_name: "Registered User",
+    guild_id: "guild",
+    guild_member_status: "active",
+    icon_key: null,
+    icon_source: "discord",
+    role: "user",
+    status: "active",
+  });
 });
 
 function testAccountConfig() {
@@ -474,6 +573,31 @@ async function setUserStatus(
     .run();
 }
 
+async function seedCorruptAuthCode(code: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO auth_codes (
+      code, app_id, discord_id, display_name, role, created_at, expires_at
+    ) VALUES (?, 'hub', '123456789', 'Akaaku', 'user', ?, ?)`,
+  )
+    .bind(code, new Date().toISOString(), "bad-expiration")
+    .run();
+}
+
+async function seedCorruptOtpChallenge(challengeId: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO otp_challenges (
+      challenge_id, discord_id, return_to, otp_hash, created_at, expires_at
+    ) VALUES (?, '123456789', 'https://app.example.com/', ?, ?, ?)`,
+  )
+    .bind(
+      challengeId,
+      hexEncode(await hmacSha256("otp-secret", `${challengeId}.123456`)),
+      new Date().toISOString(),
+      "bad-expiration",
+    )
+    .run();
+}
+
 async function seedRememberToken(
   tokenId: string,
   discordId: string,
@@ -487,6 +611,64 @@ async function seedRememberToken(
   )
     .bind(tokenId, discordId, tokenHash, nowIso, nowIso, nowSeconds() + 300)
     .run();
+}
+
+async function seedCorruptRememberToken(
+  tokenId: string,
+  discordId: string,
+  tokenHash: string,
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO remember_tokens (
+      token_id, discord_id, token_hash, created_at, last_used_at, expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(tokenId, discordId, tokenHash, nowIso, nowIso, "bad-expiration")
+    .run();
+}
+
+async function setUserForRegistrationReplacement(): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE users SET
+      discord_username = 'OldUser',
+      display_name = 'Deleted Admin',
+      role = 'admin',
+      status = 'deleted',
+      guild_id = 'old-guild',
+      guild_member_status = 'left',
+      disabled_reason = 'manual',
+      icon_source = 'none',
+      icon_key = 'icons/123456789/avatar.webp',
+      discord_avatar_hash = NULL,
+      created_at = '2000-01-01T00:00:00.000Z',
+      deleted_at = ?
+    WHERE discord_id = '123456789'`,
+  )
+    .bind(new Date().toISOString())
+    .run();
+}
+
+async function readUserForRegistrationReplacement(
+  discordId: string,
+): Promise<Record<string, string | null> | null> {
+  return await env.DB.prepare(
+    `SELECT
+      deleted_at,
+      disabled_reason,
+      discord_avatar_hash,
+      discord_username,
+      display_name,
+      guild_id,
+      guild_member_status,
+      icon_key,
+      icon_source,
+      role,
+      status
+    FROM users WHERE discord_id = ?`,
+  )
+    .bind(discordId)
+    .first<Record<string, string | null>>();
 }
 
 async function readOtpHash(challengeId: string): Promise<string | null> {

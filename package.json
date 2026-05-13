@@ -19,7 +19,11 @@
     "dev:seed": "tsx local/seedD1.ts",
     "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787 --inspector-port 0 --live-reload",
     "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789 --inspector-port 0 --live-reload",
-    "knip": "knip"
+    "knip": "knip",
+    "tf:fmt": "terraform -chdir=infra fmt",
+    "tf:fmt:check": "terraform -chdir=infra fmt -check",
+    "tf:init": "terraform -chdir=infra init",
+    "tf:validate": "terraform -chdir=infra validate"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",

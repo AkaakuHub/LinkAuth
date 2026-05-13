@@ -2,6 +2,11 @@ import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { DataConflictError } from "./errors.js";
 
+type AuthCodeUser = Pick<User, "discord_id" | "display_name" | "role"> & {
+  icon_source?: "discord" | "r2" | "none";
+  icon_key?: string;
+};
+
 type AuthCodeRow = {
   app_id: string;
   discord_id: string;
@@ -18,10 +23,7 @@ export async function createAuthCode(
     appId: string;
     code: string;
     expiresAt: number;
-    user: Pick<User, "discord_id" | "display_name" | "role"> & {
-      icon_source?: "discord" | "r2" | "none";
-      icon_key?: string;
-    };
+    user: AuthCodeUser;
   },
 ): Promise<void> {
   const result = await config.database
@@ -51,7 +53,7 @@ export async function createAuthCode(
 export async function consumeAuthCode(
   config: AccountConfig,
   input: { appId: string; code: string },
-): Promise<{ user: User } | null> {
+): Promise<{ user: AuthCodeUser } | null> {
   const now = Math.floor(Date.now() / 1000);
   const row = await config.database
     .prepare("SELECT * FROM auth_codes WHERE code = ?")
@@ -60,6 +62,7 @@ export async function consumeAuthCode(
   if (
     !row ||
     row.app_id !== input.appId ||
+    typeof row.expires_at !== "number" ||
     row.expires_at <= now ||
     (row.role !== "user" && row.role !== "admin")
   ) {
@@ -79,7 +82,6 @@ export async function consumeAuthCode(
       discord_id: row.discord_id,
       display_name: row.display_name,
       role: row.role,
-      status: "active",
       ...(row.icon_source ? { icon_source: row.icon_source } : {}),
       ...(row.icon_key ? { icon_key: row.icon_key } : {}),
     },

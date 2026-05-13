@@ -11,5 +11,6 @@
     "tests/**/*.{ts,tsx}",
     "workers/**/*.{ts,tsx}"
   ],
-  "ignoreDependencies": ["cloudflare", "lefthook", "tailwindcss"]
+  "ignoreDependencies": ["cloudflare", "lefthook", "tailwindcss"],
+  "ignoreBinaries": ["terraform"]
 }

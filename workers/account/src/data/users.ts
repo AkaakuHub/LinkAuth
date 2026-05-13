@@ -39,7 +39,11 @@ export async function getActiveUser(
     return null;
   }
   if (checkGuild) {
-    await verifyGuildMembership(config, row, checkGuild === "current");
+    await verifyGuildMembership(
+      config,
+      row,
+      row.status === "disabled" || checkGuild === "current",
+    );
   }
   if (row.status !== "active" && row.disabled_reason !== "left_guild") {
     return null;
@@ -114,12 +118,17 @@ export async function registerDiscordUser(
       ON CONFLICT(discord_id) DO UPDATE SET
         discord_username = excluded.discord_username,
         display_name = excluded.display_name,
+        role = 'user',
         status = 'active',
         guild_id = excluded.guild_id,
         guild_member_status = 'active',
         guild_checked_at = excluded.guild_checked_at,
         icon_source = excluded.icon_source,
+        icon_key = NULL,
         discord_avatar_hash = excluded.discord_avatar_hash,
+        created_at = excluded.created_at,
+        deleted_at = NULL,
+        disabled_reason = NULL,
         updated_at = excluded.updated_at`,
     )
     .bind(

@@ -6,8 +6,7 @@ export async function verifyActiveUser(
   discordId: string,
   config: AccountConfig,
 ): Promise<{ user: User } | null> {
-  const user = await findActiveUser(config, discordId, false);
-  return user ? { user } : null;
+  return await activeMemberUser(discordId, config, true);
 }
 
 export async function verifyCurrentMemberUser(
