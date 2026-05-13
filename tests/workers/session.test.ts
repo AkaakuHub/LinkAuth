@@ -1,4 +1,6 @@
 import {
+  base64UrlDecodeText,
+  base64UrlEncodeText,
   createCookie,
   getBearerToken,
   getSingleCookie,
@@ -30,6 +32,50 @@ test("Auth token verifies a signed payload before expiration", async () => {
 test("Auth token rejects tampered signatures", async () => {
   const token = await signAuthToken(payload, secret);
   const tamperedToken = `${token.slice(0, -1)}x`;
+
+  expect(
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
+test("Auth token rejects unknown key ids", async () => {
+  const token = await signAuthToken({ ...payload, kid: "unknown-key" }, secret);
+
+  expect(
+    await verifyAuthToken(token, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
+test("Auth token rejects unsupported header algorithms", async () => {
+  const token = await signAuthToken(payload, secret);
+  const tamperedToken = tamperTokenHeader(token, { alg: "none" });
+
+  expect(
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
+test("Auth token rejects unsupported header types", async () => {
+  const token = await signAuthToken(payload, secret);
+  const tamperedToken = tamperTokenHeader(token, { typ: "api" });
+
+  expect(
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
+test("Auth token rejects mismatched payload key ids", async () => {
+  const token = await signAuthToken(payload, secret);
+  const tamperedToken = tamperTokenPayload(token, { kid: "other-key" });
+
+  expect(
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
+test("Auth token rejects invalid roles", async () => {
+  const token = await signAuthToken(payload, secret);
+  const tamperedToken = tamperTokenPayload(token, { role: "owner" });
 
   expect(
     await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
@@ -72,3 +118,39 @@ test("Session cookie is Secure, HttpOnly, and SameSite=Lax", () => {
     "sid=value; Max-Age=60; Path=/; HttpOnly; Secure; SameSite=Lax",
   );
 });
+
+function tamperTokenHeader(
+  token: string,
+  values: Record<string, unknown>,
+): string {
+  return tamperTokenPart(token, 0, values);
+}
+
+function tamperTokenPayload(
+  token: string,
+  values: Record<string, unknown>,
+): string {
+  return tamperTokenPart(token, 1, values);
+}
+
+function tamperTokenPart(
+  token: string,
+  index: 0 | 1,
+  values: Record<string, unknown>,
+): string {
+  const parts = token.split(".");
+  const part = parts[index];
+  if (parts.length !== 3 || !part) {
+    throw new Error("Auth token is malformed");
+  }
+  const parsed = JSON.parse(base64UrlDecodeText(part)) as Record<
+    string,
+    unknown
+  >;
+  const tampered = base64UrlEncodeText(
+    JSON.stringify({ ...parsed, ...values }),
+  );
+  return parts
+    .map((value, partIndex) => (partIndex === index ? tampered : value))
+    .join(".");
+}
