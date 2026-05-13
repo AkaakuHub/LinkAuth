@@ -495,6 +495,52 @@ test("Account Worker session verify accepts a valid app session cookie", async (
   });
 });
 
+test("Account Worker session verify accepts a valid bearer token", async () => {
+  await replaceActiveUser({
+    displayName: "Current Akaaku",
+    iconKey: "icons/123456789/avatar.webp",
+    iconSource: "r2",
+  });
+  const session = await createAppSession("hub");
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        authorization: `Bearer ${session}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    user: {
+      discord_id: "123456789",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
+      role: "admin",
+      status: "active",
+    },
+  });
+});
+
+test("Account Worker session verify rejects conflicting cookie and bearer session tokens", async () => {
+  const session = await createAppSession("hub");
+  const otherSession = await createAppSession("other");
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        authorization: `Bearer ${session}`,
+        cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(otherSession)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
 test("Account Worker session verify rejects app sessions with the wrong app_id", async () => {
   const session = await createAppSession("other");
   const response = await fetchAccount(

@@ -1,10 +1,21 @@
 {
   "name": "link-auth",
-  "private": true,
   "packageManager": "pnpm@10.33.2",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "types": "./dist/index.d.ts",
   "scripts": {
+    "build:lib": "tsc -p tsconfig.lib.json",
     "check": "biome check .",
+    "prepack": "pnpm build:lib",
     "test": "pnpm test:workers",
     "test:e2e": "playwright test --config playwright.config.ts",
     "test:workers": "vitest run --config vitest.workers.config.ts",

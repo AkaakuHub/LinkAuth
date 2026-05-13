@@ -313,6 +313,49 @@ test("App Worker returns the current user with a valid app session", async () =>
   });
 });
 
+test("App Worker returns the current user with a valid bearer token", async () => {
+  const session = await createAppSession("hub");
+  vi.stubGlobal(
+    "fetch",
+    async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({
+        authorization: `Bearer ${session}`,
+      });
+      return Response.json({ user: currentUser });
+    },
+  );
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      authorization: `Bearer ${session}`,
+    },
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    user: {
+      discord_id: "123456789",
+      display_name: "Current Akaaku",
+      icon_key: "icons/123456789/avatar.webp",
+      icon_source: "r2",
+      role: "admin",
+      status: "active",
+    },
+  });
+});
+
+test("App Worker rejects conflicting cookie and bearer session tokens", async () => {
+  const session = await createAppSession("hub");
+  const otherSession = await createAppSession("other");
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      authorization: `Bearer ${session}`,
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(otherSession)}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+});
+
 test("App Worker rejects account session verify failures", async () => {
   vi.stubGlobal("fetch", async () =>
     Response.json({ error: "unauthorized" }, { status: 401 }),

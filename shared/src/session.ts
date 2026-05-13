@@ -26,7 +26,7 @@ type TokenHeader = {
   kid: string;
 };
 
-export async function signSessionCookie(
+export async function signAuthToken(
   payload: SessionPayload,
   secret: string,
 ): Promise<string> {
@@ -42,7 +42,7 @@ export async function signSessionCookie(
   return `${signingInput}.${signature}`;
 }
 
-export async function verifySessionCookie(
+export async function verifyAuthToken(
   value: string,
   secrets: Record<string, string>,
   now: number,
@@ -110,6 +110,21 @@ export async function verifySessionCookie(
   }
 }
 
+export async function signSessionCookie(
+  payload: SessionPayload,
+  secret: string,
+): Promise<string> {
+  return await signAuthToken(payload, secret);
+}
+
+export async function verifySessionCookie(
+  value: string,
+  secrets: Record<string, string>,
+  now: number,
+): Promise<SessionPayload | null> {
+  return await verifyAuthToken(value, secrets, now);
+}
+
 export function appSessionCookieName(appId: string): string {
   return `__Host-${appId}_session`;
 }
@@ -133,6 +148,19 @@ export function getSingleCookie(
     return null;
   }
   return decodeURIComponent(match.slice(name.length + 1));
+}
+
+export function getBearerToken(
+  authorizationHeader: string | null,
+): string | null {
+  if (!authorizationHeader) {
+    return null;
+  }
+  const match =
+    /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(
+      authorizationHeader,
+    );
+  return match?.[1] ?? null;
 }
 
 export function createCookie(

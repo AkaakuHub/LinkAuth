@@ -7,6 +7,7 @@ import {
   appSessionCookieName,
   createCookie,
   deleteCookie,
+  getBearerToken,
   getSingleCookie,
   verifySessionCookie,
 } from "../../../../shared/src/session.js";
@@ -341,8 +342,8 @@ export async function sessionVerify(
     if (!app?.sessionVerifySecret) {
       return Response.json({ error: "unknown_app" }, { status: 403 });
     }
-    const session = getSingleCookie(
-      request.headers.get("cookie"),
+    const session = getAppSessionToken(
+      request,
       appSessionCookieName(app.appId),
     );
     const payload = session
@@ -370,6 +371,21 @@ export async function sessionVerify(
         request,
         Response.json({ error: "unauthorized" }, { status: 401 }),
       );
+}
+
+function getAppSessionToken(
+  request: Request,
+  cookieName: string,
+): string | null {
+  const cookieToken = getSingleCookie(
+    request.headers.get("cookie"),
+    cookieName,
+  );
+  const bearerToken = getBearerToken(request.headers.get("authorization"));
+  if (cookieToken && bearerToken && cookieToken !== bearerToken) {
+    return null;
+  }
+  return bearerToken ?? cookieToken;
 }
 
 export async function me(

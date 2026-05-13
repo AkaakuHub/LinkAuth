@@ -1,9 +1,12 @@
 import { expect, test } from "vitest";
 import {
   createCookie,
+  getBearerToken,
   getSingleCookie,
   type SessionPayload,
+  signAuthToken,
   signSessionCookie,
+  verifyAuthToken,
   verifySessionCookie,
 } from "../../shared/src/session.js";
 
@@ -24,6 +27,14 @@ test("Session cookie verifies a signed payload before expiration", async () => {
   expect(
     await verifySessionCookie(cookie, { "session-key": secret }, now),
   ).toEqual(payload);
+});
+
+test("Auth token verifies the same payload before expiration", async () => {
+  const token = await signAuthToken(payload, secret);
+
+  expect(await verifyAuthToken(token, { "session-key": secret }, now)).toEqual(
+    payload,
+  );
 });
 
 test("Session cookie rejects tampered signatures", async () => {
@@ -55,6 +66,15 @@ test("Session cookie rejects malformed values without throwing", async () => {
 
 test("Session cookie rejects duplicate cookie values", () => {
   expect(getSingleCookie("sid=first; sid=second", "sid")).toBeNull();
+});
+
+test("Bearer token is extracted from an Authorization header", () => {
+  expect(getBearerToken("Bearer aaa.bbb.ccc")).toBe("aaa.bbb.ccc");
+});
+
+test("Bearer token rejects malformed Authorization headers", () => {
+  expect(getBearerToken("Bearer aaa.bbb.ccc extra")).toBeNull();
+  expect(getBearerToken("Basic aaa.bbb.ccc")).toBeNull();
 });
 
 test("Session cookie is Secure, HttpOnly, and SameSite=Lax", () => {

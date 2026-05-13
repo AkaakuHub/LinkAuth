@@ -3,6 +3,7 @@ import {
   appSessionCookieName,
   createCookie,
   deleteCookie,
+  getBearerToken,
   getSingleCookie,
   signSessionCookie,
   verifySessionCookie,
@@ -35,7 +36,7 @@ async function handleAppRequest(
   }
 
   const sessionCookie = appSessionCookieName(config.appId);
-  const session = getSingleCookie(request.headers.get("cookie"), sessionCookie);
+  const session = getAppSessionToken(request, sessionCookie);
   const payload = session
     ? await verifySessionCookie(
         session,
@@ -43,7 +44,7 @@ async function handleAppRequest(
         Math.floor(Date.now() / 1000),
       )
     : null;
-  if (!payload || payload.app_id !== config.appId) {
+  if (!session || !payload || payload.app_id !== config.appId) {
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
@@ -58,7 +59,7 @@ async function handleAppRequest(
     }
     return new Response("not found", { status: 404 });
   }
-  const currentUser = await fetchCurrentUser(request, config);
+  const currentUser = await fetchCurrentUser(request, config, session);
   if (!currentUser) {
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
@@ -280,6 +281,7 @@ function appAvatar(user: User, config: AppConfig): string {
 async function fetchCurrentUser(
   request: Request,
   config: AppConfig,
+  sessionToken: string,
 ): Promise<User | null> {
   const verifyUrl = new URL("/session/verify", config.navigation.AUTH_BASE_URL);
   verifyUrl.searchParams.set("app_id", config.appId);
@@ -287,6 +289,7 @@ async function fetchCurrentUser(
   try {
     response = await fetch(verifyUrl, {
       headers: {
+        authorization: `Bearer ${sessionToken}`,
         cookie: request.headers.get("cookie") ?? "",
       },
     });
@@ -302,6 +305,21 @@ async function fetchCurrentUser(
   } catch {
     return null;
   }
+}
+
+function getAppSessionToken(
+  request: Request,
+  cookieName: string,
+): string | null {
+  const cookieToken = getSingleCookie(
+    request.headers.get("cookie"),
+    cookieName,
+  );
+  const bearerToken = getBearerToken(request.headers.get("authorization"));
+  if (cookieToken && bearerToken && cookieToken !== bearerToken) {
+    return null;
+  }
+  return bearerToken ?? cookieToken;
 }
 
 function parseCurrentUser(value: unknown): User | null {
