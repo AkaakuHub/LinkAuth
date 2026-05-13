@@ -236,6 +236,21 @@ test("Account Worker redirects unauthenticated authorize requests to Discord", a
   });
 });
 
+test("Account Worker landing keeps return_to for unauthenticated account login", async () => {
+  const response = await fetchAccount(
+    "https://auth.example.com/?return_to=https%3A%2F%2Fapp.example.com%2F",
+  );
+  const state = await parseAuthState(
+    authStateCookieValue(response.headers.get("set-cookie") ?? ""),
+    testAccountConfig(),
+  );
+
+  expect(response.status).toBe(200);
+  expect(state).toEqual({
+    return_to: "https://app.example.com/",
+  });
+});
+
 test("Account Worker issues an auth code for an active session", async () => {
   stubDiscordGuildMember();
   const session = await createAccountSession();
@@ -1503,6 +1518,11 @@ function testAccountConfig() {
 
 function rememberCookieValue(setCookie: string): string | null {
   const match = setCookie.match(/__Host-org_remember=([^;,]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function authStateCookieValue(setCookie: string): string | null {
+  const match = setCookie.match(/__Host-org_auth_state=([^;,]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 

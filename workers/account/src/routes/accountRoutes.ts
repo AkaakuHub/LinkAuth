@@ -44,7 +44,10 @@ export async function accountHome(
   if (!session) {
     return appendRememberCookieDeletion(
       request,
-      await accountLandingResponse(config),
+      await accountLandingResponse(
+        config,
+        accountReturnTo(url.searchParams.get("return_to"), config),
+      ),
     );
   }
   const active = await verifyActiveUser(session.discord_id, config);
@@ -218,10 +221,11 @@ export async function logout(
 
 async function accountLandingResponse(
   config: AccountConfig,
+  returnTo = config.navigation.ACCOUNT_URL,
 ): Promise<Response> {
-  const state = await createAuthState(config.navigation.ACCOUNT_URL, config);
+  const state = await createAuthState(returnTo, config);
   if (!state) {
-    throw new Error("ACCOUNT_URL is not allowed as return_to");
+    throw new Error("return_to is not allowed");
   }
   const authorizeUrl =
     redirectToDiscordAuthorize(state, config).headers.get("location") ?? "";
