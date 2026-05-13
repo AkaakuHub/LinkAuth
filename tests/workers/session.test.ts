@@ -1,14 +1,12 @@
-import { expect, test } from "vitest";
 import {
   createCookie,
   getBearerToken,
   getSingleCookie,
   type SessionPayload,
   signAuthToken,
-  signSessionCookie,
   verifyAuthToken,
-  verifySessionCookie,
-} from "../../shared/src/session.js";
+} from "link-auth";
+import { expect, test } from "vitest";
 
 const secret = "session-secret";
 const now = 1_800_000_000;
@@ -21,15 +19,7 @@ const payload = {
   kid: "session-key",
 } satisfies SessionPayload;
 
-test("Session cookie verifies a signed payload before expiration", async () => {
-  const cookie = await signSessionCookie(payload, secret);
-
-  expect(
-    await verifySessionCookie(cookie, { "session-key": secret }, now),
-  ).toEqual(payload);
-});
-
-test("Auth token verifies the same payload before expiration", async () => {
+test("Auth token verifies a signed payload before expiration", async () => {
   const token = await signAuthToken(payload, secret);
 
   expect(await verifyAuthToken(token, { "session-key": secret }, now)).toEqual(
@@ -37,26 +27,26 @@ test("Auth token verifies the same payload before expiration", async () => {
   );
 });
 
-test("Session cookie rejects tampered signatures", async () => {
-  const cookie = await signSessionCookie(payload, secret);
-  const tamperedCookie = `${cookie.slice(0, -1)}x`;
+test("Auth token rejects tampered signatures", async () => {
+  const token = await signAuthToken(payload, secret);
+  const tamperedToken = `${token.slice(0, -1)}x`;
 
   expect(
-    await verifySessionCookie(tamperedCookie, { "session-key": secret }, now),
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
   ).toBeNull();
 });
 
-test("Session cookie rejects expired payloads", async () => {
-  const cookie = await signSessionCookie(payload, secret);
+test("Auth token rejects expired payloads", async () => {
+  const token = await signAuthToken(payload, secret);
 
   expect(
-    await verifySessionCookie(cookie, { "session-key": secret }, payload.exp),
+    await verifyAuthToken(token, { "session-key": secret }, payload.exp),
   ).toBeNull();
 });
 
-test("Session cookie rejects malformed values without throwing", async () => {
+test("Auth token rejects malformed values without throwing", async () => {
   expect(
-    await verifySessionCookie(
+    await verifyAuthToken(
       "not-json.not-json.not-json",
       { "session-key": secret },
       now,

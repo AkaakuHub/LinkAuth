@@ -1,5 +1,3 @@
-import type { AuthBaseNavigationConfig } from "../../shared/navigation.js";
-
 type AppEnv = {
   APP_ID: string;
   DOMAIN_NAME: string;
@@ -16,7 +14,9 @@ export type AppConfig = {
     kid: string;
     secret: string;
   };
-  navigation: AuthBaseNavigationConfig;
+  navigation: {
+    AUTH_BASE_URL: string;
+  };
 };
 
 export function withAppConfig(

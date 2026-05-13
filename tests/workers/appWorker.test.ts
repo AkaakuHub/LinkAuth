@@ -1,9 +1,6 @@
 import { createExecutionContext } from "cloudflare:test";
+import { appSessionCookieName, signAuthToken } from "link-auth";
 import { afterEach, expect, test, vi } from "vitest";
-import {
-  appSessionCookieName,
-  signSessionCookie,
-} from "../../shared/src/session.js";
 import {
   appAuthStateCookieName,
   createAppAuthState,
@@ -458,7 +455,7 @@ async function fetchApp(url: string, init?: RequestInit): Promise<Response> {
 
 async function createAppSession(appId: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return await signSessionCookie(
+  return await signAuthToken(
     {
       app_id: appId,
       discord_id: "123456789",

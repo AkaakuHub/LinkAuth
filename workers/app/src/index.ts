@@ -1,25 +1,26 @@
-import { hmacSha256Base64Url } from "../../../shared/src/crypto.js";
 import {
   appSessionCookieName,
   createCookie,
   deleteCookie,
   getBearerToken,
   getSingleCookie,
-  signSessionCookie,
-  verifySessionCookie,
-} from "../../../shared/src/session.js";
-import { authPanel, authShell } from "../../shared/authUi.js";
-import { attr, escapeHtml, page } from "../../shared/html.js";
-import { icon } from "../../shared/icons.js";
-import { avatarAssetUrl, profileAvatar } from "../../shared/profileUi.js";
-import { button, linkButton } from "../../shared/ui.js";
-import type { User } from "../../shared/user.js";
+  hmacSha256Base64Url,
+  signAuthToken,
+  verifyAuthToken,
+} from "link-auth";
 import { type AppConfig, withAppConfig } from "./appConfig.js";
 import {
   appAuthStateCookieName,
   createAppAuthState,
   verifyAppAuthState,
 } from "./authState.js";
+import {
+  authFailedPageBody,
+  loginPageBody,
+  page,
+  appHomePage as renderAppHomePage,
+} from "./samplePage.js";
+import type { SampleUser } from "./sampleUser.js";
 
 export default withAppConfig(handleAppRequest);
 
@@ -38,7 +39,7 @@ async function handleAppRequest(
   const sessionCookie = appSessionCookieName(config.appId);
   const session = getAppSessionToken(request, sessionCookie);
   const payload = session
-    ? await verifySessionCookie(
+    ? await verifyAuthToken(
         session,
         { [config.session.kid]: config.session.secret },
         Math.floor(Date.now() / 1000),
@@ -78,28 +79,25 @@ async function handleAppRequest(
   if (url.pathname !== "/" || request.method !== "GET") {
     return new Response("not found", { status: 404 });
   }
-  return page("App", appHomePage(request, config, currentUser));
+  const accountUrl = new URL(config.accountUrl);
+  accountUrl.searchParams.set(
+    "return_to",
+    new URL("/", request.url).toString(),
+  );
+  return page(
+    "App",
+    renderAppHomePage({
+      accountUrl: accountUrl.toString(),
+      assetBaseUrl: config.accountUrl,
+      user: currentUser,
+    }),
+  );
 }
 
 function loginPage(request: Request): Response {
   return page(
     "App Login",
-    authShell(
-      authPanel({
-        iconName: "apps",
-        label: "Sample App",
-        title: "appにログイン",
-        description:
-          "LinkAuthで本人確認し、このapp用のセッションを発行します。",
-        children: `<form action="/login" method="post"><input type="hidden" name="return_to"${attr("value", appReturnToUrl(request))}>${button(
-          {
-            type: "submit",
-            className: "w-full",
-            children: `${icon("login-2")}認証して続行`,
-          },
-        )}</form>`,
-      }),
-    ),
+    loginPageBody({ returnTo: appReturnToUrl(request) }),
   );
 }
 
@@ -184,7 +182,7 @@ async function authCallback(
   }
   const now = Math.floor(Date.now() / 1000);
   const userIcon = tokenUserIcon(user);
-  const session = await signSessionCookie(
+  const session = await signAuthToken(
     {
       discord_id: user.discord_id,
       app_id: config.appId,
@@ -249,40 +247,11 @@ async function parseTokenResponse(response: Response): Promise<{
   }
 }
 
-function appHomePage(request: Request, config: AppConfig, user: User): string {
-  const accountUrl = new URL(config.accountUrl);
-  accountUrl.searchParams.set(
-    "return_to",
-    new URL("/", request.url).toString(),
-  );
-  return `<div class="mx-auto grid w-full max-w-3xl gap-4">${appHeader(accountUrl)}<section class="overflow-hidden rounded-lg border border-line bg-panel shadow-sm"><div class="h-36 bg-haze"></div><div class="grid gap-5 px-5 pb-5"><div class="-mt-14 grid gap-3">${appAvatar(user, config)}<div class="grid gap-1"><h1 class="text-3xl font-semibold leading-tight text-ink">${escapeHtml(user.display_name)}</h1><p class="text-sm text-muted">@${escapeHtml(user.discord_id)}</p></div></div></div></section></div>`;
-}
-
-function appHeader(accountUrl: URL): string {
-  return `<header class="flex items-center justify-between gap-4 border-b border-line pb-4"><div class="inline-flex items-center gap-2 text-sm font-semibold text-primary">${icon("apps")}Sample App</div>${linkButton(
-    {
-      href: accountUrl.toString(),
-      className: "min-h-9 px-3",
-      variant: "secondary",
-      children: `${icon("settings")}設定`,
-    },
-  )}</header>`;
-}
-
-function appAvatar(user: User, config: AppConfig): string {
-  return profileAvatar({
-    avatarUrl: avatarAssetUrl(user.icon_source, user.icon_key, {
-      baseUrl: config.accountUrl,
-    }),
-    displayName: user.display_name,
-  });
-}
-
 async function fetchCurrentUser(
   request: Request,
   config: AppConfig,
   sessionToken: string,
-): Promise<User | null> {
+): Promise<SampleUser | null> {
   const verifyUrl = new URL("/session/verify", config.navigation.AUTH_BASE_URL);
   verifyUrl.searchParams.set("app_id", config.appId);
   let response: Response;
@@ -322,7 +291,7 @@ function getAppSessionToken(
   return bearerToken ?? cookieToken;
 }
 
-function parseCurrentUser(value: unknown): User | null {
+function parseCurrentUser(value: unknown): SampleUser | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -375,22 +344,7 @@ function clearAppSession(url: URL, config: AppConfig): Response {
 function appAuthFailedPage(url: URL): Response {
   return page(
     "App認証に失敗しました",
-    authShell(
-      authPanel({
-        iconName: "alert-triangle",
-        label: "認証できません",
-        title: "app認証に失敗しました",
-        description:
-          "認証リクエストが無効、期限切れ、またはすでに使用済みです。もう一度ログインしてください。",
-        tone: "danger",
-        children: linkButton({
-          href: new URL("/login", url.origin).toString(),
-          className: "w-full",
-          variant: "secondary",
-          children: `${icon("home")}ログイン画面へ戻る`,
-        }),
-      }),
-    ),
+    authFailedPageBody({ loginUrl: new URL("/login", url.origin).toString() }),
     401,
   );
 }

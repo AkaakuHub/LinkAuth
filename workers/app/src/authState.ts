@@ -1,12 +1,10 @@
 import {
-  hmacSha256Base64Url,
-  randomBase64Url,
-} from "../../../shared/src/crypto.js";
-import {
   base64UrlDecodeText,
   base64UrlEncodeText,
+  hmacSha256Base64Url,
+  randomBase64Url,
   timingSafeEqual,
-} from "../../../shared/src/encoding.js";
+} from "link-auth";
 
 export function appAuthStateCookieName(appId: string): string {
   return `__Host-${appId}_auth_state`;
