@@ -1,11 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { readLocalEnvFile } from "./env.js";
+import { readEnvFile } from "./env.js";
 
-const source = await readLocalEnvFile();
-const localApp = localAppDefinition(source);
+const options = parseOptions(process.argv.slice(2));
+const source = await readEnvFile(options.envFile);
+const app = appDefinition(source, options.envFile);
 
-await writeEnvFile("workers/account/.dev.vars", [
+await writeEnvFile(options.accountOutput, [
   "CSRF_KID",
   "CSRF_HMAC_SECRET",
   "SESSION_KID",
@@ -14,25 +15,68 @@ await writeEnvFile("workers/account/.dev.vars", [
   "DISCORD_CLIENT_ID",
   "DISCORD_CLIENT_SECRET",
   "DISCORD_PUBLIC_KEY",
-  ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
+  "DOMAIN_NAME",
   "ACCOUNT_URL",
-  ["AUTH_APPS", localApp.authApps],
+  ["AUTH_APPS", app.authApps],
   "DISCORD_BOT_TOKEN",
   "DISCORD_GUILD_IDS",
 ]);
 
-await writeEnvFile("workers/app/.dev.vars", [
-  ["APP_ID", localApp.appId],
+await writeEnvFile(options.appOutput, [
+  ["APP_ID", app.appId],
   "SESSION_KID",
   "APP_SESSION_HMAC_SECRET",
-  ["DOMAIN_NAME", "LOCAL_DOMAIN_NAME"],
+  "DOMAIN_NAME",
   "ACCOUNT_URL",
 ]);
 
-console.log("Synced .env.local to Worker .dev.vars files");
+console.log(
+  `Synced ${options.envFile} to ${options.accountOutput} and ${options.appOutput}`,
+);
+
+type Options = {
+  accountOutput: string;
+  appOutput: string;
+  envFile: string;
+};
 
 type Mapping = string | [destinationKey: string, sourceKey: string];
 type ResolvedMapping = string | [destinationKey: string, value: string];
+
+function parseOptions(args: string[]): Options {
+  const envName = optionValue(args, "--env") ?? "local";
+  const envFile = optionValue(args, "--env-file") ?? `.env.${envName}`;
+  return {
+    accountOutput:
+      optionValue(args, "--account-out") ?? defaultAccountOutput(envName),
+    appOutput: optionValue(args, "--app-out") ?? defaultAppOutput(envName),
+    envFile,
+  };
+}
+
+function optionValue(args: string[], name: string): string | null {
+  const index = args.indexOf(name);
+  if (index === -1) {
+    return null;
+  }
+  const value = args[index + 1];
+  if (!value) {
+    throw new Error(`${name} requires a value`);
+  }
+  return value;
+}
+
+function defaultAccountOutput(envName: string): string {
+  return envName === "local"
+    ? "workers/account/.dev.vars"
+    : `.wrangler/env/${envName}/account.vars`;
+}
+
+function defaultAppOutput(envName: string): string {
+  return envName === "local"
+    ? "workers/app/.dev.vars"
+    : `.wrangler/env/${envName}/app.vars`;
+}
 
 async function writeEnvFile(
   path: string,
@@ -47,7 +91,7 @@ async function writeEnvFile(
         ? source.get(sourceKey)
         : sourceKey;
     if (!value) {
-      throw new Error(`${sourceKey} is required in .env.local`);
+      throw new Error(`${sourceKey} is required in ${options.envFile}`);
     }
     lines.push(`${destinationKey}=${quoteEnv(value)}`);
   }
@@ -62,7 +106,10 @@ function quoteEnv(value: string): string {
   return value;
 }
 
-function localAppDefinition(source: Map<string, string>): {
+function appDefinition(
+  source: Map<string, string>,
+  envFile: string,
+): {
   appId: string;
   authApps: string;
 } {
@@ -71,7 +118,7 @@ function localAppDefinition(source: Map<string, string>): {
   const appSessionSecret = source.get("APP_SESSION_HMAC_SECRET");
   if (!authApps || !accountUrl || !appSessionSecret) {
     throw new Error(
-      "AUTH_APPS, ACCOUNT_URL and APP_SESSION_HMAC_SECRET are required in .env.local",
+      `AUTH_APPS, ACCOUNT_URL and APP_SESSION_HMAC_SECRET are required in ${envFile}`,
     );
   }
   const parsed = JSON.parse(authApps) as unknown;
@@ -95,7 +142,7 @@ function localAppDefinition(source: Map<string, string>): {
     return matches;
   });
   if (!app || typeof app !== "object") {
-    throw new Error("AUTH_APPS must include the local app callback URL");
+    throw new Error("AUTH_APPS must include an app callback URL");
   }
   const appId = (app as Record<string, unknown>).app_id;
   if (typeof appId !== "string" || appId.length === 0) {

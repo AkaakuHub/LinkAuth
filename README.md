@@ -10,7 +10,7 @@
 
 ## 設定
 
-必要な値は`.env.local.example`を見て、`.env.local`に設定します。ローカルWorker用のsecretは`.env.local`から生成します。
+必要な値は環境ごとの`.env.*`に設定します。ローカルは`.env.local.example`から`.env.local`を作り、本番は`.env.production.example`から`.env.production`を作ります。Worker用のenvファイルは、環境ごとの`.env.*`から生成します。
 
 `AUTH_APPS`の各appには`session_verify_secret`が必要です。この値はapp Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
 
@@ -22,13 +22,13 @@
 Copy-Item .env.local.example .env.local
 ```
 
-`.env.local`を編集したら、各Worker用の設定ファイルを生成します。
+`.env.local`を編集したら、各Worker用のenvファイルを生成します。
 
 ```powershell
 pnpm dev:env
 ```
 
-生成されるファイルは次です。secretは`.env.local`の1か所だけを編集します。
+生成されるファイルは次です。secretは`.env.local`の1か所だけを編集し、生成ファイルを直接編集しません。
 
 ```txt
 workers/account/.dev.vars
@@ -73,6 +73,8 @@ https://account.<your-domain>/callback
 
 ## Cloudflare設定
 
+運用手順だけを確認する場合は`docs/cloudflare.md`も見てください。
+
 Terraformで管理するCloudflareリソースは次です。
 
 - D1 database: `org-auth`
@@ -80,20 +82,40 @@ Terraformで管理するCloudflareリソースは次です。
 - account Worker custom domain: `account.<domain>`
 - account Worker cron trigger: expired auth data cleanup
 
-初回は`infra/terraform.tfvars.example`を`infra/terraform.tfvars`へ写して、Cloudflareの値を設定します。
+初回はWorkerサービスがまだ存在しないため、D1とR2だけを先に作成します。`infra/terraform.tfvars.example`を`infra/terraform.tfvars`へ写して、Cloudflareの値を設定します。
 
 ```powershell
 Copy-Item infra/terraform.tfvars.example infra/terraform.tfvars
 pnpm tf:init
 pnpm tf:validate
-terraform -chdir=infra apply
+terraform -chdir=infra apply -target=cloudflare_d1_database.auth -target=cloudflare_r2_bucket.assets
 ```
 
-TerraformはWorkerのsecretを管理しません。Terraform stateにsecret値を残さないためです。Workerコードのdeployとsecret/vars設定はWranglerで行います。
+TerraformはWorkerのsecretを管理しません。Terraform stateにsecret値を残さないためです。Workerコードのdeployとsecret設定はWranglerで行います。
 
-account WorkerのD1 bindingは`workers/account/wrangler.toml`の`database_id`へ実際のD1 database IDを設定してからデプロイします。リポジトリ内の`00000000-0000-0000-0000-000000000000`はプレースホルダーです。
+account WorkerのD1 bindingは`workers/account/wrangler.toml`の`database_id`へ実際のD1 database IDを設定します。`database_id`はsecretではないため、共有する本番D1が決まったらgit管理対象としてcommitします。リポジトリ内の`00000000-0000-0000-0000-000000000000`はプレースホルダーです。
 
-D1 database IDはTerraform apply後に出る`d1_database_id`です。
+D1 database IDはTerraform apply後に出る`d1_database_id`です。出力を再表示する場合は次を使います。
+
+```powershell
+terraform -chdir=infra output d1_database_id
+```
+
+本番用の値は`.env.production`に設定します。`.env.local`はローカル専用です。
+
+```powershell
+Copy-Item .env.production.example .env.production
+pnpm prod:env
+```
+
+`pnpm prod:env`は`.wrangler/env/production/account.vars`と`.wrangler/env/production/app.vars`を生成します。生成ファイルを直接編集しません。
+
+`workers/account/wrangler.toml`の`database_id`を置き換えたら、account Workerをdeployし、生成済みの本番envファイルをsecretとして登録します。
+
+```powershell
+pnpm exec wrangler deploy --config workers/account/wrangler.toml
+pnpm exec wrangler secret bulk .wrangler/env/production/account.vars --config workers/account/wrangler.toml
+```
 
 D1 schemaは本番D1へmigrationを適用します。
 
@@ -102,7 +124,13 @@ pnpm d1:migrations:list
 pnpm d1:migrations:apply
 ```
 
-account Workerには次のsecret/varsを設定します。
+account Workerのdeploy、secret登録、D1 migration適用後に、custom domainとcron triggerを作成します。
+
+```powershell
+terraform -chdir=infra apply
+```
+
+account Workerには`.wrangler/env/production/account.vars`から次のsecretを登録します。
 
 ```txt
 ACCOUNT_URL
@@ -120,7 +148,14 @@ SESSION_HMAC_SECRET
 SESSION_KID
 ```
 
-app Workerには次のsecret/varsを設定します。
+ローカル確認用のapp WorkerをCloudflareへdeployする場合だけ、同じ`.env.production`から生成した`.wrangler/env/production/app.vars`を使います。
+
+```powershell
+pnpm exec wrangler deploy --config workers/app/wrangler.toml
+pnpm exec wrangler secret bulk .wrangler/env/production/app.vars --config workers/app/wrangler.toml
+```
+
+app Workerには`.wrangler/env/production/app.vars`から次のsecretを登録します。
 
 ```txt
 ACCOUNT_URL

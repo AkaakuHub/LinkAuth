@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { config } from "dotenv";
+import { config, parse } from "dotenv";
 
 let envLoaded = false;
 
@@ -21,26 +21,20 @@ export function requiredLocalUrlPort(name: string): number {
   return Number(url.port);
 }
 
-export async function readLocalEnvFile(): Promise<Map<string, string>> {
-  const body = await readFile(".env.local", "utf8");
+export async function readEnvFile(
+  path = ".env.local",
+): Promise<Map<string, string>> {
+  const body = await readFile(path, "utf8");
+  const parsed = parse(body);
   const values = new Map<string, string>();
-  for (const rawLine of body.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-    const separatorIndex = line.indexOf("=");
-    if (separatorIndex === -1) {
-      throw new Error(`Invalid env line: ${rawLine}`);
-    }
-    const key = line.slice(0, separatorIndex);
-    const value = line.slice(separatorIndex + 1);
-    if (!key) {
-      throw new Error(`Invalid env key: ${rawLine}`);
-    }
-    values.set(key, stripQuotes(value));
+  for (const [key, value] of Object.entries(parsed)) {
+    values.set(key, value);
   }
   return values;
+}
+
+export async function readLocalEnvFile(): Promise<Map<string, string>> {
+  return await readEnvFile(".env.local");
 }
 
 function loadLocalEnv(): void {
@@ -49,14 +43,4 @@ function loadLocalEnv(): void {
   }
   config({ path: ".env.local" });
   envLoaded = true;
-}
-
-function stripQuotes(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
 }

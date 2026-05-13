@@ -16,6 +16,7 @@
     "dev": "pnpm dev:env && pnpm build:styles && pnpm build:client && concurrently --kill-others-on-fail --names assets,account,service --prefix-colors blue,green,magenta \"pnpm dev:assets\" \"pnpm dev:account\" \"pnpm dev:service\"",
     "dev:assets": "tsx local/watchDevAssets.ts",
     "dev:env": "tsx local/syncDevEnv.ts",
+    "prod:env": "tsx local/syncDevEnv.ts --env production",
     "dev:seed": "tsx local/seedD1.ts",
     "d1:migrations:apply": "wrangler d1 migrations apply org-auth --remote --config workers/account/wrangler.toml",
     "d1:migrations:list": "wrangler d1 migrations list org-auth --remote --config workers/account/wrangler.toml",
