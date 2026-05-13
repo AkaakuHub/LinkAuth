@@ -87,10 +87,12 @@ function personalAccessTokenCard({
         attributes:
           ' id="token-name" name="name" maxlength="40" placeholder="例: local curl" required',
       },
-    )}</div>${button({
-      type: "submit",
-      children: `${icon("check")}発行`,
-    })}</form>${personalAccessTokenList({
+    )}</div><fieldset class="grid gap-2"><legend class="text-sm font-semibold text-ink">期限</legend><label class="flex items-center gap-2 text-sm text-ink"><input type="radio" name="expiration" value="90d" checked>90日</label><label class="flex items-center gap-2 text-sm text-ink"><input type="radio" name="expiration" value="none">無期限</label></fieldset>${button(
+      {
+        type: "submit",
+        children: `${icon("check")}発行`,
+      },
+    )}</form>${personalAccessTokenList({
       personalAccessTokens,
       csrfToken: tokens.token,
       escapedReturnTo,
@@ -134,7 +136,7 @@ function personalAccessTokenRow({
   escapedReturnTo: string;
 }): string {
   const revoked = token.revokedAt !== null;
-  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3"><div class="grid gap-1"><p class="text-sm font-semibold text-ink">${escapeHtml(token.name)}</p><p class="text-xs text-muted">expires ${escapeHtml(formatUnixSeconds(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</p></div>${
+  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3"><div class="grid gap-1"><p class="text-sm font-semibold text-ink">${escapeHtml(token.name)}</p><p class="text-xs text-muted">expires ${escapeHtml(formatExpiresAt(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</p></div>${
     revoked
       ? ""
       : `<form method="post" action="/tokens/revoke"><input type="hidden" name="csrf_token"${attr("value", csrfToken)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="token_id"${attr("value", token.tokenId)}>${button(
@@ -147,8 +149,10 @@ function personalAccessTokenRow({
   }</div>`;
 }
 
-function formatUnixSeconds(value: number): string {
-  return new Date(value * 1000).toISOString().slice(0, 10);
+function formatExpiresAt(value: number | null): string {
+  return value === null
+    ? "never"
+    : new Date(value * 1000).toISOString().slice(0, 10);
 }
 
 function accountActions({

@@ -4,13 +4,15 @@ import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { DataConflictError } from "./errors.js";
 import { getActiveUser } from "./users.js";
-import { requireDataNumber, requireDataString } from "./validation.js";
+import { requireDataString } from "./validation.js";
 
 const tokenPrefix = "lka_pat";
 const tokenLifetimeSeconds = 90 * 24 * 60 * 60;
 const allowedScopes = ["session:verify"] as const;
+const expirationOptions = ["90d", "none"] as const;
 
 export type PersonalAccessTokenScope = (typeof allowedScopes)[number];
+export type PersonalAccessTokenExpiration = (typeof expirationOptions)[number];
 
 export type PersonalAccessTokenRecord = {
   tokenId: string;
@@ -18,7 +20,7 @@ export type PersonalAccessTokenRecord = {
   scopes: PersonalAccessTokenScope[];
   createdAt: string;
   lastUsedAt: string | null;
-  expiresAt: number;
+  expiresAt: number | null;
   revokedAt: string | null;
 };
 
@@ -30,7 +32,7 @@ type PersonalAccessTokenRow = {
   scopes: string;
   created_at: string;
   last_used_at: string | null;
-  expires_at: number;
+  expires_at: number | null;
   revoked_at: string | null;
 };
 
@@ -39,6 +41,7 @@ export async function createPersonalAccessToken(
   input: {
     discordId: string;
     name: string;
+    expiration: PersonalAccessTokenExpiration;
     nowSeconds?: number;
   },
 ): Promise<{ token: string; record: PersonalAccessTokenRecord }> {
@@ -51,7 +54,8 @@ export async function createPersonalAccessToken(
   const token = `${tokenPrefix}_${tokenId}.${secret}`;
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
   const nowIso = new Date(now * 1000).toISOString();
-  const expiresAt = now + tokenLifetimeSeconds;
+  const expiresAt =
+    input.expiration === "90d" ? now + tokenLifetimeSeconds : null;
   const scopes: PersonalAccessTokenScope[] = ["session:verify"];
   const result = await config.database
     .prepare(
@@ -67,7 +71,7 @@ export async function createPersonalAccessToken(
       await hashPersonalAccessToken(token),
       JSON.stringify(scopes),
       nowIso,
-      requireDataNumber(expiresAt, "expires_at"),
+      expiresAt,
     )
     .run();
   if (result.meta.changes !== 1) {
@@ -160,7 +164,8 @@ export async function verifyPersonalAccessToken(
   if (
     !record ||
     record.revokedAt !== null ||
-    record.expiresAt <= Math.floor(Date.now() / 1000) ||
+    (record.expiresAt !== null &&
+      record.expiresAt <= Math.floor(Date.now() / 1000)) ||
     !record.scopes.includes(input.scope)
   ) {
     return null;
@@ -186,6 +191,12 @@ export function normalizePersonalAccessTokenName(value: string): string | null {
   return name;
 }
 
+export function normalizePersonalAccessTokenExpiration(
+  value: string,
+): PersonalAccessTokenExpiration | null {
+  return expirationOptions.find((option) => option === value) ?? null;
+}
+
 function parsePersonalAccessTokenId(token: string): string | null {
   const match = /^lka_pat_([A-Za-z0-9_-]{24})\.[A-Za-z0-9_-]{43}$/.exec(token);
   return match?.[1] ?? null;
@@ -203,7 +214,7 @@ function tokenFromRow(
     typeof row.token_id !== "string" ||
     typeof row.name !== "string" ||
     typeof row.created_at !== "string" ||
-    typeof row.expires_at !== "number" ||
+    (row.expires_at !== null && typeof row.expires_at !== "number") ||
     scopes === null ||
     (row.last_used_at !== null && typeof row.last_used_at !== "string") ||
     (row.revoked_at !== null && typeof row.revoked_at !== "string")

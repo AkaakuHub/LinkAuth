@@ -8,6 +8,7 @@ import { InactiveUserError } from "../data/errors.js";
 import {
   createPersonalAccessToken,
   deleteAllPersonalAccessTokens,
+  normalizePersonalAccessTokenExpiration,
   normalizePersonalAccessTokenName,
   revokePersonalAccessToken,
 } from "../data/personalAccessTokens.js";
@@ -214,8 +215,14 @@ export async function createToken(
   const form = await request.formData();
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   const name = normalizePersonalAccessTokenName(String(form.get("name") ?? ""));
+  const expiration = normalizePersonalAccessTokenExpiration(
+    String(form.get("expiration") ?? "90d"),
+  );
   if (!name) {
     return new Response("invalid token name", { status: 400 });
+  }
+  if (!expiration) {
+    return new Response("invalid token expiration", { status: 400 });
   }
   const active = await verifyMemberUser(session.discord_id, config);
   if (!active) {
@@ -223,6 +230,7 @@ export async function createToken(
   }
   const { token } = await createPersonalAccessToken(config, {
     discordId: session.discord_id,
+    expiration,
     name,
   });
   return appendSessionCookies(

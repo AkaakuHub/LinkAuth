@@ -525,6 +525,7 @@ test("Personal access token verifies from the raw bearer value", async () => {
     testAccountConfig(),
     {
       discordId: "123456789",
+      expiration: "90d",
       name: "local curl",
       nowSeconds: nowSeconds(),
     },
@@ -544,6 +545,7 @@ test("Personal access token verifies from the raw bearer value", async () => {
 test("Personal access token rejects tampered raw values", async () => {
   const { token } = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "123456789",
+    expiration: "90d",
     name: "local curl",
   });
 
@@ -560,6 +562,7 @@ test("Personal access token rejects revoked values", async () => {
     testAccountConfig(),
     {
       discordId: "123456789",
+      expiration: "90d",
       name: "local curl",
     },
   );
@@ -576,14 +579,35 @@ test("Personal access token rejects revoked values", async () => {
   expect(result).toBeNull();
 });
 
+test("Personal access token can be created without expiration", async () => {
+  const { token, record } = await createPersonalAccessToken(
+    testAccountConfig(),
+    {
+      discordId: "123456789",
+      expiration: "none",
+      name: "local curl",
+    },
+  );
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token,
+    scope: "session:verify",
+  });
+
+  expect(record.expiresAt).toBeNull();
+  expect(result?.record.expiresAt).toBeNull();
+});
+
 test("Personal access token delete-all removes only tokens for the user", async () => {
   const own = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "123456789",
+    expiration: "90d",
     name: "own",
   });
   await seedUser({ discordId: "987654321" });
   const other = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "987654321",
+    expiration: "90d",
     name: "other",
   });
 
@@ -706,6 +730,13 @@ test("Expired auth data cleanup removes only expired transient records", async (
     JSON.stringify(["session:verify"]),
     now - 1,
   );
+  await seedPersonalAccessToken(
+    "never-expiring-pat",
+    "123456789",
+    "hash",
+    JSON.stringify(["session:verify"]),
+    null,
+  );
 
   await cleanupExpiredAuthData(testAccountConfig(), now);
 
@@ -714,6 +745,7 @@ test("Expired auth data cleanup removes only expired transient records", async (
   expect(await readOtpHash("expired-otp")).toBeNull();
   expect(await readRememberTokenHash("expired-remember")).toBeNull();
   expect(await readPersonalAccessTokenHash("expired-pat")).toBeNull();
+  expect(await readPersonalAccessTokenHash("never-expiring-pat")).toBe("hash");
 });
 
 function testAccountConfig() {
@@ -830,7 +862,7 @@ async function seedPersonalAccessToken(
   discordId: string,
   tokenHash: string,
   scopes: string,
-  expiresAt = nowSeconds() + 300,
+  expiresAt: number | null = nowSeconds() + 300,
 ): Promise<void> {
   const nowIso = new Date().toISOString();
   await env.DB.prepare(

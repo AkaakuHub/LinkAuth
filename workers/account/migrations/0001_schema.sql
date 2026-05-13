@@ -65,7 +65,7 @@ CREATE TABLE personal_access_tokens (
   scopes TEXT NOT NULL,
   created_at TEXT NOT NULL,
   last_used_at TEXT,
-  expires_at INTEGER NOT NULL,
+  expires_at INTEGER,
   revoked_at TEXT
 );
 

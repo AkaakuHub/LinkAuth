@@ -61,7 +61,7 @@ export const d1SchemaStatements = [
     scopes TEXT NOT NULL,
     created_at TEXT NOT NULL,
     last_used_at TEXT,
-    expires_at INTEGER NOT NULL,
+    expires_at INTEGER,
     revoked_at TEXT
   )`,
   "CREATE INDEX remember_tokens_discord_id_index ON remember_tokens(discord_id)",

@@ -533,6 +533,7 @@ test("Account Worker session verify accepts a valid personal access token", asyn
   });
   const { token } = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "123456789",
+    expiration: "90d",
     name: "local curl",
   });
   const response = await fetchAccount(
@@ -595,6 +596,7 @@ test("Account Worker creates a personal access token from the account page", asy
   const response = await fetchAccount("https://account.example.com/tokens", {
     body: new URLSearchParams({
       csrf_token: csrfToken,
+      expiration: "90d",
       name: "local curl",
     }),
     headers: {
@@ -614,12 +616,34 @@ test("Account Worker creates a personal access token from the account page", asy
   expect(await readPersonalAccessTokenCount("123456789")).toBe(1);
 });
 
+test("Account Worker creates a personal access token without expiration", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+  const response = await fetchAccount("https://account.example.com/tokens", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      expiration: "none",
+      name: "local curl",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("expires never");
+});
+
 test("Account Worker token creation rejects origin mismatches", async () => {
   const session = await createAccountSession();
   const csrfToken = await createAccountCsrfToken("token");
   const response = await fetchAccount("https://account.example.com/tokens", {
     body: new URLSearchParams({
       csrf_token: csrfToken,
+      expiration: "90d",
       name: "local curl",
     }),
     headers: {
@@ -633,9 +657,30 @@ test("Account Worker token creation rejects origin mismatches", async () => {
   expect(await readPersonalAccessTokenCount("123456789")).toBe(0);
 });
 
+test("Account Worker token creation rejects invalid expiration values", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+  const response = await fetchAccount("https://account.example.com/tokens", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      expiration: "forever",
+      name: "local curl",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(400);
+  expect(await readPersonalAccessTokenCount("123456789")).toBe(0);
+});
+
 test("Account Worker revokes a personal access token from the account page", async () => {
   const { record } = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "123456789",
+    expiration: "90d",
     name: "local curl",
   });
   const session = await createAccountSession();

@@ -5,8 +5,9 @@ const expiringTables = [
   "otp_challenges",
   "otp_rate_limits",
   "remember_tokens",
-  "personal_access_tokens",
 ] as const;
+
+const nullableExpiringTables = ["personal_access_tokens"] as const;
 
 export async function cleanupExpiredAuthData(
   config: AccountConfig,
@@ -15,6 +16,14 @@ export async function cleanupExpiredAuthData(
   for (const table of expiringTables) {
     await config.database
       .prepare(`DELETE FROM ${table} WHERE expires_at <= ?`)
+      .bind(nowSeconds)
+      .run();
+  }
+  for (const table of nullableExpiringTables) {
+    await config.database
+      .prepare(
+        `DELETE FROM ${table} WHERE expires_at IS NOT NULL AND expires_at <= ?`,
+      )
       .bind(nowSeconds)
       .run();
   }
