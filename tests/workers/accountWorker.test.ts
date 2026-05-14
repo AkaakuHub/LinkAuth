@@ -1035,6 +1035,45 @@ test("Account Worker avatar update rejects origin mismatches", async () => {
   expect(calls).toEqual([]);
 });
 
+test("Account Worker avatar update rejects oversized content-length before storing", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("avatar");
+
+  const response = await fetchAccount("https://account.example.com/avatar", {
+    body: new Uint8Array(),
+    headers: {
+      "content-length": String(10 * 1024 * 1024 + 1),
+      "content-type": "image/webp",
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+      "x-csrf-token": csrfToken,
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.text()).toBe("invalid image");
+});
+
+test("Account Worker avatar update rejects oversized bodies without content-length", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("avatar");
+
+  const response = await fetchAccount("https://account.example.com/avatar", {
+    body: new Uint8Array(10 * 1024 * 1024 + 1),
+    headers: {
+      "content-type": "image/webp",
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+      "x-csrf-token": csrfToken,
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(400);
+  expect(await response.text()).toBe("invalid image");
+});
+
 test("Account Worker delete rejects origin mismatches", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {

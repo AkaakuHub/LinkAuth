@@ -141,8 +141,8 @@ export async function updateAvatar(
   if (request.headers.get("content-type") !== "image/webp") {
     return new Response("invalid content-type", { status: 400 });
   }
-  const body = new Uint8Array(await request.arrayBuffer());
-  if (body.byteLength > 10 * 1024 * 1024 || !isWebp512(body)) {
+  const body = await readAvatarBody(request);
+  if (!body || !isWebp512(body)) {
     return new Response("invalid image", { status: 400 });
   }
   const active = await verifyMemberUser(session.discord_id, config);
@@ -313,4 +313,51 @@ async function accountLandingResponse(
     createCookie(authStateCookieName, state, 600),
   );
   return response;
+}
+
+const avatarMaxBytes = 10 * 1024 * 1024;
+
+async function readAvatarBody(request: Request): Promise<Uint8Array | null> {
+  if (!isAllowedAvatarContentLength(request.headers.get("content-length"))) {
+    return null;
+  }
+  if (!request.body) {
+    return new Uint8Array();
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        break;
+      }
+      totalBytes += result.value.byteLength;
+      if (totalBytes > avatarMaxBytes) {
+        return null;
+      }
+      chunks.push(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+function isAllowedAvatarContentLength(value: string | null): boolean {
+  if (value === null) {
+    return true;
+  }
+  if (!/^[0-9]+$/.test(value)) {
+    return false;
+  }
+  const length = Number(value);
+  return Number.isSafeInteger(length) && length <= avatarMaxBytes;
 }
