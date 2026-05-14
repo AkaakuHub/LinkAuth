@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createCsrfToken, verifyCsrfToken } from "../../shared/src/csrf.js";
+import { createCsrfToken, verifyCsrfToken } from "../../src/csrf.js";
 
 const baseInput = {
   discordId: "123456789",

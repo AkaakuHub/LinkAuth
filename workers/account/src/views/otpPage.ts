@@ -1,8 +1,8 @@
-import { authPanel, authShell } from "../../../shared/authUi.js";
-import { attr, page } from "../../../shared/html.js";
-import { icon } from "../../../shared/icons.js";
-import { button, textInput } from "../../../shared/ui.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
+import { authPanel, authShell } from "./lib/authUi.js";
+import { attr, page } from "./lib/html.js";
+import { icon } from "./lib/icons.js";
+import { button, textInput } from "./lib/ui.js";
 
 export function otpPage(
   challengeId: string,

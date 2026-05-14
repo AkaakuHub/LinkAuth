@@ -6,6 +6,6 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "WebWorker", "DOM.Iterable"]
   },
-  "include": ["**/*.ts", "../shared/**/*.ts"],
+  "include": ["**/*.ts", "../src/**/*.ts"],
   "exclude": ["account/src/accountClient.ts"]
 }

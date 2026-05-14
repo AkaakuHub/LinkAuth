@@ -2,14 +2,14 @@ import {
   deleteCookie,
   rememberCookieName,
   sessionCookieName,
-} from "../../../../shared/src/session.js";
-import { authPanel, authShell } from "../../../shared/authUi.js";
-import { page } from "../../../shared/html.js";
-import { icon } from "../../../shared/icons.js";
-import { authHomeUrl } from "../../../shared/navigation.js";
-import { linkButton } from "../../../shared/ui.js";
+} from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { authHomeUrl } from "../domain/navigation.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
+import { authPanel, authShell } from "./lib/authUi.js";
+import { page } from "./lib/html.js";
+import { icon } from "./lib/icons.js";
+import { linkButton } from "./lib/ui.js";
 
 export function inactiveAccountPage(
   config: AccountConfig,

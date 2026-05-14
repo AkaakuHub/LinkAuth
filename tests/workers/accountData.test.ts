@@ -1,7 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:test";
 import { beforeEach, expect, test, vi } from "vitest";
-import { hmacSha256, sha256Hex } from "../../shared/src/crypto.js";
-import { hexEncode } from "../../shared/src/encoding.js";
+import { hmacSha256, sha256Hex } from "../../src/crypto.js";
+import { hexEncode } from "../../src/encoding.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
 import {
   consumeAuthCode,

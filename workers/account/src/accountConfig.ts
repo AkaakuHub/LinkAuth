@@ -1,8 +1,8 @@
-import { parseCommaSeparatedList } from "../../../shared/src/commaSeparated.js";
+import { parseCommaSeparatedList } from "../../../src/commaSeparated.js";
 import type {
   AuthBaseNavigationConfig,
   AuthNavigationConfig,
-} from "../../shared/navigation.js";
+} from "./domain/navigation.js";
 import type { Env } from "./types.js";
 
 const discordApiBase = "https://discord.com/api/v10";

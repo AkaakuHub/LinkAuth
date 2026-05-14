@@ -1,5 +1,5 @@
-import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
+import type { User } from "../domain/user.js";
 import { InactiveUserError } from "./errors.js";
 import { userFromRow } from "./rows.js";
 

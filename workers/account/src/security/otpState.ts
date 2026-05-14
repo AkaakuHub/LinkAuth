@@ -1,9 +1,9 @@
-import { hmacSha256Base64Url } from "../../../../shared/src/crypto.js";
+import { hmacSha256Base64Url } from "../../../../src/crypto.js";
 import {
   base64UrlDecodeText,
   base64UrlEncodeText,
   timingSafeEqual,
-} from "../../../../shared/src/encoding.js";
+} from "../../../../src/encoding.js";
 import type { AccountConfig } from "../accountConfig.js";
 
 export const otpStateCookieName = "__Host-org_otp_state";

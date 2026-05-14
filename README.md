@@ -6,7 +6,7 @@
 
 - `workers/`: アカウント管理Worker、ローカル確認用サービスWorker
 - `workers/account/migrations/`: D1 schema migration
-- `shared/`: Cookie、HMAC、CSRFの共通処理
+- `src/`: link-authライブラリ
 
 ## 設定
 

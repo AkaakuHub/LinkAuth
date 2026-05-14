@@ -1,4 +1,4 @@
-import { randomBase64Url } from "../../../../shared/src/crypto.js";
+import { randomBase64Url } from "../../../../src/crypto.js";
 import {
   createCookie,
   deleteCookie,
@@ -6,10 +6,10 @@ import {
   rememberCookieName,
   sessionCookieName,
   verifySessionCookie,
-} from "../../../../shared/src/session.js";
-import { hashToken } from "../../../shared/user.js";
+} from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { rotateRememberToken } from "../data/rememberTokens.js";
+import { hashToken } from "../domain/user.js";
 import {
   createAccountSessionCookie,
   nowSeconds,

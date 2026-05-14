@@ -1,5 +1,5 @@
-import { normalizeReturnTo } from "../../../shared/navigation.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { normalizeReturnTo } from "../domain/navigation.js";
 
 export function accountReturnTo(
   value: string | null,

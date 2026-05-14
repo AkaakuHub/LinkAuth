@@ -1,4 +1,4 @@
-import type { User } from "../../../shared/user.js";
+import type { User } from "../domain/user.js";
 
 type UserRow = {
   discord_id: string;

@@ -70,7 +70,7 @@ function runBuild(target: BuildTarget): Promise<void> {
 function isGeneratedFile(fileName: string): boolean {
   return (
     fileName === "account/src/accountClientGenerated.ts" ||
-    fileName === "shared/stylesGenerated.css" ||
-    fileName === "shared/stylesGenerated.ts"
+    fileName === "account/src/views/lib/stylesGenerated.css" ||
+    fileName === "account/src/views/lib/stylesGenerated.ts"
   );
 }

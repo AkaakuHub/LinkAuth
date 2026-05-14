@@ -1,6 +1,6 @@
-import type { User } from "../../../shared/user.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { getActiveUser as findActiveUser } from "../data/users.js";
+import type { User } from "../domain/user.js";
 
 export async function verifyActiveUser(
   discordId: string,

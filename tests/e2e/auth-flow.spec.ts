@@ -9,7 +9,7 @@ import {
   appSessionCookieName,
   rememberCookieName,
   sessionCookieName,
-} from "../../shared/src/session.js";
+} from "../../src/session.js";
 import accountWorker from "../../workers/account/src/index.js";
 import type { Env as AccountEnv } from "../../workers/account/src/types.js";
 import appWorker from "../../workers/app/src/index.js";

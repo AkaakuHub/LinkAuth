@@ -1,14 +1,14 @@
 import { env as cloudflareEnv, createExecutionContext } from "cloudflare:test";
 import nacl from "tweetnacl";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { hmacSha256Base64Url, sha256Hex } from "../../shared/src/crypto.js";
-import { createCsrfToken } from "../../shared/src/csrf.js";
+import { hmacSha256Base64Url, sha256Hex } from "../../src/crypto.js";
+import { createCsrfToken } from "../../src/csrf.js";
 import {
   appSessionCookieName,
   rememberCookieName,
   sessionCookieName,
   signSessionCookie,
-} from "../../shared/src/session.js";
+} from "../../src/session.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
 import { createOtpChallenge } from "../../workers/account/src/data/otpChallenges.js";
 import { createPersonalAccessToken } from "../../workers/account/src/data/personalAccessTokens.js";

@@ -1,10 +1,10 @@
-import { attr, escapeHtml } from "../../../shared/html.js";
-import { icon } from "../../../shared/icons.js";
-import { avatarAssetUrl, profileAvatar } from "../../../shared/profileUi.js";
-import { button, card, textInput } from "../../../shared/ui.js";
-import type { User } from "../../../shared/user.js";
 import type { PersonalAccessTokenRecord } from "../data/personalAccessTokens.js";
+import type { User } from "../domain/user.js";
 import type { AccountTokens } from "../security/accountTokens.js";
+import { attr, escapeHtml } from "./lib/html.js";
+import { icon } from "./lib/icons.js";
+import { avatarAssetUrl, profileAvatar } from "./lib/profileUi.js";
+import { button, card, textInput } from "./lib/ui.js";
 
 export function accountView({
   issuedToken,

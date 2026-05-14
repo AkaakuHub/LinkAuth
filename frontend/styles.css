@@ -4,7 +4,7 @@
 
 @source "../workers/**/*.{ts,tsx}";
 @source not "../workers/account/src/accountClientGenerated.ts";
-@source not "../workers/shared/stylesGenerated.ts";
+@source not "../workers/account/src/views/lib/stylesGenerated.ts";
 
 @theme {
   --font-*: initial;

@@ -1,5 +1,5 @@
-import { hmacSha256 } from "../../../../shared/src/crypto.js";
-import { hexEncode, timingSafeEqual } from "../../../../shared/src/encoding.js";
+import { hmacSha256 } from "../../../../src/crypto.js";
+import { hexEncode, timingSafeEqual } from "../../../../src/encoding.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { DataConflictError, RateLimitedError } from "./errors.js";
 import { requireDataNumber, requireDataString } from "./validation.js";

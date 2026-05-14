@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "../../../../shared/src/encoding.js";
-import type { User } from "../../../shared/user.js";
+import { timingSafeEqual } from "../../../../src/encoding.js";
 import type { AccountConfig } from "../accountConfig.js";
+import type { User } from "../domain/user.js";
 import { DataConflictError } from "./errors.js";
 import { getActiveUser } from "./users.js";
 import { requireDataNumber, requireDataString } from "./validation.js";

@@ -1,8 +1,8 @@
 import {
   hmacSha256Base64Url,
   randomBase64Url,
-} from "../../../../shared/src/crypto.js";
-import { timingSafeEqual } from "../../../../shared/src/encoding.js";
+} from "../../../../src/crypto.js";
+import { timingSafeEqual } from "../../../../src/encoding.js";
 import {
   appSessionCookieName,
   createCookie,
@@ -10,8 +10,7 @@ import {
   getBearerToken,
   getSingleCookie,
   verifySessionCookie,
-} from "../../../../shared/src/session.js";
-import { normalizeReturnTo } from "../../../shared/navigation.js";
+} from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { consumeAuthCode, createAuthCode } from "../data/authCodes.js";
 import { DataConflictError, RateLimitedError } from "../data/errors.js";
@@ -21,6 +20,7 @@ import {
 } from "../data/otpChallenges.js";
 import { verifyPersonalAccessToken } from "../data/personalAccessTokens.js";
 import { findApp, matchesCallbackUrl } from "../domain/appRegistry.js";
+import { normalizeReturnTo } from "../domain/navigation.js";
 import { createOtpCode } from "../domain/otpCode.js";
 import { accountReturnTo } from "../domain/returnTo.js";
 import {

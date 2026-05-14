@@ -1,8 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-const css = await readFile("workers/shared/stylesGenerated.css", "utf8");
+const css = await readFile(
+  "workers/account/src/views/lib/stylesGenerated.css",
+  "utf8",
+);
 
 await writeFile(
-  "workers/shared/stylesGenerated.ts",
+  "workers/account/src/views/lib/stylesGenerated.ts",
   `export const styleSheet = ${JSON.stringify(css)};\n`,
 );

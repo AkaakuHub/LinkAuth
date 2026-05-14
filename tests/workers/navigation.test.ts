@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { normalizeReturnTo } from "../../workers/shared/navigation.js";
+import { normalizeReturnTo } from "../../workers/account/src/domain/navigation.js";
 
 const config = {
   ACCOUNT_URL: "https://auth.example.com/",

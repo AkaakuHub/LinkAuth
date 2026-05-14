@@ -2,7 +2,7 @@ import {
   createCookie,
   getSingleCookie,
   rememberCookieName,
-} from "../../../../shared/src/session.js";
+} from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
 import { InactiveUserError } from "../data/errors.js";
 import {

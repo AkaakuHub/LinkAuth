@@ -1,7 +1,7 @@
-import { authPanel, authShell } from "../../../shared/authUi.js";
-import { page } from "../../../shared/html.js";
-import { icon } from "../../../shared/icons.js";
-import { linkButton } from "../../../shared/ui.js";
+import { authPanel, authShell } from "./lib/authUi.js";
+import { page } from "./lib/html.js";
+import { icon } from "./lib/icons.js";
+import { linkButton } from "./lib/ui.js";
 
 export function accountLandingPage(discordAuthorizeUrl: string): Response {
   return page(

@@ -1,4 +1,4 @@
-import { sha256Hex } from "../../shared/src/crypto.js";
+import { sha256Hex } from "../../../../src/crypto.js";
 
 export type User = {
   discord_id: string;

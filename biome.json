@@ -11,8 +11,8 @@
       "!!**/dist",
       "!!frontend/styles.css",
       "!!workers/account/src/accountClientGenerated.ts",
-      "!!workers/shared/stylesGenerated.css",
-      "!!workers/shared/stylesGenerated.ts"
+      "!!workers/account/src/views/lib/stylesGenerated.css",
+      "!!workers/account/src/views/lib/stylesGenerated.ts"
     ]
   },
   "formatter": {

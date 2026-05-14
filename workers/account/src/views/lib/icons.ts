@@ -1,4 +1,4 @@
-import tablerNodes from "../../node_modules/@tabler/icons/tabler-nodes-outline.json" with {
+import tablerNodes from "../../../../../node_modules/@tabler/icons/tabler-nodes-outline.json" with {
   type: "json",
 };
 import { attr, escapeHtml } from "./html.js";
