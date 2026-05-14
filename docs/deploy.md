@@ -70,6 +70,20 @@ account Worker用の値です。
 - `APP_ID`:このenvから生成するapp Workerのapp ID
 - `APP_SESSION_HMAC_SECRET`:`APP_ID`に対応するapp session署名secret
 
+secret値は32bytes以上の乱数を使います。`SESSION_HMAC_SECRET`、`APP_SESSION_HMAC_SECRET`、`CSRF_HMAC_SECRET`、`OTP_HMAC_SECRET`は別々に生成します。
+
+Windows PowerShellです。
+
+```powershell
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+macOSです。
+
+```sh
+openssl rand -base64 32
+```
+
 ## 初回作成
 
 初回はD1とR2を先に作成します。
