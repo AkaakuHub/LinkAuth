@@ -12,7 +12,9 @@
 
 必要な値は環境ごとの`.env.*`に設定します。ローカルは`.env.local.example`から`.env.local`を作り、本番は`.env.production.example`から`.env.production`を作ります。Worker用のenvファイルは、環境ごとの`.env.*`から生成します。
 
-`AUTH_APPS`の各appには`session_verify_secret`が必要です。この値は該当app Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。複数appがある場合は`AUTH_APPS`へappごとに追加し、`.env.*`の`APP_ID`で今回生成するapp Workerを選びます。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
+`.env.*`は、共通値、account Worker用、サンプルapp Worker用に分けて書いています。`AUTH_APPS`はaccount Worker用の認可app一覧です。`APP_ID`と`APP_SESSION_HMAC_SECRET`はサンプルapp Worker用です。`AUTH_APPS`内の該当appの`session_verify_secret`は、そのapp Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。
+
+複数appがある場合は`AUTH_APPS`へappごとに追加し、`.env.*`の`APP_ID`で今回生成するサンプルapp Workerを選びます。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
 
 ## ローカル確認
 
