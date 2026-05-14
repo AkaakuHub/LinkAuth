@@ -10,20 +10,12 @@
     }
   },
   "files": [
-    "dist/crypto.d.ts",
-    "dist/crypto.js",
-    "dist/encoding.d.ts",
-    "dist/encoding.js",
-    "dist/appAuth.d.ts",
-    "dist/appAuth.js",
     "dist/index.d.ts",
-    "dist/index.js",
-    "dist/session.d.ts",
-    "dist/session.js"
+    "dist/index.js"
   ],
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build:lib": "rm -rf dist && tsc -p tsconfig.lib.json",
+    "build:lib": "rm -rf dist && tsc -p tsconfig.lib.json && esbuild dist/index.js --bundle --minify --format=esm --platform=neutral --target=es2022 --outfile=dist/index.bundle.js && mv dist/index.bundle.js dist/index.js",
     "check": "biome check .",
     "prepack": "pnpm build:lib",
     "test": "pnpm test:workers && pnpm test:scripts",
