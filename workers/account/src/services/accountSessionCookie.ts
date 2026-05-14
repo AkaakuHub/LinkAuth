@@ -12,7 +12,8 @@ import { createRememberToken } from "../data/rememberTokens.js";
 import { hashToken, type User } from "../domain/user.js";
 import { noStoreHeaders } from "../views/pages/accountLandingPage.js";
 
-export const accountSessionMaxAgeSeconds = 86_400;
+export const accountSessionMaxAgeSeconds = 1_800;
+export const persistentAccountSessionMaxAgeSeconds = 86_400;
 export const rememberMaxAgeSeconds = 15_552_000;
 
 export async function createAccountSessionResponse(
@@ -48,6 +49,9 @@ export async function createAccountSessionCookie(
   options: { persistent: boolean } = { persistent: true },
 ): Promise<string> {
   const now = nowSeconds();
+  const maxAgeSeconds = options.persistent
+    ? persistentAccountSessionMaxAgeSeconds
+    : accountSessionMaxAgeSeconds;
   const session = await signSessionCookie(
     {
       discord_id: user.discord_id,
@@ -55,17 +59,13 @@ export async function createAccountSessionCookie(
       display_name: user.display_name,
       persistent: options.persistent,
       iat: now,
-      exp: now + accountSessionMaxAgeSeconds,
+      exp: now + maxAgeSeconds,
       kid: config.session.kid,
     },
     config.session.secret,
   );
   if (options.persistent) {
-    return createCookie(
-      sessionCookieName,
-      session,
-      accountSessionMaxAgeSeconds,
-    );
+    return createCookie(sessionCookieName, session, maxAgeSeconds);
   }
   return createSessionCookie(sessionCookieName, session);
 }

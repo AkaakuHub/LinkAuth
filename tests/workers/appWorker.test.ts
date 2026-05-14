@@ -1,5 +1,9 @@
 import { createExecutionContext } from "cloudflare:test";
-import { appSessionCookieName, signAuthToken } from "link-auth";
+import {
+  appSessionCookieName,
+  signAuthToken,
+  verifyAuthToken,
+} from "link-auth";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   appAuthStateCookieName,
@@ -203,6 +207,12 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
   );
   expect(setCookie).toContain(`${appSessionCookieName("hub")}=`);
   expect(setCookie).toContain(`${appAuthStateCookieName("hub")}=`);
+  const sessionPayload = await appSessionPayload(setCookie);
+  expect(sessionPayload).not.toBeNull();
+  if (!sessionPayload) {
+    throw new Error("app session cookie was not valid");
+  }
+  expect(sessionPayload.exp).toBe(sessionPayload.iat + 3_600);
   expect(setCookieHeader(setCookie, appSessionCookieName("hub"))).toContain(
     "Max-Age=3600",
   );
@@ -236,6 +246,12 @@ test("App Worker creates a browser session cookie when remember_me is off", asyn
   const setCookie = response.headers.get("set-cookie") ?? "";
 
   expect(response.status).toBe(302);
+  const sessionPayload = await appSessionPayload(setCookie);
+  expect(sessionPayload).not.toBeNull();
+  if (!sessionPayload) {
+    throw new Error("app session cookie was not valid");
+  }
+  expect(sessionPayload.exp).toBe(sessionPayload.iat + 1_800);
   expect(setCookieHeader(setCookie, appSessionCookieName("hub"))).not.toContain(
     "Max-Age",
   );
@@ -582,6 +598,23 @@ function setCookieHeader(setCookie: string, name: string): string {
     throw new Error(`${name} cookie was not set`);
   }
   return header;
+}
+
+async function appSessionPayload(setCookie: string) {
+  const value = cookieValue(setCookie, appSessionCookieName("hub"));
+  return value
+    ? await verifyAuthToken(
+        value,
+        { [env.SESSION_KID]: env.APP_SESSION_HMAC_SECRET },
+        0,
+      )
+    : null;
+}
+
+function cookieValue(setCookie: string, name: string): string | null {
+  const header = setCookieHeader(setCookie, name);
+  const value = header.slice(name.length + 1).split(";")[0];
+  return value ? decodeURIComponent(value) : null;
 }
 
 const currentUser = {

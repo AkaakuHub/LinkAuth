@@ -15,6 +15,9 @@ import {
   verifyAuthToken,
 } from "./session.js";
 
+const appSessionMaxAgeSeconds = 1_800;
+const persistentAppSessionMaxAgeSeconds = 3_600;
+
 export type LinkAuthAppConfig = {
   appId: string;
   accountUrl: string;
@@ -87,12 +90,15 @@ export async function completeAppLogin(input: {
     return clearAppAuthState(input.failedResponse, input.config);
   }
   const now = Math.floor(Date.now() / 1000);
+  const maxAgeSeconds = body.session_persistent
+    ? persistentAppSessionMaxAgeSeconds
+    : appSessionMaxAgeSeconds;
   const session = await signAuthToken(
     {
       app_id: input.config.appId,
       discord_id: body.user.discord_id,
       display_name: body.user.display_name,
-      exp: now + 3_600,
+      exp: now + maxAgeSeconds,
       iat: now,
       kid: input.config.session.kid,
       persistent: body.session_persistent,
@@ -107,7 +113,11 @@ export async function completeAppLogin(input: {
   headers.append(
     "set-cookie",
     body.session_persistent
-      ? createCookie(appSessionCookieName(input.config.appId), session, 3_600)
+      ? createCookie(
+          appSessionCookieName(input.config.appId),
+          session,
+          maxAgeSeconds,
+        )
       : createSessionCookie(appSessionCookieName(input.config.appId), session),
   );
   headers.append(

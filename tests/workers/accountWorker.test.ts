@@ -8,6 +8,7 @@ import {
   rememberCookieName,
   sessionCookieName,
   signSessionCookie,
+  verifySessionCookie,
 } from "../../src/session.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
 import { createOtpChallenge } from "../../workers/account/src/data/otpChallenges.js";
@@ -1633,6 +1634,12 @@ test("Account Worker OTP success creates account and remember cookies when remem
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
+  const sessionPayload = await accountSessionPayload(setCookie);
+  expect(sessionPayload).not.toBeNull();
+  if (!sessionPayload) {
+    throw new Error("account session cookie was not valid");
+  }
+  expect(sessionPayload.exp).toBe(sessionPayload.iat + 86_400);
   expect(setCookieHeader(setCookie, sessionCookieName)).toContain(
     "Max-Age=86400",
   );
@@ -1822,6 +1829,12 @@ test("Account Worker OTP success skips remember token creation when remember_me 
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
+  const sessionPayload = await accountSessionPayload(setCookie);
+  expect(sessionPayload).not.toBeNull();
+  if (!sessionPayload) {
+    throw new Error("account session cookie was not valid");
+  }
+  expect(sessionPayload.exp).toBe(sessionPayload.iat + 1_800);
   expect(setCookieHeader(setCookie, sessionCookieName)).not.toContain(
     "Max-Age",
   );
@@ -2018,6 +2031,23 @@ function rememberCookieValue(setCookie: string): string | null {
 function authStateCookieValue(setCookie: string): string | null {
   const match = setCookie.match(/__Host-org_auth_state=([^;,]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+async function accountSessionPayload(setCookie: string) {
+  const value = cookieValue(setCookie, sessionCookieName);
+  return value
+    ? await verifySessionCookie(
+        value,
+        { [env.SESSION_KID]: env.SESSION_HMAC_SECRET },
+        0,
+      )
+    : null;
+}
+
+function cookieValue(setCookie: string, name: string): string | null {
+  const header = setCookieHeader(setCookie, name);
+  const value = header.slice(name.length + 1).split(";")[0];
+  return value ? decodeURIComponent(value) : null;
 }
 
 function setCookieHeader(setCookie: string, name: string): string {
