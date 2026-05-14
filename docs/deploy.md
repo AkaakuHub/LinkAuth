@@ -1,4 +1,4 @@
-# デプロイ手順
+# 実行手順
 
 ## 事前確認
 
@@ -7,6 +7,37 @@ pnpm check
 pnpm typecheck
 pnpm test:workers
 pnpm test:e2e
+```
+
+## ローカル確認
+
+`.env.local.example`から`.env.local`を作り、値を設定します。
+
+```powershell
+Copy-Item .env.local.example .env.local
+pnpm dev:env
+pnpm dev:seed
+pnpm dev
+```
+
+生成ファイルは直接編集しません。
+
+```txt
+workers/account/.dev.vars
+workers/app/.dev.vars
+```
+
+ローカルURLです。
+
+| Worker | URL |
+| --- | --- |
+| account | `http://localhost:8787` |
+| sample app | `http://localhost:8789` |
+
+ローカルD1でschemaエラーが出た場合はmigrationを適用します。
+
+```powershell
+pnpm exec wrangler d1 migrations apply org-auth --local --config workers/account/wrangler.toml
 ```
 
 ## 本番env生成
@@ -71,12 +102,4 @@ terraform -chdir=infra apply
 ```powershell
 pnpm exec wrangler deploy --config workers/app/wrangler.toml
 pnpm exec wrangler secret bulk .wrangler/env/production/app.vars --config workers/app/wrangler.toml
-```
-
-## ローカルD1更新
-
-ローカルでschemaエラーが出た場合はmigrationを適用します。
-
-```powershell
-pnpm exec wrangler d1 migrations apply org-auth --local --config workers/account/wrangler.toml
 ```
