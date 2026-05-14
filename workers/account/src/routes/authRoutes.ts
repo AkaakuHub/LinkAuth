@@ -230,6 +230,7 @@ export async function callback(
     config,
   );
   if (!otpResult.ok) {
+    console.warn(`Discord OTP delivery failed: ${otpResult.reason}`);
     return callbackResponse(otpDeliveryFailedPage(config, state.return_to));
   }
   const response = callbackResponse(
