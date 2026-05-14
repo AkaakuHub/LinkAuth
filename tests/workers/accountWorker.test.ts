@@ -415,6 +415,7 @@ test("Account Worker token endpoint consumes auth codes once", async () => {
 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
+    session_persistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -423,6 +424,32 @@ test("Account Worker token endpoint consumes auth codes once", async () => {
   });
   expect(replayResponse.status).toBe(401);
   expect(await replayResponse.json()).toEqual({ error: "invalid_auth_code" });
+});
+
+test("Account Worker token endpoint preserves non-persistent app sessions", async () => {
+  stubDiscordGuildMember();
+  const session = await createAccountSession({ persistent: false });
+  const authorizeResponse = await fetchAccount(
+    "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2F_auth%2Fcallback",
+    {
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+  const location = new URL(authorizeResponse.headers.get("location") ?? "");
+  const code = location.searchParams.get("code") ?? "";
+
+  const response = await fetchAccount("https://auth.example.com/token", {
+    body: JSON.stringify({ app_id: "hub", code }),
+    headers: await tokenHeaders("hub", code),
+    method: "POST",
+  });
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    session_persistent: false,
+  });
 });
 
 test("Account Worker token endpoint rejects invalid app signatures", async () => {
@@ -1872,7 +1899,9 @@ function hexEncodeBytes(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function createAccountSession(): Promise<string> {
+async function createAccountSession(
+  options: { persistent?: boolean } = {},
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return await signSessionCookie(
     {
@@ -1881,6 +1910,9 @@ async function createAccountSession(): Promise<string> {
       exp: now + 86_400,
       iat: now,
       kid: env.SESSION_KID,
+      ...(options.persistent === undefined
+        ? {}
+        : { persistent: options.persistent }),
       role: "admin",
     },
     env.SESSION_HMAC_SECRET,

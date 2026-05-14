@@ -22,6 +22,12 @@ test("App login completes through Discord OTP and creates a remember cookie by d
   await loginWithOtp(page, servers);
 
   const cookies = await page.context().cookies();
+  const appSessionCookie = cookies.find(
+    (cookie) => cookie.name === appSessionCookieName("hub"),
+  );
+  const accountSessionCookie = cookies.find(
+    (cookie) => cookie.name === sessionCookieName,
+  );
   expect(
     cookies.some((cookie) => cookie.name === appSessionCookieName("hub")),
   ).toBe(true);
@@ -31,6 +37,8 @@ test("App login completes through Discord OTP and creates a remember cookie by d
   expect(cookies.some((cookie) => cookie.name === rememberCookieName)).toBe(
     true,
   );
+  expect(appSessionCookie?.expires).toBeGreaterThan(0);
+  expect(accountSessionCookie?.expires).toBeGreaterThan(0);
   expect(servers.state.rememberCreateCount).toBe(1);
 });
 
@@ -42,6 +50,12 @@ test("App login completes without a remember cookie when remember_me is off", as
   await loginWithOtp(page, servers, { rememberMe: false });
 
   const cookies = await page.context().cookies();
+  const appSessionCookie = cookies.find(
+    (cookie) => cookie.name === appSessionCookieName("hub"),
+  );
+  const accountSessionCookie = cookies.find(
+    (cookie) => cookie.name === sessionCookieName,
+  );
   expect(
     cookies.some((cookie) => cookie.name === appSessionCookieName("hub")),
   ).toBe(true);
@@ -51,6 +65,8 @@ test("App login completes without a remember cookie when remember_me is off", as
   expect(cookies.some((cookie) => cookie.name === rememberCookieName)).toBe(
     false,
   );
+  expect(appSessionCookie?.expires).toBe(-1);
+  expect(accountSessionCookie?.expires).toBe(-1);
   expect(servers.state.rememberCreateCount).toBe(0);
 });
 

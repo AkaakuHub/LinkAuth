@@ -19,7 +19,11 @@ import {
 export async function requireSession(
   request: Request,
   config: AccountConfig,
-): Promise<{ discord_id: string; setCookies: string[] } | null> {
+): Promise<{
+  discord_id: string;
+  persistent?: boolean;
+  setCookies: string[];
+} | null> {
   const value = getSingleCookie(
     request.headers.get("cookie"),
     sessionCookieName,
@@ -74,7 +78,11 @@ export function appendRememberCookieDeletion(
 async function restoreRememberSession(
   request: Request,
   config: AccountConfig,
-): Promise<{ discord_id: string; setCookies: string[] } | null> {
+): Promise<{
+  discord_id: string;
+  persistent: true;
+  setCookies: string[];
+} | null> {
   const remember = parseRememberCookie(
     getSingleCookie(request.headers.get("cookie"), rememberCookieName),
   );
@@ -94,6 +102,7 @@ async function restoreRememberSession(
   }
   return {
     discord_id: result.user.discord_id,
+    persistent: true,
     setCookies: [
       await createAccountSessionCookie(result.user, config),
       createRememberCookie(remember.tokenId, randomToken),

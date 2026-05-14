@@ -138,7 +138,8 @@ function runD1Statement(
       role: values[4] === "admin" ? "admin" : "user",
       icon_source: values[5],
       icon_key: values[6],
-      expires_at: values[8],
+      session_persistent: values[7],
+      expires_at: values[9],
     });
     changes = 1;
   } else if (query.startsWith("DELETE FROM auth_codes")) {

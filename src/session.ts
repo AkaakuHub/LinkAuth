@@ -15,6 +15,7 @@ export type SessionPayload = {
   display_name: string;
   icon_source?: "discord" | "r2" | "none";
   icon_key?: string;
+  persistent?: boolean;
   iat: number;
   exp: number;
   kid: string;
@@ -96,6 +97,8 @@ export async function verifyAuthToken(
         payload.icon_source !== "none") ||
       (payload.icon_key !== undefined &&
         typeof payload.icon_key !== "string") ||
+      (payload.persistent !== undefined &&
+        typeof payload.persistent !== "boolean") ||
       typeof payload.iat !== "number" ||
       typeof payload.exp !== "number" ||
       payload.kid !== header.kid ||

@@ -53,6 +53,7 @@ export async function createAccountSessionCookie(
       discord_id: user.discord_id,
       role: user.role,
       display_name: user.display_name,
+      persistent: options.persistent,
       iat: now,
       exp: now + accountSessionMaxAgeSeconds,
       kid: config.session.kid,

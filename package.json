@@ -14,6 +14,8 @@
     "dist/crypto.js",
     "dist/encoding.d.ts",
     "dist/encoding.js",
+    "dist/appAuth.d.ts",
+    "dist/appAuth.js",
     "dist/index.d.ts",
     "dist/index.js",
     "dist/session.d.ts",

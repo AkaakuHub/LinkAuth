@@ -1,11 +1,12 @@
 import { createExecutionContext } from "cloudflare:test";
-import { appSessionCookieName, signAuthToken } from "link-auth";
-import { afterEach, expect, test, vi } from "vitest";
 import {
   appAuthStateCookieName,
+  appSessionCookieName,
   createAppAuthState,
+  signAuthToken,
   verifyAppAuthState,
-} from "../../workers/app/src/authState.js";
+} from "link-auth";
+import { afterEach, expect, test, vi } from "vitest";
 import worker from "../../workers/app/src/index.js";
 
 const env = {
@@ -176,6 +177,7 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
         "x-app-token-signature": expect.any(String),
       });
       return Response.json({
+        session_persistent: true,
         user: {
           discord_id: "123456789",
           display_name: "Akaaku",
@@ -202,10 +204,45 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
   );
   expect(setCookie).toContain(`${appSessionCookieName("hub")}=`);
   expect(setCookie).toContain(`${appAuthStateCookieName("hub")}=`);
+  expect(setCookieHeader(setCookie, appSessionCookieName("hub"))).toContain(
+    "Max-Age=3600",
+  );
   expect(setCookie).toContain("Max-Age=0");
   expect(setCookie).toContain("HttpOnly");
   expect(setCookie).toContain("Secure");
   expect(setCookie).toContain("SameSite=Lax");
+});
+
+test("App Worker creates a browser session cookie when remember_me is off", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({
+      session_persistent: false,
+      user: {
+        discord_id: "123456789",
+        display_name: "Akaaku",
+        role: "admin",
+      },
+    }),
+  );
+  const state = await createAppAuthState({
+    returnTo: "https://app.example.com/dashboard",
+    secret: env.APP_SESSION_HMAC_SECRET,
+  });
+
+  const response = await fetchApp(appCallbackUrl("auth-code", state), {
+    headers: {
+      cookie: `${appAuthStateCookieName("hub")}=${encodeURIComponent(state)}`,
+    },
+  });
+  const setCookie = response.headers.get("set-cookie") ?? "";
+
+  expect(response.status).toBe(302);
+  expect(setCookieHeader(setCookie, appSessionCookieName("hub"))).not.toContain(
+    "Max-Age",
+  );
+  expect(setCookieHeader(setCookie, appAuthStateCookieName("hub"))).toContain(
+    "Max-Age=0",
+  );
 });
 
 test("App Worker rejects callback requests without an auth code", async () => {
@@ -228,6 +265,7 @@ test("App Worker rejects callback requests without an auth code", async () => {
 test("App Worker callback falls back to the app root for cross-origin return_to values", async () => {
   vi.stubGlobal("fetch", async () =>
     Response.json({
+      session_persistent: true,
       user: {
         discord_id: "123456789",
         display_name: "Akaaku",
@@ -256,6 +294,7 @@ test("App Worker callback falls back to the app root for cross-origin return_to 
 test("App Worker callback ignores tampered return_to query values", async () => {
   vi.stubGlobal("fetch", async () =>
     Response.json({
+      session_persistent: true,
       user: {
         discord_id: "123456789",
         display_name: "Akaaku",
@@ -534,6 +573,16 @@ async function expectAppStateReturnTo(
     value: state,
   });
   expect(parsed).toEqual({ return_to: returnTo });
+}
+
+function setCookieHeader(setCookie: string, name: string): string {
+  const header = setCookie
+    .split(/,\s*/)
+    .find((value) => value.startsWith(`${name}=`));
+  if (!header) {
+    throw new Error(`${name} cookie was not set`);
+  }
+  return header;
 }
 
 const currentUser = {

@@ -83,6 +83,15 @@ test("Auth token rejects invalid roles", async () => {
   ).toBeNull();
 });
 
+test("Auth token rejects invalid persistent values", async () => {
+  const token = await signAuthToken({ ...payload, persistent: false }, secret);
+  const tamperedToken = tamperTokenPayload(token, { persistent: "false" });
+
+  expect(
+    await verifyAuthToken(tamperedToken, { "session-key": secret }, now),
+  ).toBeNull();
+});
+
 test("Auth token rejects expired payloads", async () => {
   const token = await signAuthToken(payload, secret);
 

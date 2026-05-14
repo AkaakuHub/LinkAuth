@@ -94,6 +94,7 @@ export async function authorize(
     appId: app.appId,
     code,
     expiresAt: Math.floor(Date.now() / 1000) + 300,
+    sessionPersistent: session.persistent !== false,
     user: {
       discord_id: active.user.discord_id,
       display_name: active.user.display_name,

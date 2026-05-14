@@ -73,6 +73,7 @@ test("Auth code can be consumed once by the same app before expiration", async (
     appId: "hub",
     code: "auth-code",
     expiresAt: nowSeconds() + 300,
+    sessionPersistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -92,6 +93,7 @@ test("Auth code can be consumed once by the same app before expiration", async (
   });
 
   expect(firstResult).toEqual({
+    session_persistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -108,6 +110,7 @@ test("Auth code rejects a different app_id without consuming the code", async ()
     appId: "hub",
     code: "auth-code",
     expiresAt: nowSeconds() + 300,
+    sessionPersistent: false,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -126,6 +129,7 @@ test("Auth code rejects a different app_id without consuming the code", async ()
 
   expect(wrongAppResult).toBeNull();
   expect(correctAppResult).toEqual({
+    session_persistent: false,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -139,6 +143,7 @@ test("Auth code rejects expired codes", async () => {
     appId: "hub",
     code: "auth-code",
     expiresAt: nowSeconds() - 1,
+    sessionPersistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -730,6 +735,7 @@ test("Expired auth data cleanup removes only expired transient records", async (
     appId: "hub",
     code: "expired-code",
     expiresAt: now - 1,
+    sessionPersistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -740,6 +746,7 @@ test("Expired auth data cleanup removes only expired transient records", async (
     appId: "hub",
     code: "fresh-code",
     expiresAt: now + 300,
+    sessionPersistent: true,
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
@@ -841,8 +848,8 @@ async function setUserStatus(
 async function seedCorruptAuthCode(code: string): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO auth_codes (
-      code, app_id, discord_id, display_name, role, created_at, expires_at
-    ) VALUES (?, 'hub', '123456789', 'Akaaku', 'user', ?, ?)`,
+      code, app_id, discord_id, display_name, role, session_persistent, created_at, expires_at
+    ) VALUES (?, 'hub', '123456789', 'Akaaku', 'user', 1, ?, ?)`,
   )
     .bind(code, new Date().toISOString(), "bad-expiration")
     .run();
