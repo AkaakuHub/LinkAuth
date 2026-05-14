@@ -24,7 +24,7 @@
     "tests/**/*.ts",
     "vitest.*.config.ts",
     "workers/**/*.ts",
-    "src/**/*.ts",
-    "backend/**/*.ts"
-  ]
+    "src/**/*.ts"
+  ],
+  "exclude": ["workers/**/.wrangler/**"]
 }

@@ -12,12 +12,6 @@ const pending = new Set<BuildTarget>();
 let timer: NodeJS.Timeout | null = null;
 let running = false;
 
-watch("frontend", { recursive: true }, (_event, fileName) => {
-  if (typeof fileName === "string") {
-    queue("styles");
-  }
-});
-
 watch("workers", { recursive: true }, (_event, fileName) => {
   if (typeof fileName !== "string" || isGeneratedFile(fileName)) {
     return;
@@ -25,7 +19,7 @@ watch("workers", { recursive: true }, (_event, fileName) => {
   if (fileName === "account/src/accountClient.ts") {
     queue("client");
   }
-  if (/\.ts$/.test(fileName)) {
+  if (fileName === "account/src/views/styles.css" || /\.ts$/.test(fileName)) {
     queue("styles");
   }
 });

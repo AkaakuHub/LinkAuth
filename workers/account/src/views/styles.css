@@ -1,10 +1,10 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
-@import "../node_modules/cropperjs/dist/cropper.css";
+@import "../../../../node_modules/cropperjs/dist/cropper.css";
 
-@source "../workers/**/*.{ts,tsx}";
-@source not "../workers/account/src/accountClientGenerated.ts";
-@source not "../workers/account/src/views/lib/stylesGenerated.ts";
+@source "../**/*.ts";
+@source not "../accountClientGenerated.ts";
+@source not "lib/stylesGenerated.ts";
 
 @theme {
   --font-*: initial;

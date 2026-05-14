@@ -3,13 +3,13 @@
   "entry": [
     "local/**/*.{ts,tsx}",
     "src/**/*.{ts,tsx}",
-    "workers/**/*.{ts,tsx}"
+    "workers/*/src/**/*.{ts,tsx}"
   ],
   "project": [
     "local/**/*.{ts,tsx}",
     "src/**/*.{ts,tsx}",
     "tests/**/*.{ts,tsx}",
-    "workers/**/*.{ts,tsx}"
+    "workers/*/src/**/*.{ts,tsx}"
   ],
   "ignoreDependencies": ["cloudflare", "lefthook", "tailwindcss"],
   "ignoreBinaries": ["terraform"]
