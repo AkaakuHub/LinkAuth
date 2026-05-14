@@ -1,7 +1,7 @@
 import type { AccountConfig } from "../accountConfig.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
 import { authPanel, authShell } from "./lib/authUi.js";
-import { attr, page } from "./lib/html.js";
+import { attr, formActionOrigins, page } from "./lib/html.js";
 import { icon } from "./lib/icons.js";
 import { button, textInput } from "./lib/ui.js";
 
@@ -39,6 +39,9 @@ export function otpPage(
     ),
     200,
     noStoreHeaders(),
-    { allowLocalhostCsp: config.environment === "local" },
+    {
+      allowLocalhostCsp: config.environment === "local",
+      formActionOrigins: formActionOrigins(config.apps),
+    },
   );
 }

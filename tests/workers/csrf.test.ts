@@ -40,6 +40,30 @@ test("CSRF token rejects action mismatch", async () => {
   ).toBe(false);
 });
 
+test("CSRF token rejects user mismatch", async () => {
+  const token = await createCsrfToken(baseInput);
+
+  expect(
+    await verifyCsrfToken({
+      ...baseInput,
+      token,
+      discordId: "987654321",
+    }),
+  ).toBe(false);
+});
+
+test("CSRF token rejects key id mismatch", async () => {
+  const token = await createCsrfToken(baseInput);
+
+  expect(
+    await verifyCsrfToken({
+      ...baseInput,
+      token,
+      kid: "other-key",
+    }),
+  ).toBe(false);
+});
+
 test("CSRF token rejects expired tokens", async () => {
   const token = await createCsrfToken(baseInput);
 

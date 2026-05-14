@@ -307,7 +307,7 @@ async function accountLandingResponse(
   }
   const authorizeUrl =
     redirectToDiscordAuthorize(state, config).headers.get("location") ?? "";
-  const response = accountLandingPage(authorizeUrl, {
+  const response = accountLandingPage(config, authorizeUrl, {
     allowLocalhostCsp: config.environment === "local",
   });
   response.headers.append(

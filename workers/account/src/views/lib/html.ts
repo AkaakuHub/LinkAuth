@@ -5,7 +5,7 @@ export function page(
   body: string,
   status = 200,
   headers?: Headers,
-  options: { allowLocalhostCsp: boolean } = { allowLocalhostCsp: false },
+  options: PageOptions = { allowLocalhostCsp: false },
 ): Response {
   return new Response(
     `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>${styleSheet}</style></head><body><main class="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8">${body}</main></body></html>`,
@@ -43,14 +43,30 @@ export function attr(name: string, value: string | number | boolean): string {
   return ` ${name}="${escapeHtml(String(value))}"`;
 }
 
+export type PageOptions = {
+  allowLocalhostCsp: boolean;
+  formActionOrigins?: string[];
+};
+
+export function formActionOrigins(apps: { callbackUrl: string }[]): string[] {
+  return [
+    ...new Set(
+      apps.map((app) => {
+        return new URL(app.callbackUrl).origin;
+      }),
+    ),
+  ];
+}
+
 function responseHeaders(
   headers: Headers | undefined,
-  options: { allowLocalhostCsp: boolean },
+  options: PageOptions,
 ): Headers {
   const responseHeaders = headers ?? new Headers();
   const developmentSources = options.allowLocalhostCsp
     ? ["http://localhost:*"]
     : [];
+  const allowedFormActionOrigins = options.formActionOrigins ?? [];
   responseHeaders.set("content-type", "text/html; charset=utf-8");
   responseHeaders.set(
     "content-security-policy",
@@ -58,7 +74,7 @@ function responseHeaders(
       "default-src 'none'",
       "base-uri 'none'",
       "connect-src 'self'",
-      `form-action 'self' https: ${developmentSources.join(" ")}`.trim(),
+      `form-action 'self' ${allowedFormActionOrigins.join(" ")}`.trim(),
       "frame-ancestors 'none'",
       `img-src 'self' data: blob: https: ${developmentSources.join(" ")}`.trim(),
       "script-src 'self'",

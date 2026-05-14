@@ -4,7 +4,7 @@ import type { User } from "../domain/user.js";
 import { createAccountTokens } from "../security/accountTokens.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
 import { accountView } from "./accountView.js";
-import { page } from "./lib/html.js";
+import { formActionOrigins, page } from "./lib/html.js";
 
 export async function accountPage(
   user: User,
@@ -31,6 +31,9 @@ export async function accountPage(
     }),
     200,
     noStoreHeaders(),
-    { allowLocalhostCsp: config.environment === "local" },
+    {
+      allowLocalhostCsp: config.environment === "local",
+      formActionOrigins: formActionOrigins(config.apps),
+    },
   );
 }

@@ -96,11 +96,20 @@ test("Account Worker rejects authorize requests for unknown apps", async () => {
   expect(response.status).toBe(401);
 });
 
+test("Account Worker authorize rejects non-GET requests", async () => {
+  const response = await fetchAccount(
+    "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2F_auth%2Fcallback",
+    { method: "POST" },
+  );
+
+  await expectMethodNotAllowed(response, "GET");
+});
+
 test("Account Worker HTML responses include browser security headers", async () => {
   const response = await fetchAccount("https://auth.example.com/");
 
   expect(response.headers.get("content-security-policy")).toBe(
-    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https:; frame-ancestors 'none'; img-src 'self' data: blob: https:; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https://app.example.com; frame-ancestors 'none'; img-src 'self' data: blob: https:; script-src 'self'; style-src 'self' 'unsafe-inline'",
   );
   expect(response.headers.get("referrer-policy")).toBe("same-origin");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
@@ -112,7 +121,7 @@ test("Account Worker allows localhost CSP sources only in local environment", as
     const response = await fetchAccount("https://auth.example.com/");
 
     expect(response.headers.get("content-security-policy")).toBe(
-      "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data: blob: https: http://localhost:*; script-src 'self'; style-src 'self' 'unsafe-inline'",
+      "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https://app.example.com; frame-ancestors 'none'; img-src 'self' data: blob: https: http://localhost:*; script-src 'self'; style-src 'self' 'unsafe-inline'",
     );
   } finally {
     delete env.LINK_AUTH_ENV;
@@ -484,6 +493,15 @@ test("Account Worker session verify rejects missing account sessions", async () 
   expect(await response.json()).toEqual({ error: "unauthorized" });
 });
 
+test("Account Worker session verify rejects non-GET requests", async () => {
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify",
+    { method: "POST" },
+  );
+
+  await expectMethodNotAllowed(response, "GET");
+});
+
 test("Account Worker session verify rejects unknown app ids", async () => {
   const response = await fetchAccount(
     "https://auth.example.com/session/verify?app_id=unknown",
@@ -842,6 +860,14 @@ test("Account Worker me rejects missing account sessions", async () => {
 
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
+test("Account Worker me rejects non-GET requests", async () => {
+  const response = await fetchAccount("https://auth.example.com/me", {
+    method: "POST",
+  });
+
+  await expectMethodNotAllowed(response, "GET");
 });
 
 test("Account Worker me returns the active account user for a valid account session", async () => {
@@ -1318,6 +1344,17 @@ test("Account Worker callback rejects app auth states without the browser state 
   expect(response.status).toBe(401);
 });
 
+test("Account Worker callback rejects non-GET requests", async () => {
+  const state = await createCallbackState("hub");
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    { method: "POST" },
+  );
+
+  await expectMethodNotAllowed(response, "GET");
+});
+
 test("Account Worker callback rejects mismatched browser state cookies", async () => {
   const state = await createCallbackState("hub");
   const otherState = await createCallbackState("hub");
@@ -1660,6 +1697,15 @@ test("Account Worker asset route only serves public avatar keys", async () => {
   }
 });
 
+test("Account Worker asset route rejects non-GET requests", async () => {
+  const response = await fetchAccount(
+    "https://auth.example.com/assets/icons/123456789/avatar.webp",
+    { method: "POST" },
+  );
+
+  await expectMethodNotAllowed(response, "GET");
+});
+
 test("Account Worker account page rejects users that left the Discord guild", async () => {
   await replaceActiveUser({
     disabledReason: "left_guild",
@@ -1788,6 +1834,15 @@ async function fetchAccount(
     env,
     createExecutionContext(),
   );
+}
+
+async function expectMethodNotAllowed(
+  response: Response,
+  allow: string,
+): Promise<void> {
+  expect(response.status).toBe(405);
+  expect(response.headers.get("allow")).toBe(allow);
+  expect(await response.text()).toBe("method not allowed");
 }
 
 function signedDiscordHeaders(

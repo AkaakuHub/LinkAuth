@@ -1,9 +1,10 @@
 import { authPanel, authShell } from "./lib/authUi.js";
-import { page } from "./lib/html.js";
+import { formActionOrigins, page } from "./lib/html.js";
 import { icon } from "./lib/icons.js";
 import { linkButton } from "./lib/ui.js";
 
 export function accountLandingPage(
+  config: { apps: { callbackUrl: string }[] },
   discordAuthorizeUrl: string,
   options: { allowLocalhostCsp: boolean },
 ): Response {
@@ -24,7 +25,7 @@ export function accountLandingPage(
     ),
     200,
     noStoreHeaders(),
-    options,
+    { ...options, formActionOrigins: formActionOrigins(config.apps) },
   );
 }
 

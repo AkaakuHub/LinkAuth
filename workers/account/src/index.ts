@@ -37,12 +37,18 @@ async function handleAccountRequest(
     });
   }
   if (url.pathname.startsWith("/assets/")) {
+    if (request.method !== "GET") {
+      return methodNotAllowed("GET");
+    }
     return asset(url, config);
   }
   if (url.pathname === "/discord/interactions" && request.method === "POST") {
     return discordInteraction(request, config);
   }
   if (url.pathname === "/authorize") {
+    if (request.method !== "GET") {
+      return methodNotAllowed("GET");
+    }
     return authorize(request, url, config);
   }
   if (url.pathname === "/token" && request.method === "POST") {
@@ -52,12 +58,21 @@ async function handleAccountRequest(
     return otp(request, config);
   }
   if (url.pathname === "/session/verify") {
+    if (request.method !== "GET") {
+      return methodNotAllowed("GET");
+    }
     return sessionVerify(request, url, config);
   }
   if (url.pathname === "/callback") {
+    if (request.method !== "GET") {
+      return methodNotAllowed("GET");
+    }
     return callback(request, url, config);
   }
   if (url.pathname === "/me") {
+    if (request.method !== "GET") {
+      return methodNotAllowed("GET");
+    }
     return me(request, config);
   }
   if (url.pathname === "/" && request.method === "GET") {
@@ -82,6 +97,13 @@ async function handleAccountRequest(
     return logout(request, url, config);
   }
   return new Response("not found", { status: 404 });
+}
+
+function methodNotAllowed(allow: string): Response {
+  return new Response("method not allowed", {
+    headers: { allow },
+    status: 405,
+  });
 }
 
 async function handleScheduled(

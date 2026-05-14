@@ -7,7 +7,7 @@ import type { AccountConfig } from "../accountConfig.js";
 import { authHomeUrl } from "../domain/navigation.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
 import { authPanel, authShell } from "./lib/authUi.js";
-import { page } from "./lib/html.js";
+import { formActionOrigins, page } from "./lib/html.js";
 import { icon } from "./lib/icons.js";
 import { linkButton } from "./lib/ui.js";
 
@@ -93,6 +93,9 @@ function accountErrorPage(
     ),
     status,
     headers,
-    { allowLocalhostCsp: config.environment === "local" },
+    {
+      allowLocalhostCsp: config.environment === "local",
+      formActionOrigins: formActionOrigins(config.apps),
+    },
   );
 }
