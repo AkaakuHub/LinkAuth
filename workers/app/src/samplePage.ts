@@ -75,13 +75,11 @@ export function loginPageBody(input: { returnTo: string }): string {
 }
 
 export function appHomePage(input: {
-  accountUrl: string;
-  assetBaseUrl: string;
+  settingsUrl: string;
   user: SampleUser;
 }): string {
-  return `<div class="shell">${appHeader(input.accountUrl)}<section class="profile"><div class="cover"></div><div class="profile-body"><div class="profile-content">${profileAvatar(
+  return `<div class="shell">${appHeader(input.settingsUrl)}<section class="profile"><div class="cover"></div><div class="profile-body"><div class="profile-content">${profileAvatar(
     input.user,
-    input.assetBaseUrl,
   )}<div><h1 class="name">${escapeHtml(input.user.display_name)}</h1><p class="id">@${escapeHtml(
     input.user.discord_id,
   )}</p></div></div></div></section></div>`;
@@ -183,10 +181,10 @@ function linkButton({
   return `<a class="${["button", variant === "secondary" ? "button-secondary" : "", className].filter(Boolean).join(" ")}" href="${escapeHtml(href)}">${children}</a>`;
 }
 
-function appHeader(accountUrl: string): string {
+function appHeader(settingsUrl: string): string {
   return `<header class="header"><div class="brand">Sample App</div>${linkButton(
     {
-      href: accountUrl,
+      href: settingsUrl,
       className: "",
       variant: "secondary",
       children: "設定",
@@ -194,30 +192,11 @@ function appHeader(accountUrl: string): string {
   )}</header>`;
 }
 
-function profileAvatar(user: SampleUser, assetBaseUrl: string): string {
-  const avatarUrl = avatarAssetUrl(
-    user.icon_source,
-    user.icon_key,
-    assetBaseUrl,
-  );
-  if (avatarUrl) {
-    return `<img class="avatar"${attr("src", avatarUrl)}${attr("alt", `${user.display_name}のアイコン`)}>`;
+function profileAvatar(user: SampleUser): string {
+  if (user.avatar_url) {
+    return `<img class="avatar"${attr("src", user.avatar_url)}${attr("alt", `${user.display_name}のアイコン`)}>`;
   }
   return `<div class="avatar avatar-initial" aria-hidden="true">${escapeHtml(profileInitial(user.display_name))}</div>`;
-}
-
-function avatarAssetUrl(
-  iconSource: SampleUser["icon_source"],
-  iconKey: string | undefined,
-  assetBaseUrl: string,
-): string | null {
-  if (iconSource !== "r2" || !iconKey) {
-    return null;
-  }
-  return new URL(
-    `/assets/${iconKey.split("/").map(encodeURIComponent).join("/")}`,
-    assetBaseUrl,
-  ).toString();
 }
 
 function profileInitial(displayName: string): string {

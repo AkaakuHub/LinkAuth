@@ -2,13 +2,13 @@
 
 ## app保護
 
-appサンプルの保護対象は必ず`getAppUser`を通ります。
+appサンプルの保護対象は必ず`handleAppAuthRequest`を通ります。
 
 - `GET /`:未認証なら`/login`へredirectします。
 - `GET /api/me`:未認証なら401です。
 - その他`/api/*`:未認証なら401、認証済みでも未定義APIは404です。
 
-`getAppUser`はapp sessionの署名、`app_id`、Cookie/Bearer不一致を検証します。その後、account Workerの`/session/verify`でユーザーがactiveであることを確認します。
+`handleAppAuthRequest`はapp sessionの署名、`app_id`、Cookie/Bearer不一致を検証します。その後、account Workerの`/session/verify`でユーザーがactiveであることを確認します。app側のコードは検証済みの`user`だけを受け取ります。
 
 ## OTP
 

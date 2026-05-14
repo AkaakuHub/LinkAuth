@@ -27,14 +27,103 @@ export type LinkAuthAppConfig = {
   };
 };
 
+export type LinkAuthAppEnv = {
+  ACCOUNT_URL: string;
+  APP_ID: string;
+  APP_SESSION_HMAC_SECRET: string;
+  SESSION_KID: string;
+};
+
+export function loadLinkAuthAppConfig(env: LinkAuthAppEnv): LinkAuthAppConfig {
+  return {
+    accountUrl: requiredBinding("ACCOUNT_URL", env.ACCOUNT_URL),
+    appId: requiredBinding("APP_ID", env.APP_ID),
+    session: {
+      kid: requiredBinding("SESSION_KID", env.SESSION_KID),
+      secret: requiredBinding(
+        "APP_SESSION_HMAC_SECRET",
+        env.APP_SESSION_HMAC_SECRET,
+      ),
+    },
+  };
+}
+
 export type LinkAuthUser = {
   discord_id: string;
   display_name: string;
   role: "user" | "admin";
   status: "active";
+  avatar_url?: string;
   icon_source?: "discord" | "r2" | "none";
   icon_key?: string;
 };
+
+export async function handleAppAuthRequest(input: {
+  authFailedResponse: (url: URL) => Response | Promise<Response>;
+  handleRequest: (input: {
+    request: Request;
+    url: URL;
+    user: LinkAuthUser;
+  }) => Response | Promise<Response>;
+  config: LinkAuthAppConfig;
+  loginResponse: (request: Request) => Response | Promise<Response>;
+  request: Request;
+}): Promise<Response> {
+  const url = new URL(input.request.url);
+  if (url.pathname === "/_auth/callback" && input.request.method === "GET") {
+    return await completeAppLogin({
+      config: input.config,
+      failedResponse: await input.authFailedResponse(url),
+      request: input.request,
+      url,
+    });
+  }
+  if (url.pathname === "/_auth/logout" && input.request.method === "GET") {
+    return clearAppSession({
+      config: input.config,
+      loginUrl: new URL("/login", url.origin).toString(),
+    });
+  }
+  if (url.pathname === "/_auth/account" && input.request.method === "GET") {
+    const accountUrl = new URL(input.config.accountUrl);
+    accountUrl.searchParams.set("return_to", new URL("/", url).toString());
+    return Response.redirect(accountUrl, 302);
+  }
+
+  const user = await getAppUser({
+    config: input.config,
+    request: input.request,
+  });
+  if (!user) {
+    if (url.pathname.startsWith("/api/")) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+    if (url.pathname === "/" && input.request.method === "GET") {
+      return Response.redirect(new URL("/login", input.request.url), 302);
+    }
+    if (url.pathname === "/login" && input.request.method === "GET") {
+      return await input.loginResponse(input.request);
+    }
+    if (url.pathname === "/login" && input.request.method === "POST") {
+      const form = await input.request.formData();
+      return await startAppLogin({
+        config: input.config,
+        request: input.request,
+        returnTo: String(form.get("return_to") ?? ""),
+      });
+    }
+    return new Response("not found", { status: 404 });
+  }
+
+  if (url.pathname === "/login" && input.request.method === "GET") {
+    return Response.redirect(new URL("/", input.request.url), 302);
+  }
+  return await input.handleRequest({
+    request: input.request,
+    url,
+    user,
+  });
+}
 
 export function appAuthStateCookieName(appId: string): string {
   return `__Host-${appId}_auth_state`;
@@ -287,7 +376,7 @@ async function fetchCurrentUser(
   }
   try {
     const body = (await response.json()) as { user?: unknown };
-    return parseCurrentUser(body.user);
+    return parseCurrentUser(body.user, config.accountUrl);
   } catch {
     return null;
   }
@@ -335,7 +424,10 @@ function parseTokenUser(value: unknown): TokenUser | null {
   };
 }
 
-function parseCurrentUser(value: unknown): LinkAuthUser | null {
+function parseCurrentUser(
+  value: unknown,
+  accountUrl: string,
+): LinkAuthUser | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -353,7 +445,7 @@ function parseCurrentUser(value: unknown): LinkAuthUser | null {
     display_name: user.display_name,
     role: user.role,
     status: user.status,
-    ...tokenUserIcon(user),
+    ...linkAuthUserIcon(user, accountUrl),
   };
 }
 
@@ -368,6 +460,28 @@ function tokenUserIcon(user: { icon_key?: unknown; icon_source?: unknown }): {
     user.icon_source === "none"
       ? { icon_source: user.icon_source }
       : {}),
+  };
+}
+
+function linkAuthUserIcon(
+  user: { icon_key?: unknown; icon_source?: unknown },
+  accountUrl: string,
+): {
+  avatar_url?: string;
+  icon_key?: string;
+  icon_source?: "discord" | "r2" | "none";
+} {
+  const icon = tokenUserIcon(user);
+  const avatarUrl =
+    icon.icon_source === "r2" && icon.icon_key
+      ? new URL(
+          `/assets/${icon.icon_key.split("/").map(encodeURIComponent).join("/")}`,
+          accountUrl,
+        ).toString()
+      : null;
+  return {
+    ...icon,
+    ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
   };
 }
 
@@ -402,4 +516,11 @@ function safeAppReturnTo(value: string, defaultUrl: URL): string {
   } catch {
     return defaultUrl.toString();
   }
+}
+
+function requiredBinding(name: string, value: string): string {
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
 }

@@ -1,10 +1,9 @@
 export {
-  clearAppSession,
-  completeAppLogin,
-  getAppUser,
+  handleAppAuthRequest,
   type LinkAuthAppConfig,
+  type LinkAuthAppEnv,
   type LinkAuthUser,
-  startAppLogin,
+  loadLinkAuthAppConfig,
 } from "./appAuth.js";
 export { hmacSha256Base64Url, randomBase64Url } from "./crypto.js";
 export {

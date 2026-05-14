@@ -1,8 +1,6 @@
-export type SampleUser = {
-  discord_id: string;
-  display_name: string;
-  role: "user" | "admin";
-  status: "active";
-  icon_source?: "discord" | "r2" | "none";
-  icon_key?: string;
-};
+import type { LinkAuthUser } from "link-auth";
+
+export type SampleUser = Pick<
+  LinkAuthUser,
+  "avatar_url" | "discord_id" | "display_name"
+>;

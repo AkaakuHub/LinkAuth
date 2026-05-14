@@ -367,12 +367,9 @@ test("App Worker returns the current user with a valid app session", async () =>
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
     user: {
+      avatar_url: "https://auth.example.com/assets/icons/123456789/avatar.webp",
       discord_id: "123456789",
       display_name: "Current Akaaku",
-      icon_key: "icons/123456789/avatar.webp",
-      icon_source: "r2",
-      role: "admin",
-      status: "active",
     },
   });
 });
@@ -417,12 +414,9 @@ test("App Worker returns the current user with a personal access bearer token", 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
     user: {
+      avatar_url: "https://auth.example.com/assets/icons/123456789/avatar.webp",
       discord_id: "123456789",
       display_name: "Current Akaaku",
-      icon_key: "icons/123456789/avatar.webp",
-      icon_source: "r2",
-      role: "admin",
-      status: "active",
     },
   });
 });
@@ -522,10 +516,20 @@ test("App Worker renders a profile page with the current icon", async () => {
   expect(body).toContain(
     'src="https://auth.example.com/assets/icons/123456789/avatar.webp"',
   );
+  expect(body).toContain('href="https://app.example.com/_auth/account"');
   expect(body).toContain("設定");
   expect(body).not.toContain("ロール");
   expect(body).not.toContain("セッション");
   expect(body).not.toContain(">app<");
+});
+
+test("App Worker redirects the settings route to the account page", async () => {
+  const response = await fetchApp("https://app.example.com/_auth/account");
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://auth.example.com/?return_to=https%3A%2F%2Fapp.example.com%2F",
+  );
 });
 
 test("App Worker does not render the profile page when account verification fails", async () => {
