@@ -2,6 +2,8 @@ import nacl from "tweetnacl";
 import type { AccountConfig } from "../accountConfig.js";
 import { registerDiscordUser } from "../data/users.js";
 
+const signatureTimestampToleranceSeconds = 300;
+
 type DiscordInteraction = {
   type: number;
   guild_id?: string;
@@ -70,7 +72,13 @@ function verifyDiscordSignature(
 ): boolean {
   const signature = headers.get("x-signature-ed25519");
   const timestamp = headers.get("x-signature-timestamp");
-  if (!signature || !timestamp) {
+  if (
+    !signature ||
+    !timestamp ||
+    !isHex(signature, 64) ||
+    !isHex(config.discord.publicKey, 32) ||
+    !isFreshUnixTimestamp(timestamp, Date.now())
+  ) {
     return false;
   }
   const message = new TextEncoder().encode(`${timestamp}${rawBody}`);
@@ -79,6 +87,25 @@ function verifyDiscordSignature(
     hexToBytes(signature),
     hexToBytes(config.discord.publicKey),
   );
+}
+
+function isFreshUnixTimestamp(value: string, nowMs: number): boolean {
+  if (!/^[0-9]+$/.test(value)) {
+    return false;
+  }
+  const timestampSeconds = Number(value);
+  if (!Number.isSafeInteger(timestampSeconds)) {
+    return false;
+  }
+  const nowSeconds = Math.floor(nowMs / 1000);
+  return (
+    Math.abs(nowSeconds - timestampSeconds) <=
+    signatureTimestampToleranceSeconds
+  );
+}
+
+function isHex(value: string, byteLength: number): boolean {
+  return value.length === byteLength * 2 && /^[0-9a-fA-F]+$/.test(value);
 }
 
 function discordMessage(content: string): Response {

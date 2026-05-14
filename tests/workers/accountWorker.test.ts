@@ -163,6 +163,39 @@ test("Account Worker Discord interaction accepts signed ping requests", async ()
   }
 });
 
+test.each([
+  {
+    name: "stale",
+    timestamp: () => "1700000000",
+  },
+  {
+    name: "future",
+    timestamp: () => String(Math.floor(Date.now() / 1000) + 301),
+  },
+])("Account Worker Discord interaction rejects $name signed requests", async ({
+  timestamp,
+}) => {
+  const keyPair = nacl.sign.keyPair();
+  const body = JSON.stringify({ type: 1 });
+  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
+  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/discord/interactions",
+      {
+        body,
+        headers: signedDiscordHeaders(body, keyPair.secretKey, timestamp()),
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "invalid_signature" });
+  } finally {
+    env.DISCORD_PUBLIC_KEY = originalPublicKey;
+  }
+});
+
 test("Account Worker Discord interaction registers signed guild members", async () => {
   const keyPair = nacl.sign.keyPair();
   const body = JSON.stringify({
@@ -1677,8 +1710,8 @@ async function fetchAccount(
 function signedDiscordHeaders(
   body: string,
   secretKey: Uint8Array,
+  timestamp = String(Math.floor(Date.now() / 1000)),
 ): Record<string, string> {
-  const timestamp = "1700000000";
   const message = new TextEncoder().encode(`${timestamp}${body}`);
   const signature = nacl.sign.detached(message, secretKey);
   return {
