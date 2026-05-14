@@ -16,7 +16,7 @@ pnpm test:e2e
 ```powershell
 Copy-Item .env.local.example .env.local
 pnpm dev:env
-pnpm dev:seed
+pnpm dev:seed -- --discord-id <your-discord-user-id>
 pnpm dev
 ```
 
