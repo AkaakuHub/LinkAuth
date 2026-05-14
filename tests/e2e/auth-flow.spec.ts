@@ -37,8 +37,12 @@ test("App login completes through Discord OTP and creates a remember cookie by d
   expect(cookies.some((cookie) => cookie.name === rememberCookieName)).toBe(
     true,
   );
-  expect(appSessionCookie?.expires).toBeGreaterThan(0);
-  expect(accountSessionCookie?.expires).toBeGreaterThan(0);
+  expectCookieMaxAge(appSessionCookie, 15_552_000);
+  expectCookieMaxAge(accountSessionCookie, 86_400);
+  expectCookieMaxAge(
+    cookies.find((cookie) => cookie.name === rememberCookieName),
+    15_552_000,
+  );
   expect(servers.state.rememberCreateCount).toBe(1);
 });
 
@@ -69,6 +73,19 @@ test("App login completes without a remember cookie when remember_me is off", as
   expect(accountSessionCookie?.expires).toBe(-1);
   expect(servers.state.rememberCreateCount).toBe(0);
 });
+
+function expectCookieMaxAge(
+  cookie: { expires: number } | undefined,
+  seconds: number,
+): void {
+  expect(cookie).toBeDefined();
+  if (!cookie) {
+    throw new Error("cookie was not set");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  expect(cookie.expires).toBeGreaterThanOrEqual(now + seconds - 30);
+  expect(cookie.expires).toBeLessThanOrEqual(now + seconds + 30);
+}
 
 test("App session is cleared after logging out from the account page", async ({
   page,
