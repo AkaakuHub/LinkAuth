@@ -12,7 +12,6 @@ export function accountLandingPage(
     "Account",
     authShell(
       authPanel({
-        iconName: "shield-check",
         label: "LinkAuth",
         title: "アカウント管理",
         description: "Discordで本人確認し、アカウント情報を安全に管理します。",

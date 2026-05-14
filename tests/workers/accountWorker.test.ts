@@ -1704,7 +1704,6 @@ test("Account Worker account page renders the current icon", async () => {
   expect(body).toContain("data-avatar-cropper-dialog");
   expect(body).not.toContain("Discord ID");
   expect(body).not.toContain("権限");
-  expect(body).not.toContain("状態");
 });
 
 test("Account Worker treats malformed session cookies as unauthenticated", async () => {

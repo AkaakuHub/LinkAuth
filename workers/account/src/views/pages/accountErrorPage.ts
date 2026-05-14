@@ -78,7 +78,6 @@ function accountErrorPage(
     "認証できません",
     authShell(
       authPanel({
-        iconName: "alert-triangle",
         label: "認証できません",
         title: content.title,
         description: content.description,

@@ -95,6 +95,7 @@ function setupProfileForm(): void {
       !elements.input.checkValidity();
   };
   const openEditor = () => {
+    elements.display.classList.add("hidden");
     elements.form.classList.remove("hidden");
     elements.input.focus();
     elements.input.select();
@@ -103,6 +104,7 @@ function setupProfileForm(): void {
   const closeEditor = () => {
     elements.input.value = initialValue;
     elements.form.classList.add("hidden");
+    elements.display.classList.remove("hidden");
     updateSubmitState();
   };
   const updateUrlBeforeSubmit = () => {
@@ -146,6 +148,10 @@ function setupAvatarUpload(): void {
 
   let cropper: Cropper | null = null;
   let imageUrl: string | null = null;
+  const setStatus = (message: string) => {
+    status.textContent = message;
+    status.classList.toggle("hidden", message === "");
+  };
 
   const closeCropper = () => {
     cropper?.destroy();
@@ -163,7 +169,7 @@ function setupAvatarUpload(): void {
     if (!file) {
       return;
     }
-    status.textContent = "";
+    setStatus("");
     cropper?.destroy();
     if (imageUrl) {
       URL.revokeObjectURL(imageUrl);
@@ -189,7 +195,7 @@ function setupAvatarUpload(): void {
     if (!cropper) {
       return;
     }
-    status.textContent = "更新中";
+    setStatus("更新中");
     input.disabled = true;
     save.disabled = true;
     try {
@@ -208,12 +214,12 @@ function setupAvatarUpload(): void {
         body: blob,
       });
       if (!response.ok) {
-        status.textContent = "更新できませんでした";
+        setStatus("更新できませんでした");
         return;
       }
       window.location.reload();
     } catch {
-      status.textContent = "更新できませんでした";
+      setStatus("更新できませんでした");
     } finally {
       input.disabled = false;
       save.disabled = false;
@@ -248,22 +254,25 @@ function profileFormElements(form: HTMLFormElement): {
   submit: HTMLButtonElement;
   editTrigger: HTMLButtonElement;
   cancel: HTMLButtonElement;
+  display: HTMLElement;
 } | null {
   const input = form.querySelector("[data-profile-input]");
   const submit = form.querySelector("[data-profile-submit]");
   const editTrigger = document.querySelector("[data-profile-edit-trigger]");
   const cancel = form.querySelector("[data-profile-cancel]");
+  const display = document.querySelector("[data-profile-display]");
 
   if (
     !(input instanceof HTMLInputElement) ||
     !(submit instanceof HTMLButtonElement) ||
     !(editTrigger instanceof HTMLButtonElement) ||
-    !(cancel instanceof HTMLButtonElement)
+    !(cancel instanceof HTMLButtonElement) ||
+    !(display instanceof HTMLElement)
   ) {
     return null;
   }
 
-  return { form, input, submit, editTrigger, cancel };
+  return { form, input, submit, editTrigger, cancel, display };
 }
 
 function canvasToWebp(canvas: HTMLCanvasElement): Promise<Blob> {

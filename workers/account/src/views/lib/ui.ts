@@ -8,14 +8,14 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-45",
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-45",
   {
     variants: {
       variant: {
         primary:
           "border-primary bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-primary",
         secondary:
-          "border-line bg-panel text-ink hover:bg-haze focus-visible:outline-primary",
+          "border-line bg-panel text-ink hover:border-muted hover:bg-haze focus-visible:outline-primary",
         danger:
           "border-danger bg-danger text-danger-foreground hover:bg-danger/90 focus-visible:outline-danger",
       },
@@ -69,7 +69,7 @@ export function card({
   children: string;
   className?: string;
 }): string {
-  return `<section class="${cn("rounded-lg border border-line bg-panel p-5 shadow-sm", className)}">${children}</section>`;
+  return `<section class="${cn("rounded-lg border border-line bg-panel p-3", className)}">${children}</section>`;
 }
 
 export function textInput({
@@ -79,7 +79,7 @@ export function textInput({
   className?: string;
   attributes?: string;
 }): string {
-  return `<input class="${cn("h-12 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/20", className)}"${attributes}>`;
+  return `<input class="${cn("h-12 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/25", className)}"${attributes}>`;
 }
 
 export function formField({
@@ -105,7 +105,7 @@ export function radioOption({
   name: string;
   value: string;
 }): string {
-  return `<label class="${cn("flex min-h-11 items-center gap-2 rounded-md border border-line bg-panel px-3 text-sm font-medium text-ink transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/10")}"><input class="accent-primary" type="radio"${attr("name", name)}${attr("value", value)}${attr("checked", checked)}>${escapeHtml(label)}</label>`;
+  return `<label class="${cn("flex min-h-11 items-center gap-2 rounded-md border border-line bg-paper px-3 text-sm font-medium text-ink transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/15")}"><input class="accent-primary" type="radio"${attr("name", name)}${attr("value", value)}${attr("checked", checked)}>${escapeHtml(label)}</label>`;
 }
 
 export function field({

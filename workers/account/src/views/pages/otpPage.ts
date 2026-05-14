@@ -18,7 +18,6 @@ export function otpPage(
     "OTP認証",
     authShell(
       authPanel({
-        iconName: "brand-discord",
         label: "Discord",
         title: "OTP認証",
         description: "Discord DMに届いた6桁の認証コードを入力してください。",

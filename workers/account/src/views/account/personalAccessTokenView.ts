@@ -16,7 +16,8 @@ export function personalAccessTokenCard({
   escapedReturnTo: string;
 }): string {
   return card({
-    children: `<div class="grid gap-5"><div class="grid gap-1"><h2 class="text-base font-semibold text-ink">Bearer token</h2><p class="text-sm text-muted">curlやAPIから使用するtokenを管理します。発行後のtoken本体はこの画面で一度だけ表示します。</p></div>${issuedTokenDialog(
+    className: "rounded-lg",
+    children: `<div class="grid gap-6"><div class="grid gap-2"><h2 class="text-xl font-semibold text-ink">Bearer token</h2><p class="max-w-2xl text-sm leading-6 text-muted">curlやAPIから使用するtokenを管理します。発行後のtoken本体はこの画面で一度だけ表示します。</p></div>${issuedTokenDialog(
       issuedToken,
     )}${personalAccessTokenForm({
       tokens,
@@ -36,7 +37,7 @@ function personalAccessTokenForm({
   tokens: AccountTokens;
   escapedReturnTo: string;
 }): string {
-  return `<form class="grid gap-4 border-t border-line pt-5" method="post" action="/tokens"><input type="hidden" name="csrf_token"${attr("value", tokens.token)}><input type="hidden" name="return_to" value="${escapedReturnTo}">${formField(
+  return `<form class="grid gap-4 border-t border-line pt-6" method="post" action="/tokens"><input type="hidden" name="csrf_token"${attr("value", tokens.token)}><input type="hidden" name="return_to" value="${escapedReturnTo}">${formField(
     {
       control: textInput({
         attributes:
@@ -47,8 +48,8 @@ function personalAccessTokenForm({
     },
   )}${expirationRadioGroup()}${button({
     type: "submit",
-    className: "w-full",
-    children: `${icon("check")}発行`,
+    className: "w-full sm:w-fit",
+    children: "発行",
   })}</form>`;
 }
 
@@ -71,12 +72,12 @@ function issuedTokenDialog(issuedToken?: string): string {
   if (!issuedToken) {
     return "";
   }
-  return `<dialog class="w-[min(92vw,40rem)] rounded-lg border border-line bg-panel p-0 shadow-sm backdrop:bg-ink/40" data-issued-token-dialog><div class="grid gap-4 p-5"><div class="grid gap-1"><h2 class="text-base font-semibold text-ink">発行済みtoken</h2><p class="text-sm text-muted">このtoken本体は一度だけ表示されます。</p></div><code class="max-h-48 overflow-auto break-all rounded-md border border-line bg-haze p-3 text-sm text-ink" data-issued-token-value>${escapeHtml(issuedToken)}</code><p class="min-h-5 text-sm text-muted" data-issued-token-status></p><div class="flex flex-wrap justify-end gap-2">${button(
+  return `<dialog class="w-[min(92vw,40rem)] rounded-lg border border-line bg-panel p-0 shadow-sm backdrop:bg-ink/50" data-issued-token-dialog><div class="grid gap-4 p-5"><div class="grid gap-1"><h2 class="text-xl font-semibold text-ink">発行済みtoken</h2><p class="text-sm text-muted">このtoken本体は一度だけ表示されます。</p></div><code class="max-h-48 overflow-auto break-all rounded-md border border-line bg-haze p-3 text-sm text-ink" data-issued-token-value>${escapeHtml(issuedToken)}</code><p class="min-h-5 text-sm text-muted" data-issued-token-status></p><div class="flex flex-wrap justify-end gap-2">${button(
     {
       type: "button",
       variant: "secondary",
       attributes: " data-issued-token-close",
-      children: `${icon("x")}閉じる`,
+      children: "閉じる",
     },
   )}${button({
     type: "button",
@@ -101,7 +102,7 @@ function personalAccessTokenList({
       escapedReturnTo,
     }),
   );
-  return `<div class="grid gap-2">${rows.length > 0 ? rows.join("") : '<p class="text-sm text-muted">発行済みtokenはありません。</p>'}</div>`;
+  return `<div class="grid gap-3">${rows.length > 0 ? rows.join("") : '<p class="rounded-md border border-dashed border-line bg-haze p-4 text-sm text-muted">発行済みtokenはありません。</p>'}</div>`;
 }
 
 function personalAccessTokenRow({
@@ -114,7 +115,7 @@ function personalAccessTokenRow({
   escapedReturnTo: string;
 }): string {
   const revoked = token.revokedAt !== null;
-  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3"><div class="grid gap-1"><p class="text-sm font-semibold text-ink">${escapeHtml(token.name)}</p><p class="text-xs text-muted">expires ${escapeHtml(formatExpiresAt(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</p></div>${
+  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-haze p-2 px-4"><div class="grid min-w-0 gap-1"><div class="break-words text-sm font-semibold text-ink my-1">${escapeHtml(token.name)}</div><div class="text-xs leading-5 text-muted my-1">expires ${escapeHtml(formatExpiresAt(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</div></div>${
     revoked
       ? ""
       : `<form method="post" action="/tokens/revoke"><input type="hidden" name="csrf_token"${attr("value", csrfToken)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="token_id"${attr("value", token.tokenId)}>${button(
