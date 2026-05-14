@@ -37,7 +37,7 @@ workers/app/.dev.vars
 ローカルD1でschemaエラーが出た場合はmigrationを適用します。
 
 ```powershell
-pnpm exec wrangler d1 migrations apply org-auth --local --config workers/account/wrangler.toml
+pnpm exec wrangler d1 migrations apply link-auth --local --config workers/account/wrangler.toml
 ```
 
 ## 本番env生成
@@ -65,8 +65,6 @@ Cloudflare用の値です。
 - `CLOUDFLARE_ACCOUNT_ID`:Cloudflare account ID
 - `CLOUDFLARE_ZONE_ID`:Cloudflare zone ID
 - `CLOUDFLARE_ACCOUNT_CLEANUP_CRON`:期限切れ認証データ削除schedule
-- `PROJECT_NAME`:D1 database名とR2 bucket名のprefix
-- `ACCOUNT_WORKER_SERVICE_NAME`:account Worker service名
 
 account Worker用の値です。
 

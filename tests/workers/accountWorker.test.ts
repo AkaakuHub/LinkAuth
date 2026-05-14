@@ -2024,12 +2024,12 @@ function testAccountConfig() {
 }
 
 function rememberCookieValue(setCookie: string): string | null {
-  const match = setCookie.match(/__Host-org_remember=([^;,]+)/);
+  const match = setCookie.match(/__Host-link_auth_remember=([^;,]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
 function authStateCookieValue(setCookie: string): string | null {
-  const match = setCookie.match(/__Host-org_auth_state=([^;,]+)/);
+  const match = setCookie.match(/__Host-link_auth_auth_state=([^;,]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 

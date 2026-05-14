@@ -43,8 +43,6 @@ if (options.terraformOutput) {
     ["cloudflare_account_id", "CLOUDFLARE_ACCOUNT_ID"],
     ["cloudflare_zone_id", "CLOUDFLARE_ZONE_ID"],
     ["domain_name", "DOMAIN_NAME"],
-    ["project_name", "PROJECT_NAME"],
-    ["account_worker_service_name", "ACCOUNT_WORKER_SERVICE_NAME"],
     ["account_cleanup_cron", "CLOUDFLARE_ACCOUNT_CLEANUP_CRON"],
   ]);
 }

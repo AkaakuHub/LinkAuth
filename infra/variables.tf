@@ -13,7 +13,7 @@ variable "cloudflare_zone_id" {
 
 variable "project_name" {
   type    = string
-  default = "org-auth"
+  default = "link-auth"
 }
 
 variable "domain_name" {
@@ -22,7 +22,7 @@ variable "domain_name" {
 
 variable "account_worker_service_name" {
   type    = string
-  default = "org-auth-account"
+  default = "link-auth-account"
 }
 
 variable "account_worker_hostname" {

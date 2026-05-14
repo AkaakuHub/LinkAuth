@@ -5,8 +5,8 @@ import {
   timingSafeEqual,
 } from "./encoding.js";
 
-export const sessionCookieName = "__Host-org_session";
-export const rememberCookieName = "__Host-org_remember";
+export const sessionCookieName = "__Host-link_auth_session";
+export const rememberCookieName = "__Host-link_auth_remember";
 
 export type SessionPayload = {
   discord_id: string;

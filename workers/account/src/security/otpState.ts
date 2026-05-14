@@ -6,7 +6,7 @@ import {
 } from "../../../../src/encoding.js";
 import type { AccountConfig } from "../accountConfig.js";
 
-export const otpStateCookieName = "__Host-org_otp_state";
+export const otpStateCookieName = "__Host-link_auth_otp_state";
 
 export async function createOtpState(
   challengeId: string,

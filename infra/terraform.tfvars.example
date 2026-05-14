@@ -3,6 +3,4 @@ cloudflare_account_id = ""
 cloudflare_zone_id    = ""
 domain_name           = "example.com"
 
-project_name                = "org-auth"
-account_worker_service_name = "org-auth-account"
 account_cleanup_cron        = "0 * * * *"
