@@ -528,6 +528,27 @@ test("App Worker renders a profile page with the current icon", async () => {
   expect(body).not.toContain(">app<");
 });
 
+test("App Worker does not render the profile page when account verification fails", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({ error: "unauthorized" }, { status: 401 }),
+  );
+  const session = await createAppSession("hub");
+
+  const response = await fetchApp("https://app.example.com/", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "https://app.example.com/login",
+  );
+  expect(body).not.toContain("Current Akaaku");
+  expect(body).not.toContain("設定");
+});
+
 test("App Worker rejects a session issued for another app", async () => {
   const session = await createAppSession("other");
   const response = await fetchApp("https://app.example.com/api/me", {
