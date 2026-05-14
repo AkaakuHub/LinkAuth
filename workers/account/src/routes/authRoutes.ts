@@ -54,8 +54,8 @@ import {
   inactiveAccountPage,
   otpDeliveryFailedPage,
   otpRateLimitedPage,
-} from "../views/accountErrorPage.js";
-import { otpPage } from "../views/otpPage.js";
+} from "../views/pages/accountErrorPage.js";
+import { otpPage } from "../views/pages/otpPage.js";
 
 export async function authorize(
   request: Request,

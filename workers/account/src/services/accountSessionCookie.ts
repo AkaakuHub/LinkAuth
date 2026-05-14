@@ -9,7 +9,7 @@ import {
 import type { AccountConfig } from "../accountConfig.js";
 import { createRememberToken } from "../data/rememberTokens.js";
 import { hashToken, type User } from "../domain/user.js";
-import { noStoreHeaders } from "../views/accountLandingPage.js";
+import { noStoreHeaders } from "../views/pages/accountLandingPage.js";
 
 export const accountSessionMaxAgeSeconds = 86_400;
 export const rememberMaxAgeSeconds = 15_552_000;

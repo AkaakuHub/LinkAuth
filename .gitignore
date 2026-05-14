@@ -11,7 +11,7 @@ workers/**/.dev.vars
 .env
 .env.local
 .env.production
-workers/account/src/generated/accountClient.ts
+workers/account/src/generated/
 test-results/
 playwright-report/
 .playwright-mcp

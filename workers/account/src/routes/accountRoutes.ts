@@ -38,9 +38,9 @@ import {
   verifyActiveUser,
   verifyMemberUser,
 } from "../services/userDirectory.js";
-import { inactiveAccountPage } from "../views/accountErrorPage.js";
-import { accountLandingPage } from "../views/accountLandingPage.js";
-import { accountPage } from "../views/page.js";
+import { inactiveAccountPage } from "../views/pages/accountErrorPage.js";
+import { accountLandingPage } from "../views/pages/accountLandingPage.js";
+import { accountPage } from "../views/pages/accountPage.js";
 
 export async function accountHome(
   request: Request,

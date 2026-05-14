@@ -1,8 +1,8 @@
-import type { PersonalAccessTokenRecord } from "../data/personalAccessTokens.js";
-import type { AccountTokens } from "../security/accountTokens.js";
-import { attr, escapeHtml } from "./lib/html.js";
-import { icon } from "./lib/icons.js";
-import { button, card, formField, radioOption, textInput } from "./lib/ui.js";
+import type { PersonalAccessTokenRecord } from "../../data/personalAccessTokens.js";
+import type { AccountTokens } from "../../security/accountTokens.js";
+import { attr, escapeHtml } from "../lib/html.js";
+import { icon } from "../lib/icons.js";
+import { button, card, formField, radioOption, textInput } from "../lib/ui.js";
 
 export function personalAccessTokenCard({
   issuedToken,

@@ -1,5 +1,7 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
+
+await mkdir("workers/account/src/generated", { recursive: true });
 
 const output = await build({
   bundle: true,

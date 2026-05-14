@@ -1,7 +1,7 @@
-import { authPanel, authShell } from "./lib/authUi.js";
-import { formActionOrigins, page } from "./lib/html.js";
-import { icon } from "./lib/icons.js";
-import { linkButton } from "./lib/ui.js";
+import { authPanel, authShell } from "../lib/authUi.js";
+import { formActionOrigins, page } from "../lib/html.js";
+import { icon } from "../lib/icons.js";
+import { linkButton } from "../lib/ui.js";
 
 export function accountLandingPage(
   config: { apps: { callbackUrl: string }[] },

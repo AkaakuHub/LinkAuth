@@ -1,10 +1,10 @@
-import type { PersonalAccessTokenRecord } from "../data/personalAccessTokens.js";
-import type { User } from "../domain/user.js";
-import type { AccountTokens } from "../security/accountTokens.js";
-import { attr, escapeHtml } from "./lib/html.js";
-import { icon } from "./lib/icons.js";
-import { avatarAssetUrl, profileAvatar } from "./lib/profileUi.js";
-import { button, card, textInput } from "./lib/ui.js";
+import type { PersonalAccessTokenRecord } from "../../data/personalAccessTokens.js";
+import type { User } from "../../domain/user.js";
+import type { AccountTokens } from "../../security/accountTokens.js";
+import { attr, escapeHtml } from "../lib/html.js";
+import { icon } from "../lib/icons.js";
+import { avatarAssetUrl, profileAvatar } from "../lib/profileUi.js";
+import { button, card, textInput } from "../lib/ui.js";
 import { personalAccessTokenCard } from "./personalAccessTokenView.js";
 
 export function accountView({

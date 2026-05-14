@@ -1,10 +1,10 @@
-import type { AccountConfig } from "../accountConfig.js";
-import { listPersonalAccessTokens } from "../data/personalAccessTokens.js";
-import type { User } from "../domain/user.js";
-import { createAccountTokens } from "../security/accountTokens.js";
+import type { AccountConfig } from "../../accountConfig.js";
+import { listPersonalAccessTokens } from "../../data/personalAccessTokens.js";
+import type { User } from "../../domain/user.js";
+import { createAccountTokens } from "../../security/accountTokens.js";
+import { accountView } from "../account/accountView.js";
+import { formActionOrigins, page } from "../lib/html.js";
 import { noStoreHeaders } from "./accountLandingPage.js";
-import { accountView } from "./accountView.js";
-import { formActionOrigins, page } from "./lib/html.js";
 
 export async function accountPage(
   user: User,
