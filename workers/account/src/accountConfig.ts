@@ -17,7 +17,6 @@ export type AccountConfig = {
     apiBase: string;
     clientId: string;
     clientSecret: string;
-    publicKey: string;
     botToken: string;
     guildIds: string[];
   };
@@ -57,7 +56,6 @@ export function loadAccountConfig(env: Env): AccountConfig {
         "DISCORD_CLIENT_SECRET",
         env.DISCORD_CLIENT_SECRET,
       ),
-      publicKey: requiredBinding("DISCORD_PUBLIC_KEY", env.DISCORD_PUBLIC_KEY),
       botToken: requiredBinding("DISCORD_BOT_TOKEN", env.DISCORD_BOT_TOKEN),
       guildIds: parseCommaSeparatedList(
         "DISCORD_GUILD_IDS",

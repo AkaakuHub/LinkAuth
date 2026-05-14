@@ -29,8 +29,8 @@ import {
   d1SchemaStatements,
 } from "../../workers/account/src/data/schema.js";
 import {
+  ensureGuildMemberUser,
   getActiveUser,
-  registerDiscordUser,
   updateUserAvatar,
   updateUserProfile,
 } from "../../workers/account/src/data/users.js";
@@ -52,8 +52,6 @@ const env: Env = {
   DISCORD_BOT_TOKEN: "discord-bot-token",
   DISCORD_CLIENT_ID: "discord-client-id",
   DISCORD_CLIENT_SECRET: "discord-client-secret",
-  DISCORD_PUBLIC_KEY:
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   DISCORD_GUILD_IDS: "guild",
   DOMAIN_NAME: "example.com",
   DB: cloudflareEnv.DB,
@@ -703,28 +701,28 @@ test("Avatar update rejects inactive users at the data boundary", async () => {
   expect(await readUserIconKey("123456789")).toBeNull();
 });
 
-test("Discord registration replaces existing user state like the old PutCommand", async () => {
-  await setUserForRegistrationReplacement();
+test("Guild member provisioning preserves account-owned fields", async () => {
+  await setUserForProvisioningUpdate();
 
-  await registerDiscordUser(testAccountConfig(), {
-    avatarHash: "avatar-hash",
+  await ensureGuildMemberUser(testAccountConfig(), {
+    avatarHash: "new-avatar-hash",
     discordId: "123456789",
-    discordUsername: "DiscordUser",
-    displayName: "Registered User",
+    discordUsername: "NewDiscordUser",
+    displayName: "New Discord Name",
     guildId: "guild",
   });
 
-  expect(await readUserForRegistrationReplacement("123456789")).toEqual({
+  expect(await readUserAccountState("123456789")).toEqual({
     deleted_at: null,
     disabled_reason: null,
-    discord_avatar_hash: "avatar-hash",
-    discord_username: "DiscordUser",
-    display_name: "Registered User",
+    discord_avatar_hash: "new-avatar-hash",
+    discord_username: "NewDiscordUser",
+    display_name: "Custom Display",
     guild_id: "guild",
     guild_member_status: "active",
-    icon_key: null,
-    icon_source: "discord",
-    role: "user",
+    icon_key: "icons/123456789/avatar.webp",
+    icon_source: "r2",
+    role: "admin",
     status: "active",
   });
 });
@@ -918,20 +916,19 @@ async function seedPersonalAccessToken(
     .run();
 }
 
-async function setUserForRegistrationReplacement(): Promise<void> {
+async function setUserForProvisioningUpdate(): Promise<void> {
   await env.DB.prepare(
     `UPDATE users SET
       discord_username = 'OldUser',
-      display_name = 'Deleted Admin',
+      display_name = 'Custom Display',
       role = 'admin',
-      status = 'deleted',
+      status = 'disabled',
       guild_id = 'old-guild',
       guild_member_status = 'left',
-      disabled_reason = 'manual',
-      icon_source = 'none',
+      disabled_reason = 'left_guild',
+      icon_source = 'r2',
       icon_key = 'icons/123456789/avatar.webp',
       discord_avatar_hash = NULL,
-      created_at = '2000-01-01T00:00:00.000Z',
       deleted_at = ?
     WHERE discord_id = '123456789'`,
   )
@@ -939,7 +936,7 @@ async function setUserForRegistrationReplacement(): Promise<void> {
     .run();
 }
 
-async function readUserForRegistrationReplacement(
+async function readUserAccountState(
   discordId: string,
 ): Promise<Record<string, string | null> | null> {
   return await env.DB.prepare(

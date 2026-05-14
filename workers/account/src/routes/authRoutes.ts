@@ -19,12 +19,14 @@ import {
   createOtpChallenge,
 } from "../data/otpChallenges.js";
 import { verifyPersonalAccessToken } from "../data/personalAccessTokens.js";
+import { ensureGuildMemberUser } from "../data/users.js";
 import { findApp, matchesCallbackUrl } from "../domain/appRegistry.js";
 import { normalizeReturnTo } from "../domain/navigation.js";
 import { createOtpCode } from "../domain/otpCode.js";
 import { accountReturnTo } from "../domain/returnTo.js";
 import {
-  fetchDiscordGuildMember,
+  type DiscordOAuthUser,
+  fetchDiscordGuildMembership,
   fetchDiscordOAuthResult,
   redirectToDiscordAuthorize,
 } from "../integrations/discordOauth.js";
@@ -186,13 +188,20 @@ export async function callback(
   if (!discordResult) {
     return callbackResponse(authFailedPage(config, state.return_to));
   }
-  const guildMember = await fetchDiscordGuildMember(
+  const guildMembership = await fetchDiscordGuildMembership(
     discordResult.accessToken,
     config,
   );
-  if (!guildMember) {
+  if (!guildMembership) {
     return callbackResponse(inactiveAccountPage(config, state.return_to));
   }
+  await ensureGuildMemberUser(config, {
+    avatarHash: discordResult.user.avatarHash,
+    discordId: discordResult.user.id,
+    discordUsername: discordResult.user.username,
+    displayName: discordDisplayName(discordResult.user),
+    guildId: guildMembership.guildId,
+  });
   const active = await verifyCurrentMemberUser(discordResult.user.id, config);
   if (!active) {
     return callbackResponse(inactiveAccountPage(config, state.return_to));
@@ -239,6 +248,19 @@ export async function callback(
 
 function callbackResponse(response: Response): Response {
   return appendSetCookie(response, deleteCookie(authStateCookieName));
+}
+
+function discordDisplayName(user: DiscordOAuthUser): string {
+  const value = user.globalName ?? user.username ?? user.id;
+  const trimmed = [...value.trim()]
+    .filter((character) => !isControlCharacter(character))
+    .join("");
+  return trimmed.slice(0, 20) || "user";
+}
+
+function isControlCharacter(value: string): boolean {
+  const codePoint = value.charCodeAt(0);
+  return codePoint <= 31 || codePoint === 127;
 }
 
 function appendSetCookie(response: Response, value: string): Response {

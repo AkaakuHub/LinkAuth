@@ -111,14 +111,14 @@ export async function markUserDeleted(
     .run();
 }
 
-export async function registerDiscordUser(
+export async function ensureGuildMemberUser(
   config: AccountConfig,
   input: {
+    avatarHash: string | null;
     discordId: string;
     discordUsername: string;
     displayName: string;
     guildId: string;
-    avatarHash: string | null;
   },
 ): Promise<void> {
   const nowIso = new Date().toISOString();
@@ -131,16 +131,19 @@ export async function registerDiscordUser(
       ) VALUES (?, ?, ?, 'user', 'active', ?, 'active', ?, ?, ?, ?, ?)
       ON CONFLICT(discord_id) DO UPDATE SET
         discord_username = excluded.discord_username,
-        display_name = excluded.display_name,
-        role = 'user',
         status = 'active',
         guild_id = excluded.guild_id,
         guild_member_status = 'active',
         guild_checked_at = excluded.guild_checked_at,
-        icon_source = excluded.icon_source,
-        icon_key = NULL,
+        icon_source = CASE
+          WHEN users.icon_source = 'r2' THEN users.icon_source
+          ELSE excluded.icon_source
+        END,
+        icon_key = CASE
+          WHEN users.icon_source = 'r2' THEN users.icon_key
+          ELSE NULL
+        END,
         discord_avatar_hash = excluded.discord_avatar_hash,
-        created_at = excluded.created_at,
         deleted_at = NULL,
         disabled_reason = NULL,
         updated_at = excluded.updated_at`,

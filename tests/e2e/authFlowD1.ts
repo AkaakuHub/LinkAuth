@@ -198,6 +198,17 @@ function runD1Statement(
       revoked_at: null,
     });
     changes = 1;
+  } else if (query.includes("INSERT INTO users")) {
+    const discordId = String(values[0]);
+    const storedUser = state.users.get(discordId);
+    state.users.set(discordId, {
+      discord_id: discordId,
+      display_name: storedUser?.display_name ?? String(values[2]),
+      role: storedUser?.role ?? "user",
+      status: "active",
+      disabled_reason: null,
+    });
+    changes = 1;
   } else if (query.startsWith("UPDATE personal_access_tokens")) {
     const token = state.personalAccessTokens.get(String(values[1]));
     if (token?.discord_id === String(values[2]) && token.revoked_at === null) {

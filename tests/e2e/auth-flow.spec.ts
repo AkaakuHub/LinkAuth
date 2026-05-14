@@ -95,7 +95,7 @@ test("App session is cleared after logging out from the account page", async ({
   await loginWithOtp(page, servers);
 
   await page.getByRole("link", { name: "設定" }).click();
-  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
+  await expect(page.getByText("Akaaku")).toBeVisible();
   await page.getByRole("button", { name: "ログアウト" }).click();
 
   await expect(page).toHaveURL(`${servers.app.origin}/login`);
@@ -221,25 +221,19 @@ test("Account profile update rejects tampered CSRF tokens", async ({
   expect(servers.state.users.get(user.discord_id)?.display_name).toBe("Akaaku");
 });
 
-test("Inactive users cannot complete app login", async ({ page }) => {
-  await using servers = await startAuthFlowServers({
-    user: {
-      ...user,
-      disabled_reason: "manual",
-      status: "disabled",
-    },
-  });
+test("Guild members can complete app login without preexisting account rows", async ({
+  page,
+}) => {
+  await using servers = await startAuthFlowServers();
 
   await page.goto(`${servers.app.origin}/login`);
   await page.getByRole("button", { name: "認証して続行" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "利用資格がありません" }),
-  ).toBeVisible();
-  expect(servers.state.otpSendCount).toBe(0);
+  await expect(page.getByRole("heading", { name: "OTP認証" })).toBeVisible();
+  expect(servers.state.users.get(user.discord_id)?.status).toBe("active");
 });
 
-test("Account deletion clears auth cookies and prevents reuse", async ({
+test("Account deletion clears auth cookies and marks the account deleted", async ({
   page,
 }) => {
   await using servers = await startAuthFlowServers();
@@ -263,10 +257,4 @@ test("Account deletion clears auth cookies and prevents reuse", async ({
   expect(cookies.some((cookie) => cookie.name === rememberCookieName)).toBe(
     false,
   );
-
-  await page.goto(`${servers.app.origin}/login`);
-  await page.getByRole("button", { name: "認証して続行" }).click();
-  await expect(
-    page.getByRole("heading", { name: "利用資格がありません" }),
-  ).toBeVisible();
 });

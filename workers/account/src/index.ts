@@ -19,7 +19,6 @@ import {
   sessionVerify,
   token,
 } from "./routes/authRoutes.js";
-import { discordInteraction } from "./routes/discordInteractionRoutes.js";
 
 export default withAccountConfig(handleAccountRequest, handleScheduled);
 
@@ -41,9 +40,6 @@ async function handleAccountRequest(
       return methodNotAllowed("GET");
     }
     return asset(url, config);
-  }
-  if (url.pathname === "/discord/interactions" && request.method === "POST") {
-    return discordInteraction(request, config);
   }
   if (url.pathname === "/authorize") {
     if (request.method !== "GET") {

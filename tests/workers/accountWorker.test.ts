@@ -1,5 +1,4 @@
 import { env as cloudflareEnv, createExecutionContext } from "cloudflare:test";
-import nacl from "tweetnacl";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { hmacSha256Base64Url, sha256Hex } from "../../src/crypto.js";
 import { createCsrfToken } from "../../src/csrf.js";
@@ -70,8 +69,6 @@ const env: Env = {
   DISCORD_BOT_TOKEN: "discord-bot-token",
   DISCORD_CLIENT_ID: "discord-client-id",
   DISCORD_CLIENT_SECRET: "discord-client-secret",
-  DISCORD_PUBLIC_KEY:
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   DISCORD_GUILD_IDS: "guild",
   DOMAIN_NAME: "example.com",
   DB: cloudflareEnv.DB,
@@ -126,139 +123,6 @@ test("Account Worker allows localhost CSP sources only in local environment", as
     );
   } finally {
     delete env.LINK_AUTH_ENV;
-  }
-});
-
-test("Account Worker Discord interaction rejects missing signatures", async () => {
-  const response = await fetchAccount(
-    "https://auth.example.com/discord/interactions",
-    {
-      body: JSON.stringify({ type: 1 }),
-      method: "POST",
-    },
-  );
-
-  expect(response.status).toBe(401);
-  expect(await response.json()).toEqual({ error: "invalid_signature" });
-});
-
-test("Account Worker Discord interaction rejects malformed signed JSON", async () => {
-  const keyPair = nacl.sign.keyPair();
-  const body = "{";
-  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
-  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
-  try {
-    const response = await fetchAccount(
-      "https://auth.example.com/discord/interactions",
-      {
-        body,
-        headers: signedDiscordHeaders(body, keyPair.secretKey),
-        method: "POST",
-      },
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "invalid_request" });
-  } finally {
-    env.DISCORD_PUBLIC_KEY = originalPublicKey;
-  }
-});
-
-test("Account Worker Discord interaction accepts signed ping requests", async () => {
-  const keyPair = nacl.sign.keyPair();
-  const body = JSON.stringify({ type: 1 });
-  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
-  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
-  try {
-    const response = await fetchAccount(
-      "https://auth.example.com/discord/interactions",
-      {
-        body,
-        headers: signedDiscordHeaders(body, keyPair.secretKey),
-        method: "POST",
-      },
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ type: 1 });
-  } finally {
-    env.DISCORD_PUBLIC_KEY = originalPublicKey;
-  }
-});
-
-test.each([
-  {
-    name: "stale",
-    timestamp: () => "1700000000",
-  },
-  {
-    name: "future",
-    timestamp: () => String(Math.floor(Date.now() / 1000) + 301),
-  },
-])("Account Worker Discord interaction rejects $name signed requests", async ({
-  timestamp,
-}) => {
-  const keyPair = nacl.sign.keyPair();
-  const body = JSON.stringify({ type: 1 });
-  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
-  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
-  try {
-    const response = await fetchAccount(
-      "https://auth.example.com/discord/interactions",
-      {
-        body,
-        headers: signedDiscordHeaders(body, keyPair.secretKey, timestamp()),
-        method: "POST",
-      },
-    );
-
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "invalid_signature" });
-  } finally {
-    env.DISCORD_PUBLIC_KEY = originalPublicKey;
-  }
-});
-
-test("Account Worker Discord interaction registers signed guild members", async () => {
-  const keyPair = nacl.sign.keyPair();
-  const body = JSON.stringify({
-    type: 2,
-    guild_id: "guild",
-    data: {
-      name: "register",
-    },
-    member: {
-      user: {
-        id: "987654321",
-        username: "DiscordUser",
-        global_name: "Registered User",
-        avatar: "avatar-hash",
-      },
-    },
-  });
-  const originalPublicKey = env.DISCORD_PUBLIC_KEY;
-  env.DISCORD_PUBLIC_KEY = hexEncodeBytes(keyPair.publicKey);
-  try {
-    const response = await fetchAccount(
-      "https://auth.example.com/discord/interactions",
-      {
-        body,
-        headers: signedDiscordHeaders(body, keyPair.secretKey),
-        method: "POST",
-      },
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      type: 4,
-      data: {
-        content: "登録しました。\nアカウントページ: https://auth.example.com",
-        flags: 64,
-      },
-    });
-    await expectRegisteredDiscordUser();
-  } finally {
-    env.DISCORD_PUBLIC_KEY = originalPublicKey;
   }
 });
 
@@ -1323,6 +1187,53 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   await expectOtpChallengeCount(1);
 });
 
+test("Account Worker callback provisions Discord guild members", async () => {
+  await env.DB.prepare("DELETE FROM users WHERE discord_id = ?")
+    .bind("123456789")
+    .run();
+  const state = await createCallbackState("hub");
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.pathname === "/api/v10/oauth2/token") {
+      return Response.json({ access_token: "discord-access-token" });
+    }
+    if (url.pathname === "/api/v10/users/@me") {
+      return Response.json({
+        avatar: "avatar-hash",
+        global_name: "Guild User",
+        id: "123456789",
+        username: "discord-user",
+      });
+    }
+    if (url.pathname === "/api/v10/users/@me/guilds/guild/member") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/guilds/guild/members/123456789") {
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/api/v10/users/@me/channels") {
+      return Response.json({ id: "dm-channel" });
+    }
+    if (url.pathname === "/api/v10/channels/dm-channel/messages") {
+      return Response.json({ ok: true });
+    }
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?code=discord-code&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  await expectProvisionedUser();
+  await expectOtpChallengeCount(1);
+});
+
 test("Account Worker callback shows a delivery error when Discord DM sending throws", async () => {
   const state = await createCallbackState("hub");
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
@@ -1894,23 +1805,6 @@ async function expectMethodNotAllowed(
   expect(await response.text()).toBe("method not allowed");
 }
 
-function signedDiscordHeaders(
-  body: string,
-  secretKey: Uint8Array,
-  timestamp = String(Math.floor(Date.now() / 1000)),
-): Record<string, string> {
-  const message = new TextEncoder().encode(`${timestamp}${body}`);
-  const signature = nacl.sign.detached(message, secretKey);
-  return {
-    "x-signature-ed25519": hexEncodeBytes(signature),
-    "x-signature-timestamp": timestamp,
-  };
-}
-
-function hexEncodeBytes(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 async function createAccountSession(
   options: { persistent?: boolean } = {},
 ): Promise<string> {
@@ -2150,27 +2044,22 @@ async function expectRememberTokenDeleted(tokenId: string): Promise<void> {
   expect(row).toBeNull();
 }
 
-async function expectRegisteredDiscordUser(): Promise<void> {
+async function expectProvisionedUser(): Promise<void> {
   const row = await env.DB.prepare(
-    "SELECT discord_id, display_name, guild_id, guild_member_status, icon_source, icon_key, status FROM users WHERE discord_id = ?",
+    "SELECT discord_id, discord_username, display_name, role, guild_id, guild_member_status, icon_source, icon_key, discord_avatar_hash, status FROM users WHERE discord_id = ?",
   )
-    .bind("987654321")
-    .first<{
-      discord_id: string;
-      display_name: string;
-      guild_id: string;
-      guild_member_status: string;
-      icon_source: string;
-      icon_key: string | null;
-      status: string;
-    }>();
+    .bind("123456789")
+    .first<Record<string, string | null>>();
   expect(row).toEqual({
-    discord_id: "987654321",
-    display_name: "Registered User",
+    discord_avatar_hash: "avatar-hash",
+    discord_id: "123456789",
+    discord_username: "discord-user",
+    display_name: "Guild User",
     guild_id: "guild",
     guild_member_status: "active",
-    icon_source: "discord",
     icon_key: null,
+    icon_source: "discord",
+    role: "user",
     status: "active",
   });
 }

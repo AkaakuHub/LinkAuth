@@ -3,11 +3,18 @@ import { callbackUrl, redirectToUrl } from "../domain/navigation.js";
 
 export type DiscordOAuthUser = {
   id: string;
+  username: string;
+  globalName: string | null;
+  avatarHash: string | null;
 };
 
 export type DiscordOAuthResult = {
   user: DiscordOAuthUser;
   accessToken: string;
+};
+
+export type DiscordGuildMembership = {
+  guildId: string;
 };
 
 export function redirectToDiscordAuthorize(
@@ -55,12 +62,23 @@ export async function fetchDiscordOAuthResult(
     if (!userResponse.ok) {
       return null;
     }
-    const user = (await userResponse.json()) as { id?: unknown };
+    const user = (await userResponse.json()) as {
+      avatar?: unknown;
+      global_name?: unknown;
+      id?: unknown;
+      username?: unknown;
+    };
     if (typeof user.id !== "string") {
       return null;
     }
     return {
-      user: { id: user.id },
+      user: {
+        avatarHash: typeof user.avatar === "string" ? user.avatar : null,
+        globalName:
+          typeof user.global_name === "string" ? user.global_name : null,
+        id: user.id,
+        username: typeof user.username === "string" ? user.username : "",
+      },
       accessToken: token.access_token,
     };
   } catch {
@@ -68,10 +86,10 @@ export async function fetchDiscordOAuthResult(
   }
 }
 
-export async function fetchDiscordGuildMember(
+export async function fetchDiscordGuildMembership(
   accessToken: string,
   config: AccountConfig,
-): Promise<boolean> {
+): Promise<DiscordGuildMembership | null> {
   try {
     for (const guildId of config.discord.guildIds) {
       const response = await fetch(
@@ -81,11 +99,11 @@ export async function fetchDiscordGuildMember(
         },
       );
       if (response.ok) {
-        return true;
+        return { guildId };
       }
     }
-    return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }

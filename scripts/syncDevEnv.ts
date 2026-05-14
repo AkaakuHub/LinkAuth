@@ -19,7 +19,6 @@ await writeEnvFile(options.accountOutput, [
   "OTP_HMAC_SECRET",
   "DISCORD_CLIENT_ID",
   "DISCORD_CLIENT_SECRET",
-  "DISCORD_PUBLIC_KEY",
   "DOMAIN_NAME",
   "ACCOUNT_URL",
   "AUTH_APPS",

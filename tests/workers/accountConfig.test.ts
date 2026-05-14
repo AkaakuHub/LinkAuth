@@ -18,8 +18,6 @@ const baseEnv = {
   DISCORD_BOT_TOKEN: "discord-bot-token",
   DISCORD_CLIENT_ID: "discord-client-id",
   DISCORD_CLIENT_SECRET: "discord-client-secret",
-  DISCORD_PUBLIC_KEY:
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   DISCORD_GUILD_IDS: "guild",
   DOMAIN_NAME: "example.com",
   OTP_HMAC_SECRET: "otp-secret",

@@ -53,7 +53,7 @@ export async function openAccountPage(
 ): Promise<void> {
   await loginWithOtp(page, servers);
   await page.getByRole("link", { name: "設定" }).click();
-  await expect(page.getByRole("heading", { name: "Akaaku" })).toBeVisible();
+  await expect(page.getByText("Akaaku")).toBeVisible();
 }
 
 export async function createPersonalAccessTokenFromAccountPage(
@@ -96,7 +96,9 @@ export async function startAuthFlowServers(
 > {
   const state: MockState = {
     authCodes: new Map(),
-    users: new Map([[user.discord_id, options.user ?? user]]),
+    users: options.user
+      ? new Map([[user.discord_id, options.user]])
+      : new Map(),
     otpChallenges: new Map(),
     personalAccessTokens: new Map(),
     rememberTokens: new Map(),
@@ -179,8 +181,6 @@ function accountEnv(input: {
     DISCORD_BOT_TOKEN: "discord-bot-token",
     DISCORD_CLIENT_ID: "discord-client-id",
     DISCORD_CLIENT_SECRET: "discord-client-secret",
-    DISCORD_PUBLIC_KEY:
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     DISCORD_GUILD_IDS: "guild",
     DOMAIN_NAME: "localhost",
     OTP_HMAC_SECRET: "otp-secret",
@@ -216,7 +216,12 @@ async function startMockServer(state: MockState): Promise<TestServer> {
       return Response.json({ access_token: "discord-access-token" });
     }
     if (url.pathname === "/discord/users/@me") {
-      return Response.json({ id: user.discord_id });
+      return Response.json({
+        avatar: null,
+        global_name: user.display_name,
+        id: user.discord_id,
+        username: user.discord_id,
+      });
     }
     if (url.pathname === "/discord/users/@me/guilds/guild/member") {
       return Response.json({ ok: true });
