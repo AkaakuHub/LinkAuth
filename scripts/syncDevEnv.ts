@@ -37,10 +37,26 @@ if (options.appOutput) {
   ]);
 }
 
+if (options.terraformOutput) {
+  await writeTerraformVarsFile(options.terraformOutput, [
+    ["cloudflare_api_token", "CLOUDFLARE_API_TOKEN"],
+    ["cloudflare_account_id", "CLOUDFLARE_ACCOUNT_ID"],
+    ["cloudflare_zone_id", "CLOUDFLARE_ZONE_ID"],
+    ["domain_name", "DOMAIN_NAME"],
+    ["project_name", "PROJECT_NAME"],
+    ["account_worker_service_name", "ACCOUNT_WORKER_SERVICE_NAME"],
+    ["account_cleanup_cron", "CLOUDFLARE_ACCOUNT_CLEANUP_CRON"],
+  ]);
+}
+
 console.log(
-  options.appOutput
-    ? `Synced ${options.envFile} to ${options.accountOutput} and ${options.appOutput}`
-    : `Synced ${options.envFile} to ${options.accountOutput}`,
+  `Synced ${options.envFile} to ${[
+    options.accountOutput,
+    options.appOutput,
+    options.terraformOutput,
+  ]
+    .filter((path) => path !== null)
+    .join(" and ")}`,
 );
 
 type Options = {
@@ -48,6 +64,7 @@ type Options = {
   appOutput: string | null;
   envFile: string;
   envName: string;
+  terraformOutput: string | null;
 };
 
 type Mapping = string | [destinationKey: string, sourceKey: string];
@@ -62,6 +79,8 @@ function parseOptions(args: string[]): Options {
     appOutput: optionValue(args, "--app-out") ?? defaultAppOutput(envName),
     envFile,
     envName,
+    terraformOutput:
+      optionValue(args, "--terraform-out") ?? defaultTerraformOutput(envName),
   };
 }
 
@@ -87,6 +106,10 @@ function defaultAppOutput(envName: string): string | null {
   return envName === "local" ? "workers/app/.dev.vars" : null;
 }
 
+function defaultTerraformOutput(envName: string): string | null {
+  return envName === "local" ? null : "infra/terraform.tfvars";
+}
+
 function workerEnvironment(envName: string): "local" | "production" {
   return envName === "local" ? "local" : "production";
 }
@@ -107,6 +130,22 @@ async function writeEnvFile(
       throw new Error(`${sourceKey} is required in ${options.envFile}`);
     }
     lines.push(`${destinationKey}=${quoteEnv(value)}`);
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${lines.join("\n")}\n`);
+}
+
+async function writeTerraformVarsFile(
+  path: string,
+  mappings: Array<[destinationKey: string, sourceKey: string]>,
+): Promise<void> {
+  const lines: string[] = [];
+  for (const [destinationKey, sourceKey] of mappings) {
+    const value = source.get(sourceKey);
+    if (!value) {
+      throw new Error(`${sourceKey} is required in ${options.envFile}`);
+    }
+    lines.push(`${destinationKey} = ${JSON.stringify(value)}`);
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${lines.join("\n")}\n`);

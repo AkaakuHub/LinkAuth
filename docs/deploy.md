@@ -49,7 +49,7 @@ Copy-Item .env.production.example .env.production
 pnpm prod:env
 ```
 
-`pnpm prod:env`は`.wrangler/env/production/account.vars`だけを生成します。
+`pnpm prod:env`は`.wrangler/env/production/account.vars`と`infra/terraform.tfvars`を生成します。環境ごとの値は`.env.production`へ集約し、生成ファイルは直接編集しません。
 
 主な値です。
 
@@ -58,6 +58,15 @@ pnpm prod:env
 - `ACCOUNT_URL`:account WorkerのURL
 - `DOMAIN_NAME`:本番domain
 - `SESSION_KID`:account/app session署名key ID
+
+Cloudflare用の値です。
+
+- `CLOUDFLARE_API_TOKEN`:Terraform用Cloudflare API token
+- `CLOUDFLARE_ACCOUNT_ID`:Cloudflare account ID
+- `CLOUDFLARE_ZONE_ID`:Cloudflare zone ID
+- `CLOUDFLARE_ACCOUNT_CLEANUP_CRON`:期限切れ認証データ削除schedule
+- `PROJECT_NAME`:D1 database名とR2 bucket名のprefix
+- `ACCOUNT_WORKER_SERVICE_NAME`:account Worker service名
 
 account Worker用の値です。
 
@@ -85,7 +94,7 @@ openssl rand -base64 32
 
 ## 初回作成
 
-初回はD1とR2を先に作成します。
+初回はD1とR2を先に作成します。`infra/terraform.tfvars`は`pnpm prod:env`で生成済みにします。
 
 ```powershell
 pnpm tf:init
