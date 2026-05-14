@@ -82,6 +82,32 @@ export function textInput({
   return `<input class="${cn("h-12 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/20", className)}"${attributes}>`;
 }
 
+export function formField({
+  control,
+  label,
+  labelFor,
+}: {
+  control: string;
+  label: string;
+  labelFor: string;
+}): string {
+  return `<div class="grid gap-2"><label class="text-sm font-semibold text-ink" for="${escapeHtml(labelFor)}">${escapeHtml(label)}</label>${control}</div>`;
+}
+
+export function radioOption({
+  checked = false,
+  label,
+  name,
+  value,
+}: {
+  checked?: boolean;
+  label: string;
+  name: string;
+  value: string;
+}): string {
+  return `<label class="${cn("flex min-h-11 items-center gap-2 rounded-md border border-line bg-panel px-3 text-sm font-medium text-ink transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/10")}"><input class="accent-primary" type="radio"${attr("name", name)}${attr("value", value)}${attr("checked", checked)}>${escapeHtml(label)}</label>`;
+}
+
 export function field({
   label,
   value,

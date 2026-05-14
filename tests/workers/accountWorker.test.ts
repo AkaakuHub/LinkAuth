@@ -677,6 +677,8 @@ test("Account Worker creates a personal access token from the account page", asy
 
   expect(response.status).toBe(200);
   expect(rawToken).toBeTruthy();
+  expect(body).toContain("data-issued-token-dialog");
+  expect(body).toContain("data-issued-token-copy");
   expect(body).toContain("local curl");
   expect(await readPersonalAccessTokenCount("123456789")).toBe(1);
 });

@@ -9,6 +9,7 @@ export type IconName =
   | "arrow-left"
   | "brand-discord"
   | "check"
+  | "copy"
   | "home"
   | "id"
   | "login-2"
@@ -31,6 +32,7 @@ const iconNames: Record<IconName, IconName> = {
   "arrow-left": "arrow-left",
   "brand-discord": "brand-discord",
   check: "check",
+  copy: "copy",
   home: "home",
   id: "id",
   "login-2": "login-2",

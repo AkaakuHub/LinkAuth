@@ -3,6 +3,7 @@ import Cropper from "cropperjs";
 setupPageCacheRefresh();
 setupHistoryBackLink();
 setupDeleteConfirmation();
+setupIssuedTokenDialog();
 setupProfileForm();
 setupAvatarUpload();
 setupOtpInput();
@@ -38,6 +39,42 @@ function setupDeleteConfirmation(): void {
       event.preventDefault();
     }
   });
+}
+
+function setupIssuedTokenDialog(): void {
+  const dialog = document.querySelector("[data-issued-token-dialog]");
+  if (!(dialog instanceof HTMLDialogElement)) {
+    return;
+  }
+
+  const token = dialog.querySelector("[data-issued-token-value]");
+  const copy = dialog.querySelector("[data-issued-token-copy]");
+  const close = dialog.querySelector("[data-issued-token-close]");
+  const status = dialog.querySelector("[data-issued-token-status]");
+  if (
+    !(token instanceof HTMLElement) ||
+    !(copy instanceof HTMLButtonElement) ||
+    !(close instanceof HTMLButtonElement) ||
+    !(status instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  const closeDialog = () => {
+    dialog.close();
+  };
+
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(token.textContent ?? "");
+      status.textContent = "コピーしました";
+    } catch {
+      status.textContent = "コピーできませんでした";
+    }
+  });
+  close.addEventListener("click", closeDialog);
+  dialog.addEventListener("cancel", closeDialog);
+  dialog.showModal();
 }
 
 function setupProfileForm(): void {

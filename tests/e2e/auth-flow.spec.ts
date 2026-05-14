@@ -152,6 +152,7 @@ test("Account page creates a personal access token", async ({ page }) => {
   await expect(
     page.locator("code").filter({ hasText: "lka_pat_" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "コピー" })).toBeVisible();
   expect(servers.state.personalAccessTokens.size).toBe(1);
 });
 

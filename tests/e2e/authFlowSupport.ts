@@ -64,6 +64,7 @@ export async function createPersonalAccessTokenFromAccountPage(
   await page.getByLabel("名前").fill("local curl");
   await page.getByRole("button", { name: "発行" }).click();
   await expect(page.getByText("発行済みtoken").first()).toBeVisible();
+  await page.getByRole("button", { name: "閉じる" }).click();
 }
 
 export async function expireCookies(
