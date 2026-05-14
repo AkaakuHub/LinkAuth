@@ -25,6 +25,7 @@
   "scripts": {
     "build:lib": "rm -rf dist && tsc -p tsconfig.lib.json",
     "check": "biome check .",
+    "postinstall": "lefthook install",
     "prepack": "pnpm build:lib",
     "test": "pnpm test:workers && pnpm test:scripts",
     "test:e2e": "playwright test --config playwright.config.ts",
