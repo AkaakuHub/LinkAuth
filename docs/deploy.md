@@ -21,10 +21,11 @@ pnpm prod:env
 主な値です。
 
 - `ACCOUNT_URL`:account WorkerのURL
-- `AUTH_APPS`:app定義。`session_verify_secret`はapp session secretと一致させます。
+- `APP_ID`:このenvから生成するapp Workerのapp ID
+- `AUTH_APPS`:認可するapp定義。複数appは配列へ追加し、各`session_verify_secret`は該当appの`APP_SESSION_HMAC_SECRET`と一致させます。
 - `DOMAIN_NAME`:本番domain
 - `SESSION_HMAC_SECRET`:account session署名secret
-- `APP_SESSION_HMAC_SECRET`:app session署名secret
+- `APP_SESSION_HMAC_SECRET`:`APP_ID`に対応するapp session署名secret
 - `CSRF_HMAC_SECRET`:CSRF署名secret
 - `OTP_HMAC_SECRET`:OTP hash secret
 - Discord関連値

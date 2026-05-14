@@ -12,7 +12,7 @@
 
 必要な値は環境ごとの`.env.*`に設定します。ローカルは`.env.local.example`から`.env.local`を作り、本番は`.env.production.example`から`.env.production`を作ります。Worker用のenvファイルは、環境ごとの`.env.*`から生成します。
 
-`AUTH_APPS`の各appには`session_verify_secret`が必要です。この値はapp Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
+`AUTH_APPS`の各appには`session_verify_secret`が必要です。この値は該当app Workerの`APP_SESSION_HMAC_SECRET`と同じ値にします。複数appがある場合は`AUTH_APPS`へappごとに追加し、`.env.*`の`APP_ID`で今回生成するapp Workerを選びます。`session_verify_secret`がないappは`/token`と`/session/verify`で拒否されます。
 
 ## ローカル確認
 
@@ -73,7 +73,7 @@ https://account.<your-domain>/callback
 
 ## Cloudflare設定
 
-運用手順だけを確認する場合は`docs/cloudflare.md`も見てください。
+運用手順だけを確認する場合は`docs/deploy.md`も見てください。
 
 Terraformで管理するCloudflareリソースは次です。
 
