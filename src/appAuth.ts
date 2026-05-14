@@ -16,7 +16,7 @@ import {
 } from "./session.js";
 
 const appSessionMaxAgeSeconds = 1_800;
-const persistentAppSessionMaxAgeSeconds = 3_600;
+const persistentAppSessionMaxAgeSeconds = 15_552_000;
 
 export type LinkAuthAppConfig = {
   appId: string;

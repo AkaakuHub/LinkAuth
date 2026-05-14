@@ -212,9 +212,9 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
   if (!sessionPayload) {
     throw new Error("app session cookie was not valid");
   }
-  expect(sessionPayload.exp).toBe(sessionPayload.iat + 3_600);
+  expect(sessionPayload.exp).toBe(sessionPayload.iat + 15_552_000);
   expect(setCookieHeader(setCookie, appSessionCookieName("hub"))).toContain(
-    "Max-Age=3600",
+    "Max-Age=15552000",
   );
   expect(setCookie).toContain("Max-Age=0");
   expect(setCookie).toContain("HttpOnly");
