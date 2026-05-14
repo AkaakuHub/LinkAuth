@@ -46,8 +46,8 @@
     "dev:account": "wrangler dev --config workers/account/wrangler.toml --local --port 8787 --inspector-port 0 --live-reload",
     "dev:service": "wrangler dev --config workers/app/wrangler.toml --local --port 8789 --inspector-port 0 --live-reload",
     "knip": "knip",
-    "tf:fmt": "terraform -chdir=infra fmt",
-    "tf:fmt:check": "terraform -chdir=infra fmt -check",
+    "tf:fmt": "terraform fmt infra/*.tf",
+    "tf:fmt:check": "terraform fmt -check infra/*.tf",
     "tf:init": "terraform -chdir=infra init",
     "tf:validate": "terraform -chdir=infra validate"
   },
