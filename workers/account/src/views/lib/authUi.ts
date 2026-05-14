@@ -20,7 +20,7 @@ export function authPanel({
   title: string;
   tone?: AuthPanelTone;
 }): string {
-  return `<section class="auth-card w-full max-w-[32rem] overflow-hidden rounded-lg border border-line bg-panel"><div class="${cn("h-1", tone === "danger" ? "bg-danger" : "bg-primary")}"></div><div class="grid gap-6 p-6 sm:p-8">${authHeader(
+  return `<section class="auth-card w-full max-w-lg overflow-hidden rounded-lg border border-line bg-panel"><div class="${cn("h-1", tone === "danger" ? "bg-danger" : "bg-primary")}"></div><div class="grid gap-6 p-6 sm:p-8">${authHeader(
     {
       description,
       label,

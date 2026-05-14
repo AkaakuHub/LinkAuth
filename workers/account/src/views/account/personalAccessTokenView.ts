@@ -115,7 +115,7 @@ function personalAccessTokenRow({
   escapedReturnTo: string;
 }): string {
   const revoked = token.revokedAt !== null;
-  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-haze p-2 px-4"><div class="grid min-w-0 gap-1"><div class="break-words text-sm font-semibold text-ink my-1">${escapeHtml(token.name)}</div><div class="text-xs leading-5 text-muted my-1">expires ${escapeHtml(formatExpiresAt(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</div></div>${
+  return `<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-haze p-2 px-4"><div class="grid min-w-0 gap-1"><div class="wrap-break-word text-sm font-semibold text-ink my-1">${escapeHtml(token.name)}</div><div class="text-xs leading-5 text-muted my-1">expires ${escapeHtml(formatExpiresAt(token.expiresAt))}${token.lastUsedAt ? ` / last used ${escapeHtml(token.lastUsedAt)}` : ""}${revoked ? " / revoked" : ""}</div></div>${
     revoked
       ? ""
       : `<form method="post" action="/tokens/revoke"><input type="hidden" name="csrf_token"${attr("value", csrfToken)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="token_id"${attr("value", token.tokenId)}>${button(

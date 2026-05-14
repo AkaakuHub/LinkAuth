@@ -58,7 +58,7 @@ function accountProfileCard({
     className: "overflow-hidden rounded-lg p-0",
     children: `<div class="h-12 border-b border-line bg-primary sm:h-16"></div><div class="relative grid justify-items-center px-5 pb-5">${avatarEditor(
       user,
-    )}<div class="grid min-w-0 justify-items-center gap-1 text-center"><div class="flex min-w-0 flex-wrap items-center justify-center gap-2" data-profile-display><div class="break-words text-2xl font-semibold leading-tight text-ink sm:text-3xl my-3">${escapeHtml(user.display_name)}</div>${button(
+    )}<div class="grid min-w-0 justify-items-center gap-1 text-center"><div class="flex min-w-0 flex-wrap items-center justify-center gap-2" data-profile-display><div class="wrap-break-word text-2xl font-semibold leading-tight text-ink sm:text-3xl my-3">${escapeHtml(user.display_name)}</div>${button(
       {
         type: "button",
         variant: "secondary",

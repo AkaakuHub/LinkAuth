@@ -105,7 +105,7 @@ export function radioOption({
   name: string;
   value: string;
 }): string {
-  return `<label class="${cn("flex min-h-11 items-center gap-2 rounded-md border border-line bg-paper px-3 text-sm font-medium text-ink transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/15")}"><input class="accent-primary" type="radio"${attr("name", name)}${attr("value", value)}${attr("checked", checked)}>${escapeHtml(label)}</label>`;
+  return `<label class="${cn("flex min-h-11 items-center gap-2 rounded-md border border-line bg-paper px-3 text-sm font-medium text-ink transition-colors has-checked:border-primary has-checked:bg-primary/15")}"><input class="accent-primary" type="radio"${attr("name", name)}${attr("value", value)}${attr("checked", checked)}>${escapeHtml(label)}</label>`;
 }
 
 export function field({
@@ -115,5 +115,5 @@ export function field({
   label: string;
   value: string;
 }): string {
-  return `<div class="grid gap-1 border-b border-line/70 py-3 sm:grid-cols-[10rem_1fr] sm:gap-4"><dt class="text-sm font-medium text-muted">${escapeHtml(label)}</dt><dd class="min-w-0 break-words text-sm font-medium text-ink">${value}</dd></div>`;
+  return `<div class="grid gap-1 border-b border-line/70 py-3 sm:grid-cols-[10rem_1fr] sm:gap-4"><dt class="text-sm font-medium text-muted">${escapeHtml(label)}</dt><dd class="min-w-0 wrap-break-word text-sm font-medium text-ink">${value}</dd></div>`;
 }
