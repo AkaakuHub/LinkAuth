@@ -47,22 +47,23 @@ async function handleAppRequest(
       ? Response.json({ error: "unauthorized" }, { status: 401 })
       : Response.redirect(new URL("/login", request.url), 302);
   }
-  const session = bearerToken ?? cookieToken;
-  const currentUserFromBearer =
-    bearerToken && !cookieToken
-      ? await fetchCurrentUser(request, config, bearerToken)
-      : null;
-  if (currentUserFromBearer) {
-    return authenticatedResponse(request, url, config, currentUserFromBearer);
+  if (bearerToken && !cookieToken) {
+    const currentUser = await fetchCurrentUser(request, config, bearerToken);
+    if (currentUser) {
+      return authenticatedResponse(request, url, config, currentUser);
+    }
+    return url.pathname.startsWith("/api/")
+      ? Response.json({ error: "unauthorized" }, { status: 401 })
+      : Response.redirect(new URL("/login", request.url), 302);
   }
-  const payload = session
+  const payload = cookieToken
     ? await verifyAuthToken(
-        session,
+        cookieToken,
         { [config.session.kid]: config.session.secret },
         Math.floor(Date.now() / 1000),
       )
     : null;
-  if (!session || !payload || payload.app_id !== config.appId) {
+  if (!cookieToken || !payload || payload.app_id !== config.appId) {
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
@@ -77,7 +78,7 @@ async function handleAppRequest(
     }
     return new Response("not found", { status: 404 });
   }
-  const currentUser = await fetchCurrentUser(request, config, session);
+  const currentUser = await fetchCurrentUser(request, config, cookieToken);
   if (!currentUser) {
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ error: "unauthorized" }, { status: 401 });

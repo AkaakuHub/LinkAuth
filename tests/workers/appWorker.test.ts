@@ -15,6 +15,8 @@ const env = {
   DOMAIN_NAME: "example.com",
   SESSION_KID: "app-session-key",
 };
+const personalAccessToken =
+  "lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -310,7 +312,7 @@ test("App Worker returns the current user with a valid app session", async () =>
   });
 });
 
-test("App Worker returns the current user with a valid bearer token", async () => {
+test("App Worker rejects a valid app session sent as bearer token", async () => {
   const session = await createAppSession("hub");
   vi.stubGlobal(
     "fetch",
@@ -318,12 +320,32 @@ test("App Worker returns the current user with a valid bearer token", async () =
       expect(init?.headers).toMatchObject({
         authorization: `Bearer ${session}`,
       });
-      return Response.json({ user: currentUser });
+      return Response.json({ error: "unauthorized" }, { status: 401 });
     },
   );
   const response = await fetchApp("https://app.example.com/api/me", {
     headers: {
       authorization: `Bearer ${session}`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
+test("App Worker returns the current user with a personal access bearer token", async () => {
+  vi.stubGlobal(
+    "fetch",
+    async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({
+        authorization: `Bearer ${personalAccessToken}`,
+      });
+      return Response.json({ user: currentUser });
+    },
+  );
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      authorization: `Bearer ${personalAccessToken}`,
     },
   });
 
@@ -340,35 +362,18 @@ test("App Worker returns the current user with a valid bearer token", async () =
   });
 });
 
-test("App Worker returns the current user with a personal access bearer token", async () => {
-  vi.stubGlobal(
-    "fetch",
-    async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.headers).toMatchObject({
-        authorization:
-          "Bearer lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
-      });
-      return Response.json({ user: currentUser });
-    },
+test("App Worker rejects a personal access bearer token when account verification fails", async () => {
+  vi.stubGlobal("fetch", async () =>
+    Response.json({ error: "unauthorized" }, { status: 401 }),
   );
   const response = await fetchApp("https://app.example.com/api/me", {
     headers: {
-      authorization:
-        "Bearer lka_pat_abcdefghijklmnopqrstuvwx.abcdefghijklmnopqrstuvwxyzABCDEFGHI",
+      authorization: `Bearer ${personalAccessToken}`,
     },
   });
 
-  expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
-    user: {
-      discord_id: "123456789",
-      display_name: "Current Akaaku",
-      icon_key: "icons/123456789/avatar.webp",
-      icon_source: "r2",
-      role: "admin",
-      status: "active",
-    },
-  });
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
 });
 
 test("App Worker rejects conflicting cookie and bearer session tokens", async () => {

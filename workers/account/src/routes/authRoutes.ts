@@ -356,14 +356,13 @@ export async function sessionVerify(
         token: bearerToken,
         scope: "session:verify",
       });
-      if (verified) {
-        return Response.json({ user: verified.user });
-      }
+      return verified
+        ? Response.json({ user: verified.user })
+        : Response.json({ error: "unauthorized" }, { status: 401 });
     }
-    const session = bearerToken ?? cookieToken;
-    const payload = session
+    const payload = cookieToken
       ? await verifySessionCookie(
-          session,
+          cookieToken,
           { [config.session.kid]: app.sessionVerifySecret },
           Math.floor(Date.now() / 1000),
         )
