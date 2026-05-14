@@ -170,7 +170,7 @@ export async function verifyPersonalAccessToken(
   ) {
     return null;
   }
-  const user = await getActiveUser(config, row.discord_id, true);
+  const user = await getPersonalAccessTokenUser(config, row.discord_id);
   if (!user) {
     return null;
   }
@@ -246,5 +246,24 @@ function parseScopes(value: string): PersonalAccessTokenScope[] | null {
     return scopes;
   } catch {
     return null;
+  }
+}
+
+async function getPersonalAccessTokenUser(
+  config: AccountConfig,
+  discordId: string,
+): Promise<User | null> {
+  try {
+    return await getActiveUser(config, discordId, true);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "left_guild" ||
+        error.message === "guild_check_failed" ||
+        error.message === "discord_unavailable")
+    ) {
+      return null;
+    }
+    throw error;
   }
 }

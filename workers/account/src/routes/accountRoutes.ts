@@ -216,7 +216,7 @@ export async function createToken(
   const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
   const name = normalizePersonalAccessTokenName(String(form.get("name") ?? ""));
   const expiration = normalizePersonalAccessTokenExpiration(
-    String(form.get("expiration") ?? "90d"),
+    String(form.get("expiration") ?? ""),
   );
   if (!name) {
     return new Response("invalid token name", { status: 400 });

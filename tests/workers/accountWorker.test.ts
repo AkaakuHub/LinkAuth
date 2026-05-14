@@ -677,6 +677,25 @@ test("Account Worker token creation rejects invalid expiration values", async ()
   expect(await readPersonalAccessTokenCount("123456789")).toBe(0);
 });
 
+test("Account Worker token creation rejects missing expiration values", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+  const response = await fetchAccount("https://account.example.com/tokens", {
+    body: new URLSearchParams({
+      csrf_token: csrfToken,
+      name: "local curl",
+    }),
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      origin: "https://account.example.com",
+    },
+    method: "POST",
+  });
+
+  expect(response.status).toBe(400);
+  expect(await readPersonalAccessTokenCount("123456789")).toBe(0);
+});
+
 test("Account Worker revokes a personal access token from the account page", async () => {
   const { record } = await createPersonalAccessToken(testAccountConfig(), {
     discordId: "123456789",
@@ -703,6 +722,35 @@ test("Account Worker revokes a personal access token from the account page", asy
 
   expect(response.status).toBe(303);
   expect(await readPersonalAccessTokenRevokedAt(record.tokenId)).toBeTruthy();
+});
+
+test("Account Worker token revocation does not revoke another user's token", async () => {
+  await seedActiveUser({ discordId: "987654321" });
+  const { record } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "987654321",
+    expiration: "90d",
+    name: "other user token",
+  });
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("token");
+
+  const response = await fetchAccount(
+    "https://account.example.com/tokens/revoke",
+    {
+      body: new URLSearchParams({
+        csrf_token: csrfToken,
+        token_id: record.tokenId,
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(303);
+  expect(await readPersonalAccessTokenRevokedAt(record.tokenId)).toBeNull();
 });
 
 test("Account Worker session verify rejects app sessions with the wrong app_id", async () => {
@@ -1899,6 +1947,7 @@ async function resetDatabase(): Promise<void> {
 
 async function seedActiveUser(
   input: {
+    discordId?: string;
     displayName?: string;
     iconKey?: string;
     iconSource?: "discord" | "r2" | "none";
@@ -1916,7 +1965,7 @@ async function seedActiveUser(
       ) VALUES (?, ?, 'admin', ?, 'guild', 'active', ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
-      activeUser.discord_id,
+      input.discordId ?? activeUser.discord_id,
       input.displayName ?? activeUser.display_name,
       input.status ?? "active",
       input.guildCheckedAt ?? now,

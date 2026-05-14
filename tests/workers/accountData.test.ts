@@ -579,6 +579,23 @@ test("Personal access token rejects revoked values", async () => {
   expect(result).toBeNull();
 });
 
+test("Personal access token rejects expired values", async () => {
+  const now = nowSeconds();
+  const { token } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    expiration: "90d",
+    name: "local curl",
+    nowSeconds: now - 90 * 24 * 60 * 60,
+  });
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token,
+    scope: "session:verify",
+  });
+
+  expect(result).toBeNull();
+});
+
 test("Personal access token can be created without expiration", async () => {
   const { token, record } = await createPersonalAccessToken(
     testAccountConfig(),
@@ -596,6 +613,25 @@ test("Personal access token can be created without expiration", async () => {
 
   expect(record.expiresAt).toBeNull();
   expect(result?.record.expiresAt).toBeNull();
+});
+
+test("Personal access token rejects users that left the Discord guild", async () => {
+  const { token } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    expiration: "90d",
+    name: "local curl",
+  });
+  await setUserStatus("123456789", "disabled", "left_guild");
+  vi.stubGlobal("fetch", async () => {
+    return Response.json({ error: "not_found" }, { status: 404 });
+  });
+
+  const result = await verifyPersonalAccessToken(testAccountConfig(), {
+    token,
+    scope: "session:verify",
+  });
+
+  expect(result).toBeNull();
 });
 
 test("Personal access token delete-all removes only tokens for the user", async () => {
