@@ -1,11 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { validateAppEnv } from "./appEnv.js";
+import { validateAuthApps, validateSampleAppEnv } from "./appEnv.js";
 import { readEnvFile } from "./env.js";
 
 const options = parseOptions(process.argv.slice(2));
 const source = await readEnvFile(options.envFile);
-validateAppEnv(source, options.envFile);
+validateAuthApps(source, options.envFile);
+if (options.appOutput) {
+  validateSampleAppEnv(source, options.envFile);
+}
 
 await writeEnvFile(options.accountOutput, [
   ["LINK_AUTH_ENV", workerEnvironment(options.envName)],
@@ -24,21 +27,25 @@ await writeEnvFile(options.accountOutput, [
   "DISCORD_GUILD_IDS",
 ]);
 
-await writeEnvFile(options.appOutput, [
-  "APP_ID",
-  "SESSION_KID",
-  "APP_SESSION_HMAC_SECRET",
-  "DOMAIN_NAME",
-  "ACCOUNT_URL",
-]);
+if (options.appOutput) {
+  await writeEnvFile(options.appOutput, [
+    "APP_ID",
+    "SESSION_KID",
+    "APP_SESSION_HMAC_SECRET",
+    "DOMAIN_NAME",
+    "ACCOUNT_URL",
+  ]);
+}
 
 console.log(
-  `Synced ${options.envFile} to ${options.accountOutput} and ${options.appOutput}`,
+  options.appOutput
+    ? `Synced ${options.envFile} to ${options.accountOutput} and ${options.appOutput}`
+    : `Synced ${options.envFile} to ${options.accountOutput}`,
 );
 
 type Options = {
   accountOutput: string;
-  appOutput: string;
+  appOutput: string | null;
   envFile: string;
   envName: string;
 };
@@ -76,10 +83,8 @@ function defaultAccountOutput(envName: string): string {
     : `.wrangler/env/${envName}/account.vars`;
 }
 
-function defaultAppOutput(envName: string): string {
-  return envName === "local"
-    ? "workers/app/.dev.vars"
-    : `.wrangler/env/${envName}/app.vars`;
+function defaultAppOutput(envName: string): string | null {
+  return envName === "local" ? "workers/app/.dev.vars" : null;
 }
 
 function workerEnvironment(envName: string): "local" | "production" {

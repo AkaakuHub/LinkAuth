@@ -1,7 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { validateAppEnv } from "../../scripts/appEnv.js";
+import {
+  validateAuthApps,
+  validateSampleAppEnv,
+} from "../../scripts/appEnv.js";
 
-describe("validateAppEnv", () => {
+describe("validateAuthApps", () => {
+  it("AUTH_APPSの各appにsession_verify_secretがあることを検証する", () => {
+    const source = env({
+      AUTH_APPS: JSON.stringify([
+        {
+          app_id: "admin",
+          callback_url: "https://admin.example.com/_auth/callback",
+          session_verify_secret: "admin-secret",
+        },
+        {
+          app_id: "service",
+          callback_url: "https://app.example.com/_auth/callback",
+          session_verify_secret: "service-secret",
+        },
+      ]),
+    });
+
+    expect(() => validateAuthApps(source, ".env.production")).not.toThrow();
+  });
+
+  it("session_verify_secretがないappを拒否する", () => {
+    const source = env({
+      AUTH_APPS: JSON.stringify([
+        {
+          app_id: "service",
+          callback_url: "https://app.example.com/_auth/callback",
+        },
+      ]),
+    });
+
+    expect(() => validateAuthApps(source, ".env.production")).toThrow(
+      "AUTH_APPS item is invalid",
+    );
+  });
+});
+
+describe("validateSampleAppEnv", () => {
   it("複数appからAPP_IDに対応するsession_verify_secretを検証する", () => {
     const source = env({
       APP_ID: "service",
@@ -20,7 +59,7 @@ describe("validateAppEnv", () => {
       ]),
     });
 
-    expect(() => validateAppEnv(source, ".env.production")).not.toThrow();
+    expect(() => validateSampleAppEnv(source, ".env.local")).not.toThrow();
   });
 
   it("AUTH_APPSにAPP_IDがない場合は拒否する", () => {
@@ -36,7 +75,7 @@ describe("validateAppEnv", () => {
       ]),
     });
 
-    expect(() => validateAppEnv(source, ".env.production")).toThrow(
+    expect(() => validateSampleAppEnv(source, ".env.local")).toThrow(
       "AUTH_APPS must include APP_ID",
     );
   });
@@ -54,7 +93,7 @@ describe("validateAppEnv", () => {
       ]),
     });
 
-    expect(() => validateAppEnv(source, ".env.production")).toThrow(
+    expect(() => validateSampleAppEnv(source, ".env.local")).toThrow(
       "APP_SESSION_HMAC_SECRET must match AUTH_APPS selected app session_verify_secret",
     );
   });

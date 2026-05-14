@@ -1,4 +1,28 @@
-export function validateAppEnv(
+export function validateAuthApps(
+  source: Map<string, string>,
+  envFile: string,
+): void {
+  const authApps = source.get("AUTH_APPS");
+  if (!authApps) {
+    throw new Error(`AUTH_APPS is required in ${envFile}`);
+  }
+  const parsed = parseAuthApps(authApps);
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") {
+      throw new Error("AUTH_APPS item is invalid");
+    }
+    const record = item as Record<string, unknown>;
+    if (
+      typeof record.app_id !== "string" ||
+      typeof record.callback_url !== "string" ||
+      typeof record.session_verify_secret !== "string"
+    ) {
+      throw new Error("AUTH_APPS item is invalid");
+    }
+  }
+}
+
+export function validateSampleAppEnv(
   source: Map<string, string>,
   envFile: string,
 ): void {
@@ -10,10 +34,7 @@ export function validateAppEnv(
       `AUTH_APPS, APP_ID and APP_SESSION_HMAC_SECRET are required in ${envFile}`,
     );
   }
-  const parsed = JSON.parse(authApps) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error("AUTH_APPS must be an array");
-  }
+  const parsed = parseAuthApps(authApps);
   const app = parsed.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -36,4 +57,12 @@ export function validateAppEnv(
       "APP_SESSION_HMAC_SECRET must match AUTH_APPS selected app session_verify_secret",
     );
   }
+}
+
+function parseAuthApps(value: string): unknown[] {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("AUTH_APPS must be an array");
+  }
+  return parsed;
 }

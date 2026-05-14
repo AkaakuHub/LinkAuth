@@ -49,6 +49,8 @@ Copy-Item .env.production.example .env.production
 pnpm prod:env
 ```
 
+`pnpm prod:env`は`.wrangler/env/production/account.vars`だけを生成します。
+
 主な値です。
 
 共通値です。
@@ -59,18 +61,15 @@ pnpm prod:env
 
 account Worker用の値です。
 
-- `AUTH_APPS`:認可するapp定義。複数appは配列へ追加し、各`session_verify_secret`は該当appの`APP_SESSION_HMAC_SECRET`と一致させます。
+- `AUTH_APPS`:認可するapp定義。複数appは配列へ追加し、各`session_verify_secret`は該当app側の`APP_SESSION_HMAC_SECRET`と一致させます。
 - `SESSION_HMAC_SECRET`:account session署名secret
 - `CSRF_HMAC_SECRET`:CSRF署名secret
 - `OTP_HMAC_SECRET`:OTP hash secret
 - Discord関連値
 
-サンプルapp Worker用の値です。
+`workers/app`は利用方法を示すローカルサンプルであり、本番へdeployしません。
 
-- `APP_ID`:このenvから生成するapp Workerのapp ID
-- `APP_SESSION_HMAC_SECRET`:`APP_ID`に対応するapp session署名secret
-
-secret値は32bytes以上の乱数を使います。`SESSION_HMAC_SECRET`、`APP_SESSION_HMAC_SECRET`、`CSRF_HMAC_SECRET`、`OTP_HMAC_SECRET`は別々に生成します。
+secret値は32bytes以上の乱数を使います。`SESSION_HMAC_SECRET`、各appの`APP_SESSION_HMAC_SECRET`、`CSRF_HMAC_SECRET`、`OTP_HMAC_SECRET`は別々に生成します。
 
 Windows PowerShellです。
 
@@ -108,12 +107,3 @@ terraform -chdir=infra apply
 ```
 
 `0003_auth_code_session_persistent.sql`まで適用されていることを確認します。
-
-## app Worker
-
-`workers/app`はサンプルです。Cloudflareへdeployする場合だけ実行します。
-
-```powershell
-pnpm exec wrangler deploy --config workers/app/wrangler.toml
-pnpm exec wrangler secret bulk .wrangler/env/production/app.vars --config workers/app/wrangler.toml
-```
