@@ -31,5 +31,6 @@ export async function accountPage(
     }),
     200,
     noStoreHeaders(),
+    { allowLocalhostCsp: config.environment === "local" },
   );
 }

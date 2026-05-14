@@ -3,7 +3,10 @@ import { page } from "./lib/html.js";
 import { icon } from "./lib/icons.js";
 import { linkButton } from "./lib/ui.js";
 
-export function accountLandingPage(discordAuthorizeUrl: string): Response {
+export function accountLandingPage(
+  discordAuthorizeUrl: string,
+  options: { allowLocalhostCsp: boolean },
+): Response {
   return page(
     "Account",
     authShell(
@@ -21,6 +24,7 @@ export function accountLandingPage(discordAuthorizeUrl: string): Response {
     ),
     200,
     noStoreHeaders(),
+    options,
   );
 }
 

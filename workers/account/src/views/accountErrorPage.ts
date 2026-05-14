@@ -93,5 +93,6 @@ function accountErrorPage(
     ),
     status,
     headers,
+    { allowLocalhostCsp: config.environment === "local" },
   );
 }

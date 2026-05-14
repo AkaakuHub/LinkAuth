@@ -223,7 +223,7 @@ export async function callback(
     return callbackResponse(otpDeliveryFailedPage(config, state.return_to));
   }
   const response = callbackResponse(
-    otpPage(challengeId, state.return_to, state.app_id),
+    otpPage(config, challengeId, state.return_to, state.app_id),
   );
   response.headers.append(
     "set-cookie",

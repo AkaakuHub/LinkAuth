@@ -10,6 +10,7 @@ export type Env = {
   DISCORD_BOT_TOKEN: string;
   DISCORD_GUILD_IDS: string;
   DISCORD_API_BASE?: string;
+  LINK_AUTH_ENV?: string;
   SESSION_KID: string;
   SESSION_HMAC_SECRET: string;
   CSRF_KID: string;

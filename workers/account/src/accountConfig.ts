@@ -9,6 +9,7 @@ const discordApiBase = "https://discord.com/api/v10";
 
 export type AccountConfig = {
   domainName: string;
+  environment: "local" | "production";
   apps: AppDefinition[];
   assets: R2Bucket;
   database: D1Database;
@@ -45,6 +46,7 @@ export function loadAccountConfig(env: Env): AccountConfig {
   const apps = parseAppDefinitions(requiredBinding("AUTH_APPS", env.AUTH_APPS));
   return {
     domainName: requiredBinding("DOMAIN_NAME", env.DOMAIN_NAME),
+    environment: parseEnvironment(env.LINK_AUTH_ENV),
     apps,
     assets: env.ASSETS,
     database: env.DB,
@@ -109,6 +111,16 @@ function requiredBinding(name: string, value: string): string {
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+function parseEnvironment(value: string | undefined): "local" | "production" {
+  if (!value) {
+    return "production";
+  }
+  if (value === "local" || value === "production") {
+    return value;
+  }
+  throw new Error("LINK_AUTH_ENV must be local or production");
 }
 
 function parseAppDefinitions(value: string): AppDefinition[] {

@@ -7,6 +7,7 @@ const source = await readEnvFile(options.envFile);
 const app = appDefinition(source, options.envFile);
 
 await writeEnvFile(options.accountOutput, [
+  ["LINK_AUTH_ENV", workerEnvironment(options.envName)],
   "CSRF_KID",
   "CSRF_HMAC_SECRET",
   "SESSION_KID",
@@ -38,6 +39,7 @@ type Options = {
   accountOutput: string;
   appOutput: string;
   envFile: string;
+  envName: string;
 };
 
 type Mapping = string | [destinationKey: string, sourceKey: string];
@@ -51,6 +53,7 @@ function parseOptions(args: string[]): Options {
       optionValue(args, "--account-out") ?? defaultAccountOutput(envName),
     appOutput: optionValue(args, "--app-out") ?? defaultAppOutput(envName),
     envFile,
+    envName,
   };
 }
 
@@ -76,6 +79,10 @@ function defaultAppOutput(envName: string): string {
   return envName === "local"
     ? "workers/app/.dev.vars"
     : `.wrangler/env/${envName}/app.vars`;
+}
+
+function workerEnvironment(envName: string): "local" | "production" {
+  return envName === "local" ? "local" : "production";
 }
 
 async function writeEnvFile(

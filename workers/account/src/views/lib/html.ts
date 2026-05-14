@@ -5,12 +5,13 @@ export function page(
   body: string,
   status = 200,
   headers?: Headers,
+  options: { allowLocalhostCsp: boolean } = { allowLocalhostCsp: false },
 ): Response {
   return new Response(
     `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>${styleSheet}</style></head><body><main class="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8">${body}</main></body></html>`,
     {
       status,
-      headers: responseHeaders(headers),
+      headers: responseHeaders(headers, options),
     },
   );
 }
@@ -42,8 +43,14 @@ export function attr(name: string, value: string | number | boolean): string {
   return ` ${name}="${escapeHtml(String(value))}"`;
 }
 
-function responseHeaders(headers?: Headers): Headers {
+function responseHeaders(
+  headers: Headers | undefined,
+  options: { allowLocalhostCsp: boolean },
+): Headers {
   const responseHeaders = headers ?? new Headers();
+  const developmentSources = options.allowLocalhostCsp
+    ? ["http://localhost:*"]
+    : [];
   responseHeaders.set("content-type", "text/html; charset=utf-8");
   responseHeaders.set(
     "content-security-policy",
@@ -51,9 +58,9 @@ function responseHeaders(headers?: Headers): Headers {
       "default-src 'none'",
       "base-uri 'none'",
       "connect-src 'self'",
-      "form-action 'self' https: http://localhost:*",
+      `form-action 'self' https: ${developmentSources.join(" ")}`.trim(),
       "frame-ancestors 'none'",
-      "img-src 'self' data: blob: https: http://localhost:*",
+      `img-src 'self' data: blob: https: ${developmentSources.join(" ")}`.trim(),
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
     ].join("; "),

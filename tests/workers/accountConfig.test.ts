@@ -34,6 +34,25 @@ test("Account config derives allowed return_to origins from app callback URLs", 
     "https://app.example.com",
   );
   expect(config.apps[0]?.sessionVerifySecret).toBe("app-session-secret");
+  expect(config.environment).toBe("production");
+});
+
+test("Account config accepts the generated local environment flag", () => {
+  const config = loadAccountConfig({
+    ...baseEnv,
+    LINK_AUTH_ENV: "local",
+  });
+
+  expect(config.environment).toBe("local");
+});
+
+test("Account config rejects invalid environment flags", () => {
+  expect(() =>
+    loadAccountConfig({
+      ...baseEnv,
+      LINK_AUTH_ENV: "staging",
+    }),
+  ).toThrow("LINK_AUTH_ENV must be local or production");
 });
 
 test("Account config can override the Discord API base for local E2E mocks", () => {

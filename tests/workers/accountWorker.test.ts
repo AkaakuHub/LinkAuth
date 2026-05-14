@@ -100,10 +100,23 @@ test("Account Worker HTML responses include browser security headers", async () 
   const response = await fetchAccount("https://auth.example.com/");
 
   expect(response.headers.get("content-security-policy")).toBe(
-    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data: blob: https: http://localhost:*; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https:; frame-ancestors 'none'; img-src 'self' data: blob: https:; script-src 'self'; style-src 'self' 'unsafe-inline'",
   );
   expect(response.headers.get("referrer-policy")).toBe("same-origin");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+});
+
+test("Account Worker allows localhost CSP sources only in local environment", async () => {
+  env.LINK_AUTH_ENV = "local";
+  try {
+    const response = await fetchAccount("https://auth.example.com/");
+
+    expect(response.headers.get("content-security-policy")).toBe(
+      "default-src 'none'; base-uri 'none'; connect-src 'self'; form-action 'self' https: http://localhost:*; frame-ancestors 'none'; img-src 'self' data: blob: https: http://localhost:*; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    );
+  } finally {
+    delete env.LINK_AUTH_ENV;
+  }
 });
 
 test("Account Worker Discord interaction rejects missing signatures", async () => {
