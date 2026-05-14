@@ -1577,6 +1577,25 @@ test("Account Worker account page renders the current icon", async () => {
   expect(body).not.toContain("状態");
 });
 
+test("Account Worker asset route only serves public avatar keys", async () => {
+  const originalGet = assets.get;
+  const requestedKeys: string[] = [];
+  assets.get = async (key: string): Promise<R2ObjectBody | null> => {
+    requestedKeys.push(key);
+    return null;
+  };
+  try {
+    const response = await fetchAccount(
+      "https://auth.example.com/assets/private/secret.webp",
+    );
+
+    expect(response.status).toBe(404);
+    expect(requestedKeys).toEqual([]);
+  } finally {
+    assets.get = originalGet;
+  }
+});
+
 test("Account Worker account page rejects users that left the Discord guild", async () => {
   await replaceActiveUser({
     disabledReason: "left_guild",
