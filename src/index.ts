@@ -1,13 +1,10 @@
 export {
-  appAuthStateCookieName,
   clearAppSession,
   completeAppLogin,
-  createAppAuthState,
   getAppUser,
   type LinkAuthAppConfig,
   type LinkAuthUser,
   startAppLogin,
-  verifyAppAuthState,
 } from "./appAuth.js";
 export { hmacSha256Base64Url, randomBase64Url } from "./crypto.js";
 export {
