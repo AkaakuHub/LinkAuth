@@ -9,9 +9,9 @@
     "includes": [
       "**",
       "!!**/dist",
-      "!!workers/account/src/accountClientGenerated.ts",
-      "!!workers/account/src/views/lib/stylesGenerated.css",
-      "!!workers/account/src/views/lib/stylesGenerated.ts",
+      "!!workers/account/src/generated/accountClient.ts",
+      "!!workers/account/src/generated/styles.css",
+      "!!workers/account/src/generated/styles.ts",
       "!!workers/account/src/views/styles.css"
     ]
   },

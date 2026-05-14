@@ -1,6 +1,6 @@
-import { accountClientScript } from "./accountClientGenerated.js";
 import { type AccountConfig, withAccountConfig } from "./accountConfig.js";
 import { cleanupExpiredAuthData } from "./data/cleanup.js";
+import { accountClientScript } from "./generated/accountClient.js";
 import {
   accountHome,
   createToken,

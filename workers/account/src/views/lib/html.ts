@@ -1,4 +1,4 @@
-import { styleSheet } from "./stylesGenerated.js";
+import { styleSheet } from "../../generated/styles.js";
 
 export function page(
   title: string,

@@ -3,8 +3,8 @@
 @import "../../../../node_modules/cropperjs/dist/cropper.css";
 
 @source "../**/*.ts";
-@source not "../accountClientGenerated.ts";
-@source not "lib/stylesGenerated.ts";
+@source not "../generated/accountClient.ts";
+@source not "../generated/styles.ts";
 
 @theme {
   --font-*: initial;

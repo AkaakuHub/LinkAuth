@@ -16,6 +16,6 @@ if (!accountClientScript) {
 }
 
 await writeFile(
-  "workers/account/src/accountClientGenerated.ts",
+  "workers/account/src/generated/accountClient.ts",
   `export const accountClientScript = ${JSON.stringify(accountClientScript)};\n`,
 );
