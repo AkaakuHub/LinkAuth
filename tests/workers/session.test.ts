@@ -104,6 +104,10 @@ test("Session cookie rejects duplicate cookie values", () => {
   expect(getSingleCookie("sid=first; sid=second", "sid")).toBeNull();
 });
 
+test("Session cookie rejects malformed percent encoding", () => {
+  expect(getSingleCookie("sid=%", "sid")).toBeNull();
+});
+
 test("Bearer token is extracted from an Authorization header", () => {
   expect(getBearerToken("Bearer aaa.bbb.ccc")).toBe("aaa.bbb.ccc");
   expect(

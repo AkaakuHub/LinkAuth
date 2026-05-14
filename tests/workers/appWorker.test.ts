@@ -29,6 +29,17 @@ test("App Worker rejects API requests without a valid app session", async () => 
   expect(await response.json()).toEqual({ error: "unauthorized" });
 });
 
+test("App Worker rejects malformed session cookie values", async () => {
+  const response = await fetchApp("https://app.example.com/api/me", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=%`,
+    },
+  });
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
 test("App Worker redirects the home page to login without a session", async () => {
   const response = await fetchApp("https://app.example.com/");
 

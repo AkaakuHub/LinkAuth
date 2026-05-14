@@ -1577,6 +1577,18 @@ test("Account Worker account page renders the current icon", async () => {
   expect(body).not.toContain("状態");
 });
 
+test("Account Worker treats malformed session cookies as unauthenticated", async () => {
+  const response = await fetchAccount("https://auth.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=%`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("Discordでログイン");
+});
+
 test("Account Worker asset route only serves public avatar keys", async () => {
   const originalGet = assets.get;
   const requestedKeys: string[] = [];

@@ -147,7 +147,11 @@ export function getSingleCookie(
   if (match === undefined) {
     return null;
   }
-  return decodeURIComponent(match.slice(name.length + 1));
+  try {
+    return decodeURIComponent(match.slice(name.length + 1));
+  } catch {
+    return null;
+  }
 }
 
 export function getBearerToken(
