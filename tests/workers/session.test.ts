@@ -1,6 +1,9 @@
+import { expect, test } from "vitest";
 import {
   base64UrlDecodeText,
   base64UrlEncodeText,
+} from "../../src/encoding.js";
+import {
   createCookie,
   createSessionCookie,
   getBearerToken,
@@ -8,8 +11,7 @@ import {
   type SessionPayload,
   signAuthToken,
   verifyAuthToken,
-} from "link-auth";
-import { expect, test } from "vitest";
+} from "../../src/session.js";
 
 const secret = "session-secret";
 const now = 1_800_000_000;

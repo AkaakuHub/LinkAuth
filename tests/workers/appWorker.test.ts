@@ -1,15 +1,15 @@
 import { createExecutionContext } from "cloudflare:test";
-import {
-  appSessionCookieName,
-  signAuthToken,
-  verifyAuthToken,
-} from "link-auth";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   appAuthStateCookieName,
   createAppAuthState,
   verifyAppAuthState,
 } from "../../src/appAuth.js";
+import {
+  appSessionCookieName,
+  signAuthToken,
+  verifyAuthToken,
+} from "../../src/session.js";
 import worker from "../../workers/app/src/index.js";
 
 const env = {
