@@ -9,6 +9,6 @@ bucket_name = "link-auth-assets"
 [[d1_databases]]
 binding = "DB"
 database_name = "link-auth"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "bf3d55a3-44f8-47c8-a333-675851b88819"
 preview_database_id = "DB"
 migrations_dir = "migrations"

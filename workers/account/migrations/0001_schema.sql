@@ -24,7 +24,6 @@ CREATE TABLE auth_codes (
   role TEXT NOT NULL CHECK (role IN ('user', 'admin')),
   icon_source TEXT CHECK (icon_source IN ('discord', 'r2', 'none')),
   icon_key TEXT,
-  session_persistent INTEGER NOT NULL CHECK (session_persistent IN (0, 1)) DEFAULT 1,
   created_at TEXT NOT NULL,
   expires_at INTEGER NOT NULL
 );
