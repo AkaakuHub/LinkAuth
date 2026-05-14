@@ -1,6 +1,7 @@
 import { randomBase64Url } from "../../../../src/crypto.js";
 import {
   createCookie,
+  createSessionCookie,
   deleteCookie,
   rememberCookieName,
   sessionCookieName,
@@ -26,7 +27,9 @@ export async function createAccountSessionResponse(
   const headers = new Headers({ location: input.returnTo });
   headers.append(
     "set-cookie",
-    await createAccountSessionCookie(user, input.config),
+    await createAccountSessionCookie(user, input.config, {
+      persistent: input.rememberMe,
+    }),
   );
   if (input.rememberMe) {
     headers.append(
@@ -42,6 +45,7 @@ export async function createAccountSessionResponse(
 export async function createAccountSessionCookie(
   user: Pick<User, "discord_id" | "display_name" | "role">,
   config: AccountConfig,
+  options: { persistent: boolean } = { persistent: true },
 ): Promise<string> {
   const now = nowSeconds();
   const session = await signSessionCookie(
@@ -55,7 +59,14 @@ export async function createAccountSessionCookie(
     },
     config.session.secret,
   );
-  return createCookie(sessionCookieName, session, accountSessionMaxAgeSeconds);
+  if (options.persistent) {
+    return createCookie(
+      sessionCookieName,
+      session,
+      accountSessionMaxAgeSeconds,
+    );
+  }
+  return createSessionCookie(sessionCookieName, session);
 }
 
 export async function createRememberCookie(

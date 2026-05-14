@@ -2,6 +2,7 @@ import {
   base64UrlDecodeText,
   base64UrlEncodeText,
   createCookie,
+  createSessionCookie,
   getBearerToken,
   getSingleCookie,
   type SessionPayload,
@@ -127,6 +128,12 @@ test("Bearer token rejects malformed Authorization headers", () => {
 test("Session cookie is Secure, HttpOnly, and SameSite=Lax", () => {
   expect(createCookie("sid", "value", 60)).toBe(
     "sid=value; Max-Age=60; Path=/; HttpOnly; Secure; SameSite=Lax",
+  );
+});
+
+test("Session cookie without Max-Age is scoped to the browser session", () => {
+  expect(createSessionCookie("sid", "value")).toBe(
+    "sid=value; Path=/; HttpOnly; Secure; SameSite=Lax",
   );
 });
 

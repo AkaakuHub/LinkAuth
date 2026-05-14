@@ -181,6 +181,16 @@ export function createCookie(
     .join("; ");
 }
 
+export function createSessionCookie(name: string, value: string): string {
+  return [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+  ].join("; ");
+}
+
 export function deleteCookie(name: string): string {
   return [
     `${name}=`,

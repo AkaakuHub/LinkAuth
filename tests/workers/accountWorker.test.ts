@@ -1606,7 +1606,12 @@ test("Account Worker OTP success creates account and remember cookies when remem
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
-  expect(setCookie).toContain("Max-Age=15552000");
+  expect(setCookieHeader(setCookie, sessionCookieName)).toContain(
+    "Max-Age=86400",
+  );
+  expect(setCookieHeader(setCookie, rememberCookieName)).toContain(
+    "Max-Age=15552000",
+  );
   expect(setCookie).toContain("HttpOnly");
   expect(setCookie).toContain("Secure");
   const rememberValue = rememberCookieValue(setCookie);
@@ -1790,7 +1795,10 @@ test("Account Worker OTP success skips remember token creation when remember_me 
   expect(response.headers.get("location")).toBe("https://app.example.com/");
   expect(setCookie).toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
-  expect(setCookie).toContain("Max-Age=0");
+  expect(setCookieHeader(setCookie, sessionCookieName)).not.toContain(
+    "Max-Age",
+  );
+  expect(setCookieHeader(setCookie, rememberCookieName)).toContain("Max-Age=0");
   await expectRememberTokenCount(0);
 });
 
@@ -1978,6 +1986,16 @@ function rememberCookieValue(setCookie: string): string | null {
 function authStateCookieValue(setCookie: string): string | null {
   const match = setCookie.match(/__Host-org_auth_state=([^;,]+)/);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookieHeader(setCookie: string, name: string): string {
+  const header = setCookie
+    .split(/,\s*/)
+    .find((value) => value.startsWith(`${name}=`));
+  if (!header) {
+    throw new Error(`${name} cookie was not set`);
+  }
+  return header;
 }
 
 async function hashTokenForTest(value: string): Promise<string> {
