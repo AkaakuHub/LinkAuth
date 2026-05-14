@@ -1,12 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "local/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,tsx}",
     "src/**/*.{ts,tsx}",
     "workers/*/src/**/*.{ts,tsx}"
   ],
   "project": [
-    "local/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,tsx}",
     "src/**/*.{ts,tsx}",
     "tests/**/*.{ts,tsx}",
     "workers/*/src/**/*.{ts,tsx}"

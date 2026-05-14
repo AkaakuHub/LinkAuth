@@ -19,7 +19,7 @@
     ]
   },
   "include": [
-    "local/**/*.ts",
+    "scripts/**/*.ts",
     "playwright.config.ts",
     "tests/**/*.ts",
     "vitest.*.config.ts",
