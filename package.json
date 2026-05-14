@@ -25,7 +25,6 @@
   "scripts": {
     "build:lib": "rm -rf dist && tsc -p tsconfig.lib.json",
     "check": "biome check .",
-    "postinstall": "lefthook install",
     "prepack": "pnpm build:lib",
     "test": "pnpm test:workers && pnpm test:scripts",
     "test:e2e": "playwright test --config playwright.config.ts",
@@ -58,22 +57,20 @@
     "@playwright/test": "^1.59.1",
     "@tailwindcss/cli": "^4.2.4",
     "@types/node": "^22.15.3",
+    "@tabler/icons": "3.41.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
+    "cropperjs": "1.6.2",
     "dotenv": "^17.4.2",
     "esbuild": "^0.27.3",
     "knip": "^6.7.0",
     "lefthook": "^2.1.6",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^4.1.5",
     "wrangler": "^4.13.0"
-  },
-  "dependencies": {
-    "@tabler/icons": "3.41.1",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cropperjs": "1.6.2",
-    "tailwind-merge": "^3.5.0"
   }
 }
