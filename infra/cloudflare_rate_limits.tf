@@ -10,7 +10,7 @@ resource "cloudflare_ruleset" "account_rate_limits" {
     description = "Limit account asset, session, user, and token endpoints by IP"
     expression = join(" and ", [
       "http.host eq \"${local.account_worker_hostname}\"",
-      "((http.request.uri.path contains \"/assets/icons/\" and http.request.uri.path contains \"/avatar.webp\") or http.request.uri.path in {\"/session/verify\" \"/me\" \"/token\"})",
+      "(http.request.uri.path contains \"/assets/icons/\" or http.request.uri.path in {\"/session/verify\" \"/me\" \"/token\"})",
     ])
     action  = "block"
     enabled = true
