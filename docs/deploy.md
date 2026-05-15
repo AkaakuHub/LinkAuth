@@ -49,7 +49,22 @@ Copy-Item .env.production.example .env.production
 pnpm prod:env
 ```
 
-`pnpm prod:env`は`.wrangler/env/production/account.vars`と`infra/terraform.tfvars`を生成します。環境ごとの値は`.env.production`へ集約し、生成ファイルは直接編集しません。
+`pnpm prod:env`は`.wrangler/env/production/account.vars`と`infra/terraform.tfvars`を生成するだけです。Cloudflare上のWorker secretは更新しません。環境ごとの値は`.env.production`へ集約し、生成ファイルは直接編集しません。
+
+`.env.production`のaccount Worker用secretをCloudflareへ反映するコマンドです。`AUTH_APPS`を変更した場合も、このコマンドで反映します。
+
+```powershell
+pnpm prod:secrets
+```
+
+これは次の処理をまとめて実行します。
+
+```powershell
+pnpm prod:env
+pnpm exec wrangler secret bulk .wrangler/env/production/account.vars --config workers/account/wrangler.toml
+```
+
+Workerコードを変更していない場合、`AUTH_APPS`などのsecret更新に`wrangler deploy`は不要です。
 
 主な値です。
 
@@ -106,8 +121,8 @@ terraform -chdir=infra output d1_database_id
 ## account Worker
 
 ```powershell
-pnpm exec wrangler deploy --config workers/account/wrangler.toml
-pnpm exec wrangler secret bulk .wrangler/env/production/account.vars --config workers/account/wrangler.toml
+pnpm prod:secrets
+pnpm prod:account:deploy
 pnpm d1:migrations:list
 pnpm d1:migrations:apply
 terraform -chdir=infra apply

@@ -31,6 +31,8 @@
     "dev:assets": "tsx scripts/watchDevAssets.ts",
     "dev:env": "tsx scripts/syncDevEnv.ts",
     "prod:env": "tsx scripts/syncDevEnv.ts --env production",
+    "prod:secrets": "pnpm prod:env && wrangler secret bulk .wrangler/env/production/account.vars --config workers/account/wrangler.toml",
+    "prod:account:deploy": "wrangler deploy --config workers/account/wrangler.toml",
     "dev:seed": "tsx scripts/seedD1.ts",
     "d1:migrations:apply": "wrangler d1 migrations apply link-auth --remote --config workers/account/wrangler.toml",
     "d1:migrations:list": "wrangler d1 migrations list link-auth --remote --config workers/account/wrangler.toml",
