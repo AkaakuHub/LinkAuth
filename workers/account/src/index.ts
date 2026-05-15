@@ -25,6 +25,7 @@ export default withAccountConfig(handleAccountRequest, handleScheduled);
 async function handleAccountRequest(
   request: Request,
   config: AccountConfig,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === "/account-client.js" && request.method === "GET") {
@@ -78,7 +79,7 @@ async function handleAccountRequest(
     return updateProfile(request, url, config);
   }
   if (url.pathname === "/avatar" && request.method === "POST") {
-    return updateAvatar(request, url, config);
+    return updateAvatar(request, url, config, ctx);
   }
   if (url.pathname === "/tokens" && request.method === "POST") {
     return createToken(request, url, config);

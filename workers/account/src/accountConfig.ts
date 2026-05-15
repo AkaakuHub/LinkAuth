@@ -83,7 +83,11 @@ export function loadAccountConfig(env: Env): AccountConfig {
 }
 
 export function withAccountConfig(
-  handler: (request: Request, config: AccountConfig) => Promise<Response>,
+  handler: (
+    request: Request,
+    config: AccountConfig,
+    ctx: ExecutionContext,
+  ) => Promise<Response>,
   scheduledHandler?: (
     controller: ScheduledController,
     config: AccountConfig,
@@ -91,8 +95,12 @@ export function withAccountConfig(
   ) => Promise<void>,
 ): ExportedHandler<Env> {
   return {
-    async fetch(request: Request, env: Env): Promise<Response> {
-      return await handler(request, loadAccountConfig(env));
+    async fetch(
+      request: Request,
+      env: Env,
+      ctx: ExecutionContext,
+    ): Promise<Response> {
+      return await handler(request, loadAccountConfig(env), ctx);
     },
     async scheduled(
       controller: ScheduledController,

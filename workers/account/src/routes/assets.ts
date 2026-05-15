@@ -1,4 +1,5 @@
 import type { AccountConfig } from "../accountConfig.js";
+import { isPublicAvatarIconKey } from "../domain/avatar.js";
 
 export async function asset(
   url: URL,
@@ -14,6 +15,7 @@ export async function asset(
   }
   return new Response(object.body, {
     headers: {
+      "cache-control": "public, max-age=31536000, immutable",
       "content-type": "image/webp",
       "x-content-type-options": "nosniff",
     },
@@ -21,5 +23,5 @@ export async function asset(
 }
 
 function isPublicAssetKey(key: string): boolean {
-  return /^icons\/[0-9]+\/avatar\.webp$/.test(key);
+  return isPublicAvatarIconKey(key);
 }

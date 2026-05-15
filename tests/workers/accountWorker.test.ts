@@ -1009,6 +1009,48 @@ test("Account Worker avatar update rejects oversized bodies without content-leng
   expect(await response.text()).toBe("invalid image");
 });
 
+test("Account Worker avatar update stores a content-addressed icon key", async () => {
+  await replaceActiveUser({
+    iconKey: "icons/123456789/avatar.webp",
+    iconSource: "r2",
+  });
+  const originalPut = assets.put;
+  const storedKeys: string[] = [];
+  assets.put = async (
+    ...args: Parameters<R2Bucket["put"]>
+  ): Promise<R2Object> => {
+    const [key, , options] = args;
+    storedKeys.push(key);
+    expect(options?.httpMetadata).toEqual({ contentType: "image/webp" });
+    return {} as R2Object;
+  };
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("avatar");
+  const body = testVp8xWebp(512, 512);
+  const requestBody = new ArrayBuffer(body.byteLength);
+  new Uint8Array(requestBody).set(body);
+  const expectedIconKey = `icons/123456789/avatar-${await sha256Hex(body)}.webp`;
+
+  try {
+    const response = await fetchAccount("https://account.example.com/avatar", {
+      body: requestBody,
+      headers: {
+        "content-type": "image/webp",
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+        "x-csrf-token": csrfToken,
+      },
+      method: "POST",
+    });
+
+    expect(response.status).toBe(200);
+    expect(storedKeys).toEqual([expectedIconKey]);
+    expect(await readUserIconKey("123456789")).toBe(expectedIconKey);
+  } finally {
+    assets.put = originalPut;
+  }
+});
+
 test("Account Worker delete rejects origin mismatches", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
@@ -1598,7 +1640,7 @@ test("Account Worker restores an account session with a valid remember cookie", 
 
 test("Account Worker account page renders the current icon", async () => {
   await replaceActiveUser({
-    iconKey: "icons/123456789/avatar.webp",
+    iconKey: `icons/123456789/avatar-${"a".repeat(64)}.webp`,
     iconSource: "r2",
   });
   const session = await createAccountSession();
@@ -1611,7 +1653,9 @@ test("Account Worker account page renders the current icon", async () => {
   const body = await response.text();
 
   expect(response.status).toBe(200);
-  expect(body).toContain('src="/assets/icons/123456789/avatar.webp"');
+  expect(body).toContain(
+    `src="/assets/icons/123456789/avatar-${"a".repeat(64)}.webp"`,
+  );
   expect(body).toContain("data-avatar-input");
   expect(body).toContain("data-avatar-cropper-dialog");
   expect(body).not.toContain("Discord ID");
@@ -1644,6 +1688,40 @@ test("Account Worker asset route only serves public avatar keys", async () => {
 
     expect(response.status).toBe(404);
     expect(requestedKeys).toEqual([]);
+  } finally {
+    assets.get = originalGet;
+  }
+});
+
+test("Account Worker asset route serves avatar keys with immutable cache", async () => {
+  const originalGet = assets.get;
+  const requestedKeys: string[] = [];
+  const iconKey = `icons/123456789/avatar-${"a".repeat(64)}.webp`;
+  assets.get = async (key: string): Promise<R2ObjectBody | null> => {
+    requestedKeys.push(key);
+    return {
+      body: new ReadableStream<Uint8Array>({
+        start(controller): void {
+          controller.enqueue(new Uint8Array([1, 2, 3]));
+          controller.close();
+        },
+      }),
+    } as R2ObjectBody;
+  };
+  try {
+    const response = await fetchAccount(
+      `https://auth.example.com/assets/${iconKey}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(requestedKeys).toEqual([iconKey]);
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
   } finally {
     assets.get = originalGet;
   }
@@ -2002,6 +2080,15 @@ async function expectUserStatus(
   expect(row?.status).toBe(status);
 }
 
+async function readUserIconKey(discordId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT icon_key FROM users WHERE discord_id = ?",
+  )
+    .bind(discordId)
+    .first<{ icon_key: string | null }>();
+  return row?.icon_key ?? null;
+}
+
 async function expectOtpChallengeCount(count: number): Promise<void> {
   const row = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM otp_challenges",
@@ -2073,6 +2160,45 @@ async function expectRememberTokenCount(count: number): Promise<void> {
     "SELECT COUNT(*) AS count FROM remember_tokens",
   ).first<{ count: number }>();
   expect(row?.count).toBe(count);
+}
+
+function testVp8xWebp(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(30);
+  writeAscii(bytes, 0, "RIFF");
+  writeUint32LittleEndian(bytes, 4, 22);
+  writeAscii(bytes, 8, "WEBP");
+  writeAscii(bytes, 12, "VP8X");
+  writeUint32LittleEndian(bytes, 16, 10);
+  writeUint24LittleEndian(bytes, 24, width - 1);
+  writeUint24LittleEndian(bytes, 27, height - 1);
+  return bytes;
+}
+
+function writeAscii(bytes: Uint8Array, offset: number, value: string): void {
+  for (let index = 0; index < value.length; index += 1) {
+    bytes[offset + index] = value.charCodeAt(index);
+  }
+}
+
+function writeUint24LittleEndian(
+  bytes: Uint8Array,
+  offset: number,
+  value: number,
+): void {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >> 8) & 0xff;
+  bytes[offset + 2] = (value >> 16) & 0xff;
+}
+
+function writeUint32LittleEndian(
+  bytes: Uint8Array,
+  offset: number,
+  value: number,
+): void {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >> 8) & 0xff;
+  bytes[offset + 2] = (value >> 16) & 0xff;
+  bytes[offset + 3] = (value >> 24) & 0xff;
 }
 
 const activeUser = {

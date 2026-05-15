@@ -22,6 +22,7 @@ import {
   updateUserProfile,
 } from "../data/users.js";
 import { appLogoutUrlForReturnTo } from "../domain/appRegistry.js";
+import { createAvatarIconKey } from "../domain/avatar.js";
 import { normalizeDisplayName } from "../domain/displayName.js";
 import { accountReturnTo, redirectToAccountRoot } from "../domain/returnTo.js";
 import { redirectToDiscordAuthorize } from "../integrations/discordOauth.js";
@@ -119,6 +120,7 @@ export async function updateAvatar(
   request: Request,
   url: URL,
   config: AccountConfig,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   const session = await requireSession(request, config);
   if (!session) {
@@ -149,7 +151,9 @@ export async function updateAvatar(
   if (!active) {
     return inactiveAccountPage(config);
   }
-  const iconKey = `icons/${session.discord_id}/avatar.webp`;
+  const previousIconKey =
+    active.user.icon_source === "r2" ? active.user.icon_key : null;
+  const iconKey = await createAvatarIconKey(session.discord_id, body);
   await config.assets.put(iconKey, body, {
     httpMetadata: { contentType: "image/webp" },
   });
@@ -159,10 +163,14 @@ export async function updateAvatar(
       iconKey,
     });
   } catch (error) {
+    await deleteStoredAvatarAfterFailedUpdate(config, iconKey);
     if (error instanceof InactiveUserError) {
       return inactiveAccountPage(config);
     }
     throw error;
+  }
+  if (previousIconKey && previousIconKey !== iconKey) {
+    ctx.waitUntil(deleteStoredAvatar(config, previousIconKey));
   }
   return appendSessionCookies(Response.json({ ok: true }), session);
 }
@@ -361,4 +369,22 @@ function isAllowedAvatarContentLength(value: string | null): boolean {
   }
   const length = Number(value);
   return Number.isSafeInteger(length) && length <= avatarMaxBytes;
+}
+
+async function deleteStoredAvatar(
+  config: AccountConfig,
+  iconKey: string,
+): Promise<void> {
+  await config.assets.delete(iconKey);
+}
+
+async function deleteStoredAvatarAfterFailedUpdate(
+  config: AccountConfig,
+  iconKey: string,
+): Promise<void> {
+  try {
+    await deleteStoredAvatar(config, iconKey);
+  } catch {
+    return;
+  }
 }
