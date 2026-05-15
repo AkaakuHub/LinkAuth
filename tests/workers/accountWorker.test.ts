@@ -1231,6 +1231,31 @@ test("Account Worker callback creates an OTP challenge and renders the OTP form"
   await expectOtpChallengeCount(1);
 });
 
+test("Account Worker callback returns to the app when Discord authorization is denied", async () => {
+  const state = await createCallbackState(
+    "hub",
+    "https://app.example.com/_auth/callback?state=app-state",
+  );
+
+  const response = await fetchAccount(
+    `https://auth.example.com/callback?error=access_denied&state=${encodeURIComponent(state)}`,
+    {
+      headers: {
+        cookie: `${authStateCookieName}=${encodeURIComponent(state)}`,
+      },
+    },
+  );
+  const body = await response.text();
+
+  expect(response.status).toBe(401);
+  expect(body).toContain("認証に失敗しました");
+  expect(body).toContain(
+    'href="https://app.example.com/_auth/callback?state=app-state"',
+  );
+  expect(body).toContain("戻る");
+  expect(body).not.toContain("アカウントトップへ戻る");
+});
+
 test("Account Worker callback provisions Discord guild members", async () => {
   await env.DB.prepare("DELETE FROM users WHERE discord_id = ?")
     .bind("123456789")

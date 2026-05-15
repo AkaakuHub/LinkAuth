@@ -166,8 +166,11 @@ export async function callback(
   const code = url.searchParams.get("code");
   const stateValue = url.searchParams.get("state");
   const state = await parseAuthState(stateValue, config);
-  if (!code || !state) {
+  if (!state) {
     return callbackResponse(authFailedPage(config));
+  }
+  if (!code) {
+    return callbackResponse(authFailedPage(config, state.return_to));
   }
   const authStateValue = stateValue;
   if (!authStateValue) {
