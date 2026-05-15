@@ -282,6 +282,10 @@ export async function otp(
   const challengeId = String(form.get("challenge_id") ?? "");
   const otpCode = String(form.get("otp") ?? "");
   const rememberMe = form.get("remember_me") === "1";
+  const formReturnTo = accountReturnTo(
+    String(form.get("return_to") ?? ""),
+    config,
+  );
   if (
     !/^[0-9]{6}$/.test(otpCode) ||
     !(await verifyOtpState({
@@ -290,7 +294,7 @@ export async function otp(
       value: getSingleCookie(request.headers.get("cookie"), otpStateCookieName),
     }))
   ) {
-    return clearOtpState(authFailedPage(config));
+    return clearOtpState(authFailedPage(config, formReturnTo));
   }
   try {
     const result = await consumeOtpChallenge(config, {
@@ -298,11 +302,12 @@ export async function otp(
       otp: otpCode,
     });
     if (!result) {
-      return clearOtpState(authFailedPage(config));
+      return clearOtpState(authFailedPage(config, formReturnTo));
     }
+    const returnTo = accountReturnTo(result.returnTo, config);
     const active = await verifyActiveUser(result.discordId, config);
     if (!active) {
-      return clearOtpState(inactiveAccountPage(config));
+      return clearOtpState(inactiveAccountPage(config, returnTo));
     }
     const response = await createAccountSessionResponse(
       active.user,
@@ -310,14 +315,14 @@ export async function otp(
         appId: result.appId ?? "",
         config,
         rememberMe,
-        returnTo: accountReturnTo(result.returnTo, config),
+        returnTo,
       }),
     );
     response.headers.append("set-cookie", deleteCookie(otpStateCookieName));
     return response;
   } catch (error) {
     if (error instanceof DataConflictError) {
-      return clearOtpState(authFailedPage(config));
+      return clearOtpState(authFailedPage(config, formReturnTo));
     }
     throw error;
   }

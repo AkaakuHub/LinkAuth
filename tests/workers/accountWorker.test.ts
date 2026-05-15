@@ -1516,7 +1516,7 @@ test("Account Worker OTP rejects requests without the browser challenge state", 
 
 test("Account Worker OTP consumes challenges before validating the submitted code", async () => {
   await seedOtpChallenge({
-    returnTo: "https://app.example.com/",
+    returnTo: "https://app.example.com/_auth/callback?state=app-state",
   });
   const headers = await otpHeaders("challenge-id");
 
@@ -1524,6 +1524,7 @@ test("Account Worker OTP consumes challenges before validating the submitted cod
     body: new URLSearchParams({
       challenge_id: "challenge-id",
       otp: "000000",
+      return_to: "https://app.example.com/_auth/callback?state=app-state",
     }),
     headers,
     method: "POST",
@@ -1538,7 +1539,13 @@ test("Account Worker OTP consumes challenges before validating the submitted cod
   });
 
   expect(response.status).toBe(401);
-  expect(await response.text()).toContain("認証に失敗しました");
+  const body = await response.text();
+  expect(body).toContain("認証に失敗しました");
+  expect(body).toContain(
+    'href="https://app.example.com/_auth/callback?state=app-state"',
+  );
+  expect(body).toContain("戻る");
+  expect(body).not.toContain("アカウントトップへ戻る");
   expect(replayResponse.status).toBe(401);
   expect(await replayResponse.text()).toContain("認証に失敗しました");
   await expectOtpChallengeCount(0);
