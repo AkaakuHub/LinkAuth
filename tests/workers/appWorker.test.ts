@@ -6,6 +6,13 @@ import {
   verifyAppAuthState,
 } from "../../src/appAuth.js";
 import {
+  getLinkAuthSessionCookieName,
+  getLinkAuthSessionToken,
+  getLinkAuthSessionUser,
+  handleAppAuthRequest,
+  loadLinkAuthAppConfig,
+} from "../../src/index.js";
+import {
   appSessionCookieName,
   signAuthToken,
   verifyAuthToken,
@@ -572,6 +579,116 @@ test("App Worker rejects a session issued for another app", async () => {
   expect(response.status).toBe(401);
 });
 
+test("LinkAuth local session user verifies an app session without account fetch", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    calls.push(input instanceof Request ? input.url : String(input));
+    return Response.json({ error: "unexpected" }, { status: 500 });
+  });
+  const session = await createAppSession("hub", {
+    displayName: "Local Akaaku",
+    iconKey: `icons/123456789/avatar-${"a".repeat(64)}.webp`,
+  });
+  const config = loadLinkAuthAppConfig(env);
+  const request = new Request("https://app.example.com/assets/card.webp", {
+    headers: {
+      cookie: `${getLinkAuthSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(getLinkAuthSessionCookieName("hub")).toBe("__Host-hub_session");
+  expect(getLinkAuthSessionToken({ config, request })).toBe(session);
+  await expect(getLinkAuthSessionUser({ config, request })).resolves.toEqual({
+    avatar_url: `https://auth.example.com/assets/icons/123456789/avatar-${"a".repeat(64)}.webp`,
+    discord_id: "123456789",
+    display_name: "Local Akaaku",
+    icon_key: `icons/123456789/avatar-${"a".repeat(64)}.webp`,
+    icon_source: "r2",
+    role: "admin",
+    status: "active",
+  });
+  expect(calls).toEqual([]);
+});
+
+test("LinkAuth local session user rejects bearer-only tokens", async () => {
+  const session = await createAppSession("hub");
+  const config = loadLinkAuthAppConfig(env);
+  const request = new Request("https://app.example.com/assets/card.webp", {
+    headers: {
+      authorization: `Bearer ${session}`,
+    },
+  });
+
+  expect(getLinkAuthSessionToken({ config, request })).toBeNull();
+  await expect(getLinkAuthSessionUser({ config, request })).resolves.toBeNull();
+});
+
+test("LinkAuth local session user rejects conflicting bearer and cookie tokens", async () => {
+  const session = await createAppSession("hub");
+  const otherSession = await createAppSession("other");
+  const config = loadLinkAuthAppConfig(env);
+  const request = new Request("https://app.example.com/assets/card.webp", {
+    headers: {
+      authorization: `Bearer ${otherSession}`,
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  expect(getLinkAuthSessionToken({ config, request })).toBeNull();
+  await expect(getLinkAuthSessionUser({ config, request })).resolves.toBeNull();
+});
+
+test("LinkAuth handler uses local session only for matched requests", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+    calls.push(input instanceof Request ? input.url : String(input));
+    return Response.json({ user: currentUser });
+  });
+  const session = await createAppSession("hub");
+  const config = loadLinkAuthAppConfig(env);
+  const assetRequest = new Request("https://app.example.com/cards/1.webp", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+
+  const assetResponse = await handleAppAuthRequest({
+    authFailedResponse: () => new Response("failed", { status: 401 }),
+    config,
+    handleRequest: ({ user }) => Response.json({ user }),
+    localSessionOnly: ({ url }) => url.pathname.startsWith("/cards/"),
+    loginResponse: () => new Response("login"),
+    request: assetRequest,
+  });
+
+  expect(assetResponse.status).toBe(200);
+  expect(calls).toEqual([]);
+  await expect(assetResponse.json()).resolves.toMatchObject({
+    user: {
+      discord_id: "123456789",
+      display_name: "Akaaku",
+      status: "active",
+    },
+  });
+
+  const apiRequest = new Request("https://app.example.com/api/me", {
+    headers: {
+      cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+    },
+  });
+  const apiResponse = await handleAppAuthRequest({
+    authFailedResponse: () => new Response("failed", { status: 401 }),
+    config,
+    handleRequest: ({ user }) => Response.json({ user }),
+    localSessionOnly: ({ url }) => url.pathname.startsWith("/cards/"),
+    loginResponse: () => new Response("login"),
+    request: apiRequest,
+  });
+
+  expect(apiResponse.status).toBe(200);
+  expect(calls).toEqual(["https://auth.example.com/session/verify?app_id=hub"]);
+});
+
 async function fetchApp(url: string, init?: RequestInit): Promise<Response> {
   const fetchHandler = worker.fetch;
   if (!fetchHandler) {
@@ -587,16 +704,19 @@ async function fetchApp(url: string, init?: RequestInit): Promise<Response> {
   );
 }
 
-async function createAppSession(appId: string): Promise<string> {
+async function createAppSession(
+  appId: string,
+  options: { displayName?: string; iconKey?: string | null } = {},
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return await signAuthToken(
     {
       app_id: appId,
       discord_id: "123456789",
-      display_name: "Akaaku",
+      display_name: options.displayName ?? "Akaaku",
       exp: now + 3_600,
-      icon_key: null,
-      icon_source: "none",
+      icon_key: options.iconKey ?? null,
+      icon_source: options.iconKey ? "r2" : "none",
       iat: now,
       kid: env.SESSION_KID,
       role: "admin",

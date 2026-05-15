@@ -58,6 +58,11 @@ export type LinkAuthUser = {
   icon_key: string | null;
 };
 
+export type LinkAuthSessionOnlyMatcher = (input: {
+  request: Request;
+  url: URL;
+}) => boolean | Promise<boolean>;
+
 export async function handleAppAuthRequest(input: {
   authFailedResponse: (url: URL) => Response | Promise<Response>;
   handleRequest: (input: {
@@ -66,6 +71,7 @@ export async function handleAppAuthRequest(input: {
     user: LinkAuthUser;
   }) => Response | Promise<Response>;
   config: LinkAuthAppConfig;
+  localSessionOnly?: LinkAuthSessionOnlyMatcher;
   loginResponse: (request: Request) => Response | Promise<Response>;
   request: Request;
 }): Promise<Response> {
@@ -90,10 +96,17 @@ export async function handleAppAuthRequest(input: {
     return Response.redirect(accountUrl, 302);
   }
 
-  const user = await getAppUser({
-    config: input.config,
-    request: input.request,
-  });
+  const useLocalSession =
+    input.localSessionOnly?.({ request: input.request, url }) ?? false;
+  const user = await ((await useLocalSession)
+    ? getAppSessionUser({
+        config: input.config,
+        request: input.request,
+      })
+    : getAppUser({
+        config: input.config,
+        request: input.request,
+      }));
   if (!user) {
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
@@ -127,6 +140,10 @@ export async function handleAppAuthRequest(input: {
 
 export function appAuthStateCookieName(appId: string): string {
   return `__Host-${appId}_auth_state`;
+}
+
+export function getAppSessionCookieName(appId: string): string {
+  return appSessionCookieName(appId);
 }
 
 export async function startAppLogin(input: {
@@ -221,11 +238,37 @@ export async function getAppUser(input: {
   config: LinkAuthAppConfig;
   request: Request;
 }): Promise<LinkAuthUser | null> {
-  const sessionToken = await getAppSessionToken(input.request, input.config);
+  const sessionToken = await getRemoteSessionToken(input.request, input.config);
   if (!sessionToken) {
     return null;
   }
   return await fetchCurrentUser(input.config, input.request, sessionToken);
+}
+
+export function getAppSessionToken(input: {
+  config: LinkAuthAppConfig;
+  request: Request;
+}): string | null {
+  return getLocalSessionToken(input.request, input.config);
+}
+
+export async function getAppSessionUser(input: {
+  config: LinkAuthAppConfig;
+  request: Request;
+}): Promise<LinkAuthUser | null> {
+  const sessionToken = getLocalSessionToken(input.request, input.config);
+  if (!sessionToken) {
+    return null;
+  }
+  const payload = await verifyAuthToken(
+    sessionToken,
+    { [input.config.session.kid]: input.config.session.secret },
+    Math.floor(Date.now() / 1000),
+  );
+  if (!payload || payload.app_id !== input.config.appId) {
+    return null;
+  }
+  return linkAuthUserFromSessionPayload(payload, input.config.accountUrl);
 }
 
 export function clearAppSession(input: {
@@ -293,7 +336,22 @@ export async function verifyAppAuthState(input: {
   }
 }
 
-async function getAppSessionToken(
+function getLocalSessionToken(
+  request: Request,
+  config: LinkAuthAppConfig,
+): string | null {
+  const cookieToken = getSingleCookie(
+    request.headers.get("cookie"),
+    appSessionCookieName(config.appId),
+  );
+  const bearerToken = getBearerToken(request.headers.get("authorization"));
+  if (!cookieToken || (bearerToken && bearerToken !== cookieToken)) {
+    return null;
+  }
+  return cookieToken;
+}
+
+async function getRemoteSessionToken(
   request: Request,
   config: LinkAuthAppConfig,
 ): Promise<string | null> {
@@ -319,6 +377,29 @@ async function getAppSessionToken(
     return null;
   }
   return cookieToken;
+}
+
+function linkAuthUserFromSessionPayload(
+  payload: {
+    discord_id: string;
+    display_name: string;
+    role: "user" | "admin";
+    icon_source: "r2" | "none";
+    icon_key: string | null;
+  },
+  accountUrl: string,
+): LinkAuthUser | null {
+  const icon = linkAuthUserIcon(payload, accountUrl);
+  if (!icon) {
+    return null;
+  }
+  return {
+    discord_id: payload.discord_id,
+    display_name: payload.display_name,
+    role: payload.role,
+    status: "active",
+    ...icon,
+  };
 }
 
 async function exchangeAuthCode(
