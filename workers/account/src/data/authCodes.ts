@@ -4,7 +4,7 @@ import { DataConflictError } from "./errors.js";
 import { requireDataNumber, requireDataString } from "./validation.js";
 
 type AuthCodeUser = Pick<User, "discord_id" | "display_name" | "role"> & {
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
   icon_key?: string;
 };
 
@@ -13,7 +13,7 @@ type AuthCodeRow = {
   discord_id: string;
   display_name: string;
   role: "user" | "admin";
-  icon_source: "discord" | "r2" | "none" | null;
+  icon_source: "r2" | "none" | null;
   icon_key: string | null;
   session_persistent: number;
   expires_at: number;
@@ -72,7 +72,6 @@ export async function consumeAuthCode(
     row.expires_at <= now ||
     (row.role !== "user" && row.role !== "admin") ||
     (row.icon_source !== null &&
-      row.icon_source !== "discord" &&
       row.icon_source !== "r2" &&
       row.icon_source !== "none") ||
     (row.icon_key !== null && typeof row.icon_key !== "string") ||

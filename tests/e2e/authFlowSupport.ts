@@ -217,7 +217,6 @@ async function startMockServer(state: MockState): Promise<TestServer> {
     }
     if (url.pathname === "/discord/users/@me") {
       return Response.json({
-        avatar: null,
         global_name: user.display_name,
         id: user.discord_id,
         username: user.discord_id,

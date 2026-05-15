@@ -694,7 +694,6 @@ test("Avatar update rejects inactive users at the data boundary", async () => {
     updateUserAvatar(testAccountConfig(), {
       discordId: "123456789",
       iconKey: "icons/123456789/avatar.webp",
-      iconSource: "r2",
     }),
   ).rejects.toThrow("inactive user");
 
@@ -705,7 +704,6 @@ test("Guild member provisioning preserves account-owned fields", async () => {
   await setUserForProvisioningUpdate();
 
   await ensureGuildMemberUser(testAccountConfig(), {
-    avatarHash: "new-avatar-hash",
     discordId: "123456789",
     discordUsername: "NewDiscordUser",
     displayName: "New Discord Name",
@@ -715,7 +713,6 @@ test("Guild member provisioning preserves account-owned fields", async () => {
   expect(await readUserAccountState("123456789")).toEqual({
     deleted_at: null,
     disabled_reason: null,
-    discord_avatar_hash: "new-avatar-hash",
     discord_username: "NewDiscordUser",
     display_name: "Custom Display",
     guild_id: "guild",
@@ -928,7 +925,6 @@ async function setUserForProvisioningUpdate(): Promise<void> {
       disabled_reason = 'left_guild',
       icon_source = 'r2',
       icon_key = 'icons/123456789/avatar.webp',
-      discord_avatar_hash = NULL,
       deleted_at = ?
     WHERE discord_id = '123456789'`,
   )
@@ -943,7 +939,6 @@ async function readUserAccountState(
     `SELECT
       deleted_at,
       disabled_reason,
-      discord_avatar_hash,
       discord_username,
       display_name,
       guild_id,

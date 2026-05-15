@@ -196,7 +196,6 @@ export async function callback(
     return callbackResponse(inactiveAccountPage(config, state.return_to));
   }
   await ensureGuildMemberUser(config, {
-    avatarHash: discordResult.user.avatarHash,
     discordId: discordResult.user.id,
     discordUsername: discordResult.user.username,
     displayName: discordDisplayName(discordResult.user),

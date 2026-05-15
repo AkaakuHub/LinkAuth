@@ -25,7 +25,7 @@ export type LinkAuthUser = {
   role: "user" | "admin";
   status: "active";
   avatar_url?: string;
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
   icon_key?: string;
 };
 

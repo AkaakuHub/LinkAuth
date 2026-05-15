@@ -10,9 +10,8 @@ type UserRow = {
   guild_member_status: "active" | "left" | null;
   guild_checked_at: string | null;
   disabled_reason: string | null;
-  icon_source: "discord" | "r2" | "none" | null;
+  icon_source: "r2" | "none" | null;
   icon_key: string | null;
-  discord_avatar_hash: string | null;
 };
 
 export function userFromRow(row: UserRow): User {
@@ -24,8 +23,5 @@ export function userFromRow(row: UserRow): User {
     status: row.status,
     ...(row.icon_source ? { icon_source: row.icon_source } : {}),
     ...(row.icon_key ? { icon_key: row.icon_key } : {}),
-    ...(row.discord_avatar_hash !== null
-      ? { discord_avatar_hash: row.discord_avatar_hash }
-      : {}),
   };
 }

@@ -1,7 +1,7 @@
 import { attr, escapeHtml } from "./html.js";
 
 export function avatarAssetUrl(
-  iconSource: "discord" | "r2" | "none" | undefined,
+  iconSource: "r2" | "none" | undefined,
   iconKey: string | undefined,
   options: { baseUrl?: string } = {},
 ): string | null {

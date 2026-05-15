@@ -5,7 +5,6 @@ export type DiscordOAuthUser = {
   id: string;
   username: string;
   globalName: string | null;
-  avatarHash: string | null;
 };
 
 export type DiscordOAuthResult = {
@@ -63,7 +62,6 @@ export async function fetchDiscordOAuthResult(
       return null;
     }
     const user = (await userResponse.json()) as {
-      avatar?: unknown;
       global_name?: unknown;
       id?: unknown;
       username?: unknown;
@@ -73,7 +71,6 @@ export async function fetchDiscordOAuthResult(
     }
     return {
       user: {
-        avatarHash: typeof user.avatar === "string" ? user.avatar : null,
         globalName:
           typeof user.global_name === "string" ? user.global_name : null,
         id: user.id,

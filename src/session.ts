@@ -13,7 +13,7 @@ export type SessionPayload = {
   app_id?: string;
   role: "user" | "admin";
   display_name: string;
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
   icon_key?: string;
   persistent?: boolean;
   iat: number;
@@ -92,7 +92,6 @@ export async function verifyAuthToken(
       (payload.role !== "user" && payload.role !== "admin") ||
       typeof payload.display_name !== "string" ||
       (payload.icon_source !== undefined &&
-        payload.icon_source !== "discord" &&
         payload.icon_source !== "r2" &&
         payload.icon_source !== "none") ||
       (payload.icon_key !== undefined &&

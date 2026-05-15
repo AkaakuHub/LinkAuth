@@ -8,9 +8,8 @@ CREATE TABLE users (
   guild_member_status TEXT CHECK (guild_member_status IN ('active', 'left')),
   guild_checked_at TEXT,
   disabled_reason TEXT,
-  icon_source TEXT CHECK (icon_source IN ('discord', 'r2', 'none')),
+  icon_source TEXT CHECK (icon_source IN ('r2', 'none')),
   icon_key TEXT,
-  discord_avatar_hash TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT
@@ -22,7 +21,7 @@ CREATE TABLE auth_codes (
   discord_id TEXT NOT NULL,
   display_name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('user', 'admin')),
-  icon_source TEXT CHECK (icon_source IN ('discord', 'r2', 'none')),
+  icon_source TEXT CHECK (icon_source IN ('r2', 'none')),
   icon_key TEXT,
   created_at TEXT NOT NULL,
   expires_at INTEGER NOT NULL

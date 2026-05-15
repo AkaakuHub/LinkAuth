@@ -15,9 +15,8 @@ type UserRow = {
   guild_member_status: "active" | "left" | null;
   guild_checked_at: string | null;
   disabled_reason: string | null;
-  icon_source: "discord" | "r2" | "none" | null;
+  icon_source: "r2" | "none" | null;
   icon_key: string | null;
-  discord_avatar_hash: string | null;
   created_at: string | null;
 };
 
@@ -69,7 +68,6 @@ export async function updateUserAvatar(
   config: AccountConfig,
   input: {
     discordId: string;
-    iconSource: "discord" | "r2" | "none";
     iconKey: string;
   },
 ): Promise<void> {
@@ -78,12 +76,7 @@ export async function updateUserAvatar(
     .prepare(
       "UPDATE users SET icon_source = ?, icon_key = ?, updated_at = ? WHERE discord_id = ?",
     )
-    .bind(
-      input.iconSource,
-      input.iconKey,
-      new Date().toISOString(),
-      input.discordId,
-    )
+    .bind("r2", input.iconKey, new Date().toISOString(), input.discordId)
     .run();
 }
 
@@ -114,7 +107,6 @@ export async function markUserDeleted(
 export async function ensureGuildMemberUser(
   config: AccountConfig,
   input: {
-    avatarHash: string | null;
     discordId: string;
     discordUsername: string;
     displayName: string;
@@ -126,9 +118,9 @@ export async function ensureGuildMemberUser(
     .prepare(
       `INSERT INTO users (
         discord_id, discord_username, display_name, role, status, guild_id,
-        guild_member_status, guild_checked_at, icon_source, discord_avatar_hash,
+        guild_member_status, guild_checked_at, icon_source,
         created_at, updated_at
-      ) VALUES (?, ?, ?, 'user', 'active', ?, 'active', ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, 'user', 'active', ?, 'active', ?, 'none', ?, ?)
       ON CONFLICT(discord_id) DO UPDATE SET
         discord_username = excluded.discord_username,
         status = 'active',
@@ -143,7 +135,6 @@ export async function ensureGuildMemberUser(
           WHEN users.icon_source = 'r2' THEN users.icon_key
           ELSE NULL
         END,
-        discord_avatar_hash = excluded.discord_avatar_hash,
         deleted_at = NULL,
         disabled_reason = NULL,
         updated_at = excluded.updated_at`,
@@ -154,8 +145,6 @@ export async function ensureGuildMemberUser(
       input.displayName,
       input.guildId,
       nowIso,
-      input.avatarHash ? "discord" : "none",
-      input.avatarHash,
       nowIso,
       nowIso,
     )

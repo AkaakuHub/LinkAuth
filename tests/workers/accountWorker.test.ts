@@ -1199,7 +1199,6 @@ test("Account Worker callback provisions Discord guild members", async () => {
     }
     if (url.pathname === "/api/v10/users/@me") {
       return Response.json({
-        avatar: "avatar-hash",
         global_name: "Guild User",
         id: "123456789",
         username: "discord-user",
@@ -2046,19 +2045,18 @@ async function expectRememberTokenDeleted(tokenId: string): Promise<void> {
 
 async function expectProvisionedUser(): Promise<void> {
   const row = await env.DB.prepare(
-    "SELECT discord_id, discord_username, display_name, role, guild_id, guild_member_status, icon_source, icon_key, discord_avatar_hash, status FROM users WHERE discord_id = ?",
+    "SELECT discord_id, discord_username, display_name, role, guild_id, guild_member_status, icon_source, icon_key, status FROM users WHERE discord_id = ?",
   )
     .bind("123456789")
     .first<Record<string, string | null>>();
   expect(row).toEqual({
-    discord_avatar_hash: "avatar-hash",
     discord_id: "123456789",
     discord_username: "discord-user",
     display_name: "Guild User",
     guild_id: "guild",
     guild_member_status: "active",
     icon_key: null,
-    icon_source: "discord",
+    icon_source: "none",
     role: "user",
     status: "active",
   });
@@ -2092,7 +2090,7 @@ async function seedActiveUser(
     discordId?: string;
     displayName?: string;
     iconKey?: string;
-    iconSource?: "discord" | "r2" | "none";
+    iconSource?: "r2" | "none";
     guildCheckedAt?: string;
     status?: "active" | "disabled" | "deleted";
     disabledReason?: string | null;

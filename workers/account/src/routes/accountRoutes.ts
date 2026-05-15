@@ -156,7 +156,6 @@ export async function updateAvatar(
   try {
     await updateUserAvatar(config, {
       discordId: session.discord_id,
-      iconSource: "r2",
       iconKey,
     });
   } catch (error) {

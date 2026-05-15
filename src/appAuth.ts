@@ -54,7 +54,7 @@ export type LinkAuthUser = {
   role: "user" | "admin";
   status: "active";
   avatar_url?: string;
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
   icon_key?: string;
 };
 
@@ -386,7 +386,7 @@ type TokenUser = {
   discord_id: string;
   display_name: string;
   role: "user" | "admin";
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
   icon_key?: string;
 };
 
@@ -451,13 +451,11 @@ function parseCurrentUser(
 
 function tokenUserIcon(user: { icon_key?: unknown; icon_source?: unknown }): {
   icon_key?: string;
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
 } {
   return {
     ...(typeof user.icon_key === "string" ? { icon_key: user.icon_key } : {}),
-    ...(user.icon_source === "discord" ||
-    user.icon_source === "r2" ||
-    user.icon_source === "none"
+    ...(user.icon_source === "r2" || user.icon_source === "none"
       ? { icon_source: user.icon_source }
       : {}),
   };
@@ -469,7 +467,7 @@ function linkAuthUserIcon(
 ): {
   avatar_url?: string;
   icon_key?: string;
-  icon_source?: "discord" | "r2" | "none";
+  icon_source?: "r2" | "none";
 } {
   const icon = tokenUserIcon(user);
   const avatarUrl =
