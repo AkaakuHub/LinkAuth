@@ -44,7 +44,10 @@ export async function createAccountSessionResponse(
 }
 
 export async function createAccountSessionCookie(
-  user: Pick<User, "discord_id" | "display_name" | "role">,
+  user: Pick<
+    User,
+    "discord_id" | "display_name" | "icon_key" | "icon_source" | "role"
+  >,
   config: AccountConfig,
   options: { persistent: boolean } = { persistent: true },
 ): Promise<string> {
@@ -57,6 +60,8 @@ export async function createAccountSessionCookie(
       discord_id: user.discord_id,
       role: user.role,
       display_name: user.display_name,
+      icon_key: user.icon_key,
+      icon_source: user.icon_source,
       persistent: options.persistent,
       iat: now,
       exp: now + maxAgeSeconds,

@@ -284,6 +284,8 @@ test("Account Worker token endpoint consumes auth codes once", async () => {
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "admin",
     },
   });
@@ -1813,6 +1815,8 @@ async function createAccountSession(
       discord_id: "123456789",
       display_name: "Akaaku",
       exp: now + 86_400,
+      icon_key: null,
+      icon_source: "none",
       iat: now,
       kid: env.SESSION_KID,
       ...(options.persistent === undefined
@@ -1832,6 +1836,8 @@ async function createAppSession(appId: string): Promise<string> {
       discord_id: "123456789",
       display_name: "Akaaku",
       exp: now + 3_600,
+      icon_key: null,
+      icon_source: "none",
       iat: now,
       kid: env.SESSION_KID,
       role: "admin",
@@ -2072,6 +2078,8 @@ async function expectRememberTokenCount(count: number): Promise<void> {
 const activeUser = {
   discord_id: "123456789",
   display_name: "Akaaku",
+  icon_key: null,
+  icon_source: "none",
   role: "admin",
   status: "active",
 };
@@ -2110,7 +2118,7 @@ async function seedActiveUser(
       input.status ?? "active",
       input.guildCheckedAt ?? now,
       input.disabledReason ?? null,
-      input.iconSource ?? null,
+      input.iconSource ?? "none",
       input.iconKey ?? null,
       now,
       now,

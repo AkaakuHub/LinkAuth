@@ -4,8 +4,8 @@ import { DataConflictError } from "./errors.js";
 import { requireDataNumber, requireDataString } from "./validation.js";
 
 type AuthCodeUser = Pick<User, "discord_id" | "display_name" | "role"> & {
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
 };
 
 type AuthCodeRow = {
@@ -13,7 +13,7 @@ type AuthCodeRow = {
   discord_id: string;
   display_name: string;
   role: "user" | "admin";
-  icon_source: "r2" | "none" | null;
+  icon_source: "r2" | "none";
   icon_key: string | null;
   session_persistent: number;
   expires_at: number;
@@ -42,8 +42,8 @@ export async function createAuthCode(
       requireDataString(input.user.discord_id, "discord_id"),
       requireDataString(input.user.display_name, "display_name"),
       input.user.role,
-      input.user.icon_source ?? null,
-      input.user.icon_key ?? null,
+      input.user.icon_source,
+      input.user.icon_key,
       input.sessionPersistent ? 1 : 0,
       new Date().toISOString(),
       requireDataNumber(input.expiresAt, "expires_at"),
@@ -71,9 +71,7 @@ export async function consumeAuthCode(
     typeof row.expires_at !== "number" ||
     row.expires_at <= now ||
     (row.role !== "user" && row.role !== "admin") ||
-    (row.icon_source !== null &&
-      row.icon_source !== "r2" &&
-      row.icon_source !== "none") ||
+    (row.icon_source !== "r2" && row.icon_source !== "none") ||
     (row.icon_key !== null && typeof row.icon_key !== "string") ||
     (row.session_persistent !== 0 && row.session_persistent !== 1)
   ) {
@@ -94,8 +92,8 @@ export async function consumeAuthCode(
       discord_id: row.discord_id,
       display_name: row.display_name,
       role: row.role,
-      ...(row.icon_source ? { icon_source: row.icon_source } : {}),
-      ...(row.icon_key ? { icon_key: row.icon_key } : {}),
+      icon_source: row.icon_source,
+      icon_key: row.icon_key,
     },
   };
 }

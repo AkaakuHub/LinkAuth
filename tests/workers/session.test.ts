@@ -19,6 +19,8 @@ const payload = {
   discord_id: "123456789",
   role: "admin",
   display_name: "Akaaku",
+  icon_key: null,
+  icon_source: "none",
   iat: now,
   exp: now + 86_400,
   kid: "session-key",

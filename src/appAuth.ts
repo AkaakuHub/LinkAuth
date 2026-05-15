@@ -53,9 +53,9 @@ export type LinkAuthUser = {
   display_name: string;
   role: "user" | "admin";
   status: "active";
-  avatar_url?: string;
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  avatar_url: string | null;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
 };
 
 export async function handleAppAuthRequest(input: {
@@ -189,10 +189,11 @@ export async function completeAppLogin(input: {
       display_name: body.user.display_name,
       exp: now + maxAgeSeconds,
       iat: now,
+      icon_key: body.user.icon_key,
+      icon_source: body.user.icon_source,
       kid: input.config.session.kid,
       persistent: body.session_persistent,
       role: body.user.role,
-      ...tokenUserIcon(body.user),
     },
     input.config.session.secret,
   );
@@ -386,8 +387,8 @@ type TokenUser = {
   discord_id: string;
   display_name: string;
   role: "user" | "admin";
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
 };
 
 function parseTokenResponse(
@@ -416,11 +417,15 @@ function parseTokenUser(value: unknown): TokenUser | null {
   ) {
     return null;
   }
+  const icon = tokenUserIcon(user);
+  if (!icon) {
+    return null;
+  }
   return {
     discord_id: user.discord_id,
     display_name: user.display_name,
     role: user.role,
-    ...tokenUserIcon(user),
+    ...icon,
   };
 }
 
@@ -440,36 +445,44 @@ function parseCurrentUser(
   ) {
     return null;
   }
+  const icon = linkAuthUserIcon(user, accountUrl);
+  if (!icon) {
+    return null;
+  }
   return {
     discord_id: user.discord_id,
     display_name: user.display_name,
     role: user.role,
     status: user.status,
-    ...linkAuthUserIcon(user, accountUrl),
+    ...icon,
   };
 }
 
 function tokenUserIcon(user: { icon_key?: unknown; icon_source?: unknown }): {
-  icon_key?: string;
-  icon_source?: "r2" | "none";
-} {
-  return {
-    ...(typeof user.icon_key === "string" ? { icon_key: user.icon_key } : {}),
-    ...(user.icon_source === "r2" || user.icon_source === "none"
-      ? { icon_source: user.icon_source }
-      : {}),
-  };
+  icon_key: string | null;
+  icon_source: "r2" | "none";
+} | null {
+  if (user.icon_source === "none" && user.icon_key === null) {
+    return { icon_key: null, icon_source: "none" };
+  }
+  if (user.icon_source === "r2" && typeof user.icon_key === "string") {
+    return { icon_key: user.icon_key, icon_source: "r2" };
+  }
+  return null;
 }
 
 function linkAuthUserIcon(
   user: { icon_key?: unknown; icon_source?: unknown },
   accountUrl: string,
 ): {
-  avatar_url?: string;
-  icon_key?: string;
-  icon_source?: "r2" | "none";
-} {
+  avatar_url: string | null;
+  icon_key: string | null;
+  icon_source: "r2" | "none";
+} | null {
   const icon = tokenUserIcon(user);
+  if (!icon) {
+    return null;
+  }
   const avatarUrl =
     icon.icon_source === "r2" && icon.icon_key
       ? new URL(
@@ -478,8 +491,8 @@ function linkAuthUserIcon(
         ).toString()
       : null;
   return {
+    avatar_url: avatarUrl,
     ...icon,
-    ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
   };
 }
 

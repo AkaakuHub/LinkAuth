@@ -15,7 +15,7 @@ type UserRow = {
   guild_member_status: "active" | "left" | null;
   guild_checked_at: string | null;
   disabled_reason: string | null;
-  icon_source: "r2" | "none" | null;
+  icon_source: "r2" | "none";
   icon_key: string | null;
   created_at: string | null;
 };

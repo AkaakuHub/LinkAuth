@@ -100,10 +100,8 @@ export async function authorize(
     user: {
       discord_id: active.user.discord_id,
       display_name: active.user.display_name,
-      ...(active.user.icon_source
-        ? { icon_source: active.user.icon_source }
-        : {}),
-      ...(active.user.icon_key ? { icon_key: active.user.icon_key } : {}),
+      icon_source: active.user.icon_source,
+      icon_key: active.user.icon_key,
       role: active.user.role,
     },
   });

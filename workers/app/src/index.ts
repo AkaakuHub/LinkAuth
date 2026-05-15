@@ -67,7 +67,7 @@ function appAuthFailedPage(url: URL): Response {
 
 function toSampleUser(user: LinkAuthUser): SampleUser {
   return {
-    ...(user.avatar_url ? { avatar_url: user.avatar_url } : {}),
+    avatar_url: user.avatar_url,
     discord_id: user.discord_id,
     display_name: user.display_name,
   };

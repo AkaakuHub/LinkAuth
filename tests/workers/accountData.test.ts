@@ -112,6 +112,8 @@ test("Auth code rejects a different app_id without consuming the code", async ()
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "user",
     },
   });
@@ -131,6 +133,8 @@ test("Auth code rejects a different app_id without consuming the code", async ()
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "user",
     },
   });
@@ -145,6 +149,8 @@ test("Auth code rejects expired codes", async () => {
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "user",
     },
   });
@@ -396,6 +402,8 @@ test("Remember token rotates when the stored hash matches", async () => {
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "admin",
       status: "active",
     },
@@ -734,6 +742,8 @@ test("Expired auth data cleanup removes only expired transient records", async (
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "user",
     },
   });
@@ -745,6 +755,8 @@ test("Expired auth data cleanup removes only expired transient records", async (
     user: {
       discord_id: "123456789",
       display_name: "Akaaku",
+      icon_key: null,
+      icon_source: "none",
       role: "user",
     },
   });
@@ -813,8 +825,9 @@ async function seedUser(input: {
   await env.DB.prepare(
     `INSERT INTO users (
       discord_id, display_name, role, status, guild_id, guild_member_status,
-      guild_checked_at, disabled_reason, created_at, updated_at
-    ) VALUES (?, ?, 'admin', ?, 'guild', 'active', ?, ?, ?, ?)`,
+      guild_checked_at, disabled_reason, icon_source, icon_key, created_at,
+      updated_at
+    ) VALUES (?, ?, 'admin', ?, 'guild', 'active', ?, ?, 'none', NULL, ?, ?)`,
   )
     .bind(
       input.discordId,
@@ -843,8 +856,9 @@ async function setUserStatus(
 async function seedCorruptAuthCode(code: string): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO auth_codes (
-      code, app_id, discord_id, display_name, role, session_persistent, created_at, expires_at
-    ) VALUES (?, 'hub', '123456789', 'Akaaku', 'user', 1, ?, ?)`,
+      code, app_id, discord_id, display_name, role, icon_source, icon_key,
+      session_persistent, created_at, expires_at
+    ) VALUES (?, 'hub', '123456789', 'Akaaku', 'user', 'none', NULL, 1, ?, ?)`,
   )
     .bind(code, new Date().toISOString(), "bad-expiration")
     .run();

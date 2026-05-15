@@ -10,7 +10,7 @@ type UserRow = {
   guild_member_status: "active" | "left" | null;
   guild_checked_at: string | null;
   disabled_reason: string | null;
-  icon_source: "r2" | "none" | null;
+  icon_source: "r2" | "none";
   icon_key: string | null;
 };
 
@@ -21,7 +21,7 @@ export function userFromRow(row: UserRow): User {
     display_name: row.display_name,
     role: row.role,
     status: row.status,
-    ...(row.icon_source ? { icon_source: row.icon_source } : {}),
-    ...(row.icon_key ? { icon_key: row.icon_key } : {}),
+    icon_source: row.icon_source,
+    icon_key: row.icon_key,
   };
 }

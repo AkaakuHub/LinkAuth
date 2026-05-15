@@ -13,8 +13,8 @@ export type SessionPayload = {
   app_id?: string;
   role: "user" | "admin";
   display_name: string;
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
   persistent?: boolean;
   iat: number;
   exp: number;
@@ -91,11 +91,8 @@ export async function verifyAuthToken(
       (payload.app_id !== undefined && typeof payload.app_id !== "string") ||
       (payload.role !== "user" && payload.role !== "admin") ||
       typeof payload.display_name !== "string" ||
-      (payload.icon_source !== undefined &&
-        payload.icon_source !== "r2" &&
-        payload.icon_source !== "none") ||
-      (payload.icon_key !== undefined &&
-        typeof payload.icon_key !== "string") ||
+      (payload.icon_source !== "r2" && payload.icon_source !== "none") ||
+      (payload.icon_key !== null && typeof payload.icon_key !== "string") ||
       (payload.persistent !== undefined &&
         typeof payload.persistent !== "boolean") ||
       typeof payload.iat !== "number" ||

@@ -1,8 +1,8 @@
 import { attr, escapeHtml } from "./html.js";
 
 export function avatarAssetUrl(
-  iconSource: "r2" | "none" | undefined,
-  iconKey: string | undefined,
+  iconSource: "r2" | "none",
+  iconKey: string | null,
   options: { baseUrl?: string } = {},
 ): string | null {
   if (iconSource !== "r2" || !iconKey) {

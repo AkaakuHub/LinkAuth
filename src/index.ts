@@ -24,9 +24,9 @@ export type LinkAuthUser = {
   display_name: string;
   role: "user" | "admin";
   status: "active";
-  avatar_url?: string;
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  avatar_url: string | null;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
 };
 
 export function loadLinkAuthAppConfig(env: LinkAuthAppEnv): LinkAuthAppConfig {

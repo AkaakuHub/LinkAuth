@@ -184,6 +184,8 @@ test("App Worker exchanges a code and creates an app session cookie", async () =
         user: {
           discord_id: "123456789",
           display_name: "Akaaku",
+          icon_key: null,
+          icon_source: "none",
           role: "admin",
         },
       });
@@ -229,6 +231,8 @@ test("App Worker creates a browser session cookie when remember_me is off", asyn
       user: {
         discord_id: "123456789",
         display_name: "Akaaku",
+        icon_key: null,
+        icon_source: "none",
         role: "admin",
       },
     }),
@@ -284,6 +288,8 @@ test("App Worker callback falls back to the app root for cross-origin return_to 
       user: {
         discord_id: "123456789",
         display_name: "Akaaku",
+        icon_key: null,
+        icon_source: "none",
         role: "admin",
       },
     }),
@@ -313,6 +319,8 @@ test("App Worker callback ignores tampered return_to query values", async () => 
       user: {
         discord_id: "123456789",
         display_name: "Akaaku",
+        icon_key: null,
+        icon_source: "none",
         role: "admin",
       },
     }),
@@ -587,6 +595,8 @@ async function createAppSession(appId: string): Promise<string> {
       discord_id: "123456789",
       display_name: "Akaaku",
       exp: now + 3_600,
+      icon_key: null,
+      icon_source: "none",
       iat: now,
       kid: env.SESSION_KID,
       role: "admin",

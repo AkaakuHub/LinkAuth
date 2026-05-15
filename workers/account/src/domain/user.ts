@@ -6,8 +6,8 @@ export type User = {
   display_name: string;
   role: "user" | "admin";
   status: "active" | "disabled" | "deleted";
-  icon_source?: "r2" | "none";
-  icon_key?: string;
+  icon_source: "r2" | "none";
+  icon_key: string | null;
 };
 
 export async function hashToken(value: string): Promise<string> {
