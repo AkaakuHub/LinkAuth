@@ -10,6 +10,8 @@ npm install link-auth
 
 ## Usage
 
+### Cloudflare Workers
+
 ```ts
 import { handleAppAuthRequest, loadLinkAuthAppConfig } from "link-auth";
 
@@ -33,6 +35,67 @@ export default {
 };
 ```
 
+### APIサーバーのBearer token認証
+
+`getLinkAuthUser`は、`Authorization: Bearer ...`またはapp session cookieを検証し、認証済みユーザーを返します。Bearer tokenには、LinkAuthのaccount画面で発行したPersonal Access Tokenを指定します。
+
+```ts
+import { getLinkAuthUser, loadLinkAuthAppConfig } from "link-auth";
+
+const config = loadLinkAuthAppConfig(process.env);
+
+async function authenticate(request: Request) {
+  const user = await getLinkAuthUser({ config, request });
+
+  if (!user) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  return Response.json({ user });
+}
+```
+
+NestJSでは、受け取ったHTTPリクエストからWeb標準の`Request`を作って`getLinkAuthUser`へ渡します。
+
+```ts
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
+import { getLinkAuthUser, loadLinkAuthAppConfig } from "link-auth";
+
+@Injectable()
+export class LinkAuthGuard implements CanActivate {
+  private readonly config = loadLinkAuthAppConfig(process.env);
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest();
+    const host = req.headers.host;
+    const protocol = req.protocol ?? "https";
+    const url = `${protocol}://${host}${req.originalUrl ?? req.url}`;
+    const request = new Request(url, {
+      headers: req.headers,
+      method: req.method,
+    });
+    const user = await getLinkAuthUser({
+      config: this.config,
+      request,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    req.linkAuthUser = user;
+    return true;
+  }
+}
+```
+
+curlからは次のように呼び出します。
+
+```sh
+curl https://api.example.com/api/me \
+  -H "Authorization: Bearer lka_pat_xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
 ## Environment
 
 ```text
@@ -51,6 +114,10 @@ app WorkerのenvからLinkAuth設定を読み込みます。
 ### `handleAppAuthRequest(input)`
 
 ログイン開始、callback、ログアウト、現在ユーザー取得、app session検証をまとめて処理します。認証済みリクエストでは`handleRequest`に`LinkAuthUser`を渡します。
+
+### `getLinkAuthUser(input)`
+
+Web標準の`Request`からBearer tokenまたはapp session cookieを検証し、`LinkAuthUser`を返します。検証に失敗した場合は`null`を返します。
 
 ### `LinkAuthUser`
 

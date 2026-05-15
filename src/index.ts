@@ -1,4 +1,5 @@
 import {
+  getAppUser as getLinkAuthUserInternal,
   handleAppAuthRequest as handleAppAuthRequestInternal,
   loadLinkAuthAppConfig as loadLinkAuthAppConfigInternal,
 } from "./appAuth.js";
@@ -31,6 +32,13 @@ export type LinkAuthUser = {
 
 export function loadLinkAuthAppConfig(env: LinkAuthAppEnv): LinkAuthAppConfig {
   return loadLinkAuthAppConfigInternal(env);
+}
+
+export async function getLinkAuthUser(input: {
+  config: LinkAuthAppConfig;
+  request: Request;
+}): Promise<LinkAuthUser | null> {
+  return await getLinkAuthUserInternal(input);
 }
 
 export async function handleAppAuthRequest(input: {
