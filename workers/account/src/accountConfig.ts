@@ -11,6 +11,7 @@ export type AccountConfig = {
   domainName: string;
   environment: "local" | "production";
   apps: AppDefinition[];
+  adminDiscordIds: string[];
   assets: R2Bucket;
   database: D1Database;
   discord: {
@@ -47,6 +48,10 @@ export function loadAccountConfig(env: Env): AccountConfig {
     domainName: requiredBinding("DOMAIN_NAME", env.DOMAIN_NAME),
     environment: parseEnvironment(env.LINK_AUTH_ENV),
     apps,
+    adminDiscordIds: parseCommaSeparatedList(
+      "ADMIN_DISCORD_IDS",
+      requiredBinding("ADMIN_DISCORD_IDS", env.ADMIN_DISCORD_IDS),
+    ),
     assets: env.ASSETS,
     database: env.DB,
     discord: {

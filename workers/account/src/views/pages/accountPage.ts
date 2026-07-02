@@ -1,6 +1,7 @@
 import type { AccountConfig } from "../../accountConfig.js";
 import { listAppGuildAccess } from "../../data/appGuildAccess.js";
 import { listPersonalAccessTokens } from "../../data/personalAccessTokens.js";
+import { isAccountAdmin } from "../../domain/admin.js";
 import type { User } from "../../domain/user.js";
 import { createAccountTokens } from "../../security/accountTokens.js";
 import { accountView } from "../account/accountView.js";
@@ -19,14 +20,16 @@ export async function accountPage(
     config,
     user.discord_id,
   );
-  const appGuildAccess =
-    user.role === "admin" ? await listAppGuildAccess(config) : [];
+  const appGuildAccess = isAccountAdmin(config, user)
+    ? await listAppGuildAccess(config)
+    : [];
   const showBackLink = returnTo !== config.navigation.ACCOUNT_URL;
   return page(
     "Account",
     accountView({
       issuedToken,
       appGuildAccess,
+      isAdmin: isAccountAdmin(config, user),
       apps: config.apps,
       guildIds: config.discord.guildIds,
       personalAccessTokens,

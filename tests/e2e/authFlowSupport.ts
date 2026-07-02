@@ -168,6 +168,7 @@ function accountEnv(input: {
 }): AccountEnv {
   return {
     ACCOUNT_URL: input.accountOrigin,
+    ADMIN_DISCORD_IDS: user.discord_id,
     ASSETS: unusedR2Bucket(),
     AUTH_APPS: JSON.stringify([
       {

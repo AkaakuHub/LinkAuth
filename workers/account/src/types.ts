@@ -4,6 +4,7 @@ export type Env = {
   DOMAIN_NAME: string;
   ACCOUNT_URL: string;
   AUTH_APPS: string;
+  ADMIN_DISCORD_IDS: string;
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;
   DISCORD_BOT_TOKEN: string;

@@ -4,6 +4,7 @@ import type { Env } from "../../workers/account/src/types.js";
 
 const baseEnv = {
   ACCOUNT_URL: "https://auth.example.com",
+  ADMIN_DISCORD_IDS: "123456789",
   ASSETS: {} as R2Bucket,
   DB: {} as D1Database,
   AUTH_APPS: JSON.stringify([

@@ -12,6 +12,7 @@ import { personalAccessTokenCard } from "./personalAccessTokenView.js";
 export function accountView({
   issuedToken,
   appGuildAccess,
+  isAdmin,
   apps,
   guildIds,
   personalAccessTokens,
@@ -22,6 +23,7 @@ export function accountView({
 }: {
   issuedToken: string | undefined;
   appGuildAccess: AppGuildAccessRecord[];
+  isAdmin: boolean;
   apps: AppDefinition[];
   guildIds: string[];
   personalAccessTokens: PersonalAccessTokenRecord[];
@@ -53,7 +55,7 @@ export function accountView({
     guildIds,
     tokens,
     escapedReturnTo,
-    user,
+    isAdmin,
   })}${accountActions({
     tokens,
     escapedReturnTo,
@@ -66,16 +68,16 @@ function adminAppGuildAccessCard({
   guildIds,
   tokens,
   escapedReturnTo,
-  user,
+  isAdmin,
 }: {
   appGuildAccess: AppGuildAccessRecord[];
   apps: AppDefinition[];
   guildIds: string[];
   tokens: AccountTokens;
   escapedReturnTo: string;
-  user: User;
+  isAdmin: boolean;
 }): string {
-  if (user.role !== "admin") {
+  if (!isAdmin) {
     return "";
   }
   const rows = appGuildAccess.length

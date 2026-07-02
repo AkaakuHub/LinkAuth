@@ -84,6 +84,7 @@ Cloudflare用の値です。
 account Worker用の値です。
 
 - `AUTH_APPS`:認可するapp定義。複数appは配列へ追加し、各`session_verify_secret`は該当app側の`APP_SESSION_HMAC_SECRET`と一致させます。
+- `ADMIN_DISCORD_IDS`:管理画面を操作できるDiscordユーザーID。複数人はカンマ区切りで指定します。
 - `SESSION_HMAC_SECRET`:account session署名secret
 - `CSRF_HMAC_SECRET`:CSRF署名secret
 - `OTP_HMAC_SECRET`:OTP hash secret
@@ -128,4 +129,4 @@ pnpm d1:migrations:apply
 terraform -chdir=infra apply
 ```
 
-`0003_auth_code_session_persistent.sql`まで適用されていることを確認します。
+`0006_app_guild_access.sql`まで適用されていることを確認します。migration適用後、`app_guild_access`が空のappは認証を拒否します。`ADMIN_DISCORD_IDS`に含まれる管理者でaccount画面にログインし、対象appとDiscordサーバーの許可を作成してから既存appの切り替えを確認します。

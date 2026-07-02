@@ -25,6 +25,7 @@ import {
   updateUserAvatar,
   updateUserProfile,
 } from "../data/users.js";
+import { isAccountAdmin } from "../domain/admin.js";
 import { appLogoutUrlForReturnTo, findApp } from "../domain/appRegistry.js";
 import { createAvatarIconKey } from "../domain/avatar.js";
 import { normalizeDisplayName } from "../domain/displayName.js";
@@ -303,7 +304,7 @@ export async function updateAppGuildAccess(
   if (!active) {
     return inactiveAccountPage(config);
   }
-  if (active.user.role !== "admin") {
+  if (!isAccountAdmin(config, active.user)) {
     return new Response("forbidden", { status: 403 });
   }
   const form = await request.formData();

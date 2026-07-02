@@ -57,6 +57,7 @@ const assets: R2Bucket = {
 
 const env: Env = {
   ACCOUNT_URL: "https://auth.example.com",
+  ADMIN_DISCORD_IDS: "123456789",
   ASSETS: assets,
   AUTH_APPS: JSON.stringify([
     {
@@ -626,42 +627,54 @@ test("Account Worker renders app guild access management for admins", async () =
 });
 
 test("Account Worker hides app guild access management from non-admin users", async () => {
-  await replaceActiveUser({ role: "user" });
-  const session = await createAccountSession({ role: "user" });
-  const response = await fetchAccount("https://account.example.com/", {
-    headers: {
-      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
-    },
-  });
-  const body = await response.text();
+  const originalAdminDiscordIds = env.ADMIN_DISCORD_IDS;
+  env.ADMIN_DISCORD_IDS = "987654321";
+  try {
+    await replaceActiveUser({ role: "user" });
+    const session = await createAccountSession({ role: "user" });
+    const response = await fetchAccount("https://account.example.com/", {
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      },
+    });
+    const body = await response.text();
 
-  expect(response.status).toBe(200);
-  expect(body).not.toContain("アプリ閲覧権限");
-  expect(body).not.toContain('action="/admin/app-guild-access"');
+    expect(response.status).toBe(200);
+    expect(body).not.toContain("アプリ閲覧権限");
+    expect(body).not.toContain('action="/admin/app-guild-access"');
+  } finally {
+    env.ADMIN_DISCORD_IDS = originalAdminDiscordIds;
+  }
 });
 
 test("Account Worker rejects app guild access updates from non-admin users", async () => {
-  await replaceActiveUser({ role: "user" });
-  const session = await createAccountSession({ role: "user" });
-  const csrfToken = await createAccountCsrfToken("app-guild-access");
-  const response = await fetchAccount(
-    "https://account.example.com/admin/app-guild-access",
-    {
-      body: new URLSearchParams({
-        action: "grant",
-        app_id: "hub",
-        csrf_token: csrfToken,
-        guild_id: "guild",
-      }),
-      headers: {
-        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
-        origin: "https://account.example.com",
+  const originalAdminDiscordIds = env.ADMIN_DISCORD_IDS;
+  env.ADMIN_DISCORD_IDS = "987654321";
+  try {
+    await replaceActiveUser({ role: "user" });
+    const session = await createAccountSession({ role: "user" });
+    const csrfToken = await createAccountCsrfToken("app-guild-access");
+    const response = await fetchAccount(
+      "https://account.example.com/admin/app-guild-access",
+      {
+        body: new URLSearchParams({
+          action: "grant",
+          app_id: "hub",
+          csrf_token: csrfToken,
+          guild_id: "guild",
+        }),
+        headers: {
+          cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+          origin: "https://account.example.com",
+        },
+        method: "POST",
       },
-      method: "POST",
-    },
-  );
+    );
 
-  expect(response.status).toBe(403);
+    expect(response.status).toBe(403);
+  } finally {
+    env.ADMIN_DISCORD_IDS = originalAdminDiscordIds;
+  }
 });
 
 test("Account Worker rejects app guild access updates without valid CSRF", async () => {

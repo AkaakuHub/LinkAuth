@@ -22,6 +22,7 @@ await writeEnvFile(options.accountOutput, [
   "DOMAIN_NAME",
   "ACCOUNT_URL",
   "AUTH_APPS",
+  "ADMIN_DISCORD_IDS",
   "DISCORD_BOT_TOKEN",
   "DISCORD_GUILD_IDS",
 ]);

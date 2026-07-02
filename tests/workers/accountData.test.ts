@@ -43,6 +43,7 @@ import type { Env } from "../../workers/account/src/types.js";
 const assets = {} as R2Bucket;
 const env: Env = {
   ACCOUNT_URL: "https://auth.example.com",
+  ADMIN_DISCORD_IDS: "123456789",
   ASSETS: assets,
   AUTH_APPS: JSON.stringify([
     {
