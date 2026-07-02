@@ -21,10 +21,12 @@ import {
 } from "../data/otpChallenges.js";
 import { verifyPersonalAccessToken } from "../data/personalAccessTokens.js";
 import { ensureGuildMemberUser } from "../data/users.js";
+import { isAccountAdmin } from "../domain/admin.js";
 import { findApp, matchesCallbackUrl } from "../domain/appRegistry.js";
 import { normalizeReturnTo } from "../domain/navigation.js";
 import { createOtpCode } from "../domain/otpCode.js";
 import { accountReturnTo } from "../domain/returnTo.js";
+import type { User } from "../domain/user.js";
 import {
   type DiscordOAuthUser,
   fetchDiscordGuildMembership,
@@ -106,13 +108,7 @@ export async function authorize(
     code,
     expiresAt: Math.floor(Date.now() / 1000) + 300,
     sessionPersistent: session.persistent !== false,
-    user: {
-      discord_id: active.user.discord_id,
-      display_name: active.user.display_name,
-      icon_source: active.user.icon_source,
-      icon_key: active.user.icon_key,
-      role: active.user.role,
-    },
+    user: appAuthUser(config, active.user),
   });
   const callbackUrl = new URL(returnTo);
   callbackUrl.searchParams.set("code", code);
@@ -403,7 +399,7 @@ export async function sessionVerify(
       ) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
-      return Response.json({ user: verified.user });
+      return Response.json({ user: appAuthUser(config, verified.user) });
     }
     const payload = cookieToken
       ? await verifySessionCookie(
@@ -428,7 +424,7 @@ export async function sessionVerify(
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
     return Response.json({
-      user: active.user,
+      user: appAuthUser(config, active.user),
     });
   }
   const session = await requireSession(request, config);
@@ -438,6 +434,23 @@ export async function sessionVerify(
         request,
         Response.json({ error: "unauthorized" }, { status: 401 }),
       );
+}
+
+function appAuthUser(
+  config: AccountConfig,
+  user: User,
+): Pick<
+  User,
+  "discord_id" | "display_name" | "role" | "status" | "icon_source" | "icon_key"
+> {
+  return {
+    discord_id: user.discord_id,
+    display_name: user.display_name,
+    icon_source: user.icon_source,
+    icon_key: user.icon_key,
+    role: isAccountAdmin(config, user) ? "admin" : user.role,
+    status: "active",
+  };
 }
 
 export async function me(
