@@ -9,6 +9,7 @@ export type AccountTokens = {
   logout: string;
   delete: string;
   token: string;
+  appGuildAccess: string;
 };
 
 export async function createAccountTokens(
@@ -57,6 +58,14 @@ export async function createAccountTokens(
       discordId: user.discord_id,
       origin,
       action: "token",
+      kid: config.csrf.kid,
+      secret: config.csrf.secret,
+      now,
+    }),
+    appGuildAccess: await createCsrfToken({
+      discordId: user.discord_id,
+      origin,
+      action: "app-guild-access",
       kid: config.csrf.kid,
       secret: config.csrf.secret,
       now,

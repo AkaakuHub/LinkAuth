@@ -7,6 +7,7 @@ import {
   deleteAccount,
   logout,
   revokeToken,
+  updateAppGuildAccess,
   updateAvatar,
   updateProfile,
 } from "./routes/accountRoutes.js";
@@ -86,6 +87,9 @@ async function handleAccountRequest(
   }
   if (url.pathname === "/tokens/revoke" && request.method === "POST") {
     return revokeToken(request, url, config);
+  }
+  if (url.pathname === "/admin/app-guild-access" && request.method === "POST") {
+    return updateAppGuildAccess(request, url, config);
   }
   if (url.pathname === "/delete" && request.method === "POST") {
     return deleteAccount(request, url, config);

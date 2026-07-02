@@ -1,3 +1,5 @@
+import type { AppDefinition } from "../../accountConfig.js";
+import type { AppGuildAccessRecord } from "../../data/appGuildAccess.js";
 import type { PersonalAccessTokenRecord } from "../../data/personalAccessTokens.js";
 import type { User } from "../../domain/user.js";
 import type { AccountTokens } from "../../security/accountTokens.js";
@@ -9,6 +11,9 @@ import { personalAccessTokenCard } from "./personalAccessTokenView.js";
 
 export function accountView({
   issuedToken,
+  appGuildAccess,
+  apps,
+  guildIds,
   personalAccessTokens,
   user,
   tokens,
@@ -16,6 +21,9 @@ export function accountView({
   showBackLink,
 }: {
   issuedToken: string | undefined;
+  appGuildAccess: AppGuildAccessRecord[];
+  apps: AppDefinition[];
+  guildIds: string[];
   personalAccessTokens: PersonalAccessTokenRecord[];
   user: User;
   tokens: AccountTokens;
@@ -39,10 +47,49 @@ export function accountView({
     personalAccessTokens,
     tokens,
     escapedReturnTo,
+  })}${adminAppGuildAccessCard({
+    appGuildAccess,
+    apps,
+    guildIds,
+    tokens,
+    escapedReturnTo,
+    user,
   })}${accountActions({
     tokens,
     escapedReturnTo,
   })}</div>`;
+}
+
+function adminAppGuildAccessCard({
+  appGuildAccess,
+  apps,
+  guildIds,
+  tokens,
+  escapedReturnTo,
+  user,
+}: {
+  appGuildAccess: AppGuildAccessRecord[];
+  apps: AppDefinition[];
+  guildIds: string[];
+  tokens: AccountTokens;
+  escapedReturnTo: string;
+  user: User;
+}): string {
+  if (user.role !== "admin") {
+    return "";
+  }
+  const rows = appGuildAccess.length
+    ? appGuildAccess
+        .map(
+          (access) =>
+            `<li class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-haze px-3 py-2"><span class="text-sm text-ink">${escapeHtml(access.appId)} / ${escapeHtml(access.guildId)}</span><form method="post" action="/admin/app-guild-access"><input type="hidden" name="csrf_token"${attr("value", tokens.appGuildAccess)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="app_id"${attr("value", access.appId)}><input type="hidden" name="guild_id"${attr("value", access.guildId)}>${button({ type: "submit", variant: "secondary", className: "min-h-9 px-3", children: `${icon("trash")}解除` })}</form></li>`,
+        )
+        .join("")
+    : `<li class="rounded-md border border-line bg-haze px-3 py-2 text-sm text-muted">許可されている組み合わせはありません。</li>`;
+  return card({
+    className: "grid gap-5 rounded-lg",
+    children: `<div class="grid gap-2"><h2 class="text-xl font-semibold text-ink">アプリ閲覧権限</h2><p class="text-sm leading-6 text-muted">Discordサーバーごとに閲覧できるアプリを管理します。</p></div><form class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" method="post" action="/admin/app-guild-access"><input type="hidden" name="csrf_token"${attr("value", tokens.appGuildAccess)}><input type="hidden" name="return_to" value="${escapedReturnTo}"><input type="hidden" name="action" value="grant"><label class="grid gap-1 text-sm font-semibold text-ink">アプリ<select class="min-h-11 rounded-md border border-line bg-panel px-3 text-sm text-ink" name="app_id" required>${apps.map((app) => `<option${attr("value", app.appId)}>${escapeHtml(app.appId)}</option>`).join("")}</select></label><label class="grid gap-1 text-sm font-semibold text-ink">Discordサーバー<select class="min-h-11 rounded-md border border-line bg-panel px-3 text-sm text-ink" name="guild_id" required>${guildIds.map((guildId) => `<option${attr("value", guildId)}>${escapeHtml(guildId)}</option>`).join("")}</select></label><div class="flex items-end">${button({ type: "submit", className: "min-h-11 px-4", children: `${icon("check")}許可` })}</div></form><ul class="grid gap-2">${rows}</ul>`,
+  });
 }
 
 function accountProfileCard({

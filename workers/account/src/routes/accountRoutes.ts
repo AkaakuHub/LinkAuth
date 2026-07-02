@@ -4,6 +4,10 @@ import {
   rememberCookieName,
 } from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
+import {
+  grantAppGuildAccess,
+  revokeAppGuildAccess,
+} from "../data/appGuildAccess.js";
 import { InactiveUserError } from "../data/errors.js";
 import {
   createPersonalAccessToken,
@@ -21,7 +25,7 @@ import {
   updateUserAvatar,
   updateUserProfile,
 } from "../data/users.js";
-import { appLogoutUrlForReturnTo } from "../domain/appRegistry.js";
+import { appLogoutUrlForReturnTo, findApp } from "../domain/appRegistry.js";
 import { createAvatarIconKey } from "../domain/avatar.js";
 import { normalizeDisplayName } from "../domain/displayName.js";
 import { accountReturnTo, redirectToAccountRoot } from "../domain/returnTo.js";
@@ -270,6 +274,59 @@ export async function revokeToken(
     tokenId: String(form.get("token_id") ?? ""),
   });
   return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
+}
+
+export async function updateAppGuildAccess(
+  request: Request,
+  url: URL,
+  config: AccountConfig,
+): Promise<Response> {
+  const session = await requireSession(request, config);
+  if (!session) {
+    return appendRememberCookieDeletion(
+      request,
+      await accountLandingResponse(config),
+    );
+  }
+  if (
+    !(await verifyFormCsrf(
+      request,
+      url,
+      config,
+      session.discord_id,
+      "app-guild-access",
+    ))
+  ) {
+    return new Response("forbidden", { status: 403 });
+  }
+  const active = await verifyActiveUser(session.discord_id, config);
+  if (!active) {
+    return inactiveAccountPage(config);
+  }
+  if (active.user.role !== "admin") {
+    return new Response("forbidden", { status: 403 });
+  }
+  const form = await request.formData();
+  const returnTo = accountReturnTo(String(form.get("return_to") ?? ""), config);
+  const appId = String(form.get("app_id") ?? "");
+  const guildId = String(form.get("guild_id") ?? "");
+  const action = String(form.get("action") ?? "");
+  if (!findApp(config, appId) || !config.discord.guildIds.includes(guildId)) {
+    return new Response("invalid app_id or guild_id", { status: 400 });
+  }
+  if (action === "grant") {
+    await grantAppGuildAccess(config, {
+      appId,
+      guildId,
+      createdByDiscordId: active.user.discord_id,
+    });
+    return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
+  }
+  if (action === "revoke") {
+    await revokeAppGuildAccess(config, { appId, guildId });
+    return appendSessionCookies(redirectToAccountRoot(url, returnTo), session);
+  }
+  return new Response("invalid action", { status: 400 });
 }
 
 export async function logout(

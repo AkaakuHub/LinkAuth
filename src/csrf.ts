@@ -5,7 +5,13 @@ import {
   timingSafeEqual,
 } from "./encoding.js";
 
-export type CsrfAction = "profile" | "avatar" | "delete" | "logout" | "token";
+export type CsrfAction =
+  | "profile"
+  | "avatar"
+  | "delete"
+  | "logout"
+  | "token"
+  | "app-guild-access";
 
 type CsrfPayload = {
   typ: "csrf";
