@@ -1,5 +1,6 @@
 import type { AccountConfig } from "../accountConfig.js";
 import type { User } from "../domain/user.js";
+import { upsertUserGuildMembership } from "./appGuildAccess.js";
 import { InactiveUserError } from "./errors.js";
 import { userFromRow } from "./rows.js";
 
@@ -114,6 +115,11 @@ export async function ensureGuildMemberUser(
   },
 ): Promise<void> {
   const nowIso = new Date().toISOString();
+  await upsertUserGuildMembership(config, {
+    discordId: input.discordId,
+    guildId: input.guildId,
+    status: "active",
+  });
   await config.database
     .prepare(
       `INSERT INTO users (

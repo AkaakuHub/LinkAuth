@@ -12,6 +12,7 @@ import {
   verifySessionCookie,
 } from "../../../../src/session.js";
 import type { AccountConfig } from "../accountConfig.js";
+import { verifyCurrentAppGuildAccess } from "../data/appGuildAccess.js";
 import { consumeAuthCode, createAuthCode } from "../data/authCodes.js";
 import { DataConflictError, RateLimitedError } from "../data/errors.js";
 import {
@@ -89,6 +90,14 @@ export async function authorize(
   }
   const active = await verifyCurrentMemberUser(session.discord_id, config);
   if (!active) {
+    return inactiveAccountPage(config, returnTo);
+  }
+  if (
+    !(await verifyCurrentAppGuildAccess(config, {
+      appId: app.appId,
+      discordId: active.user.discord_id,
+    }))
+  ) {
     return inactiveAccountPage(config, returnTo);
   }
   const code = randomBase64Url(32);
@@ -385,9 +394,16 @@ export async function sessionVerify(
         token: bearerToken,
         scope: "session:verify",
       });
-      return verified
-        ? Response.json({ user: verified.user })
-        : Response.json({ error: "unauthorized" }, { status: 401 });
+      if (
+        !verified ||
+        !(await verifyCurrentAppGuildAccess(config, {
+          appId: app.appId,
+          discordId: verified.user.discord_id,
+        }))
+      ) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return Response.json({ user: verified.user });
     }
     const payload = cookieToken
       ? await verifySessionCookie(
@@ -401,6 +417,14 @@ export async function sessionVerify(
     }
     const active = await verifyActiveUser(payload.discord_id, config);
     if (!active) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+    if (
+      !(await verifyCurrentAppGuildAccess(config, {
+        appId: app.appId,
+        discordId: active.user.discord_id,
+      }))
+    ) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
     return Response.json({
