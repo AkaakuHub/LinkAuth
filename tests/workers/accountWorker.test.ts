@@ -1866,7 +1866,7 @@ test("Account Worker OTP success creates account and remember cookies when remem
   );
 });
 
-test("Account Worker restores an account session with a valid remember cookie", async () => {
+test("Account Worker does not restore account management with a remember cookie", async () => {
   const oldRandomToken = "old-random-token";
   await createRememberToken(testAccountConfig(), {
     discordId: activeUser.discord_id,
@@ -1885,11 +1885,11 @@ test("Account Worker restores an account session with a valid remember cookie", 
 
   expect(response.status).toBe(200);
   const body = await response.text();
-  expect(body).toContain("アカウント設定");
-  expect(body).toContain("data-avatar-csrf");
-  expect(setCookie).toContain(`${sessionCookieName}=`);
+  expect(body).toContain("Discordでログイン");
+  expect(body).not.toContain("data-avatar-csrf");
+  expect(setCookie).not.toContain(`${sessionCookieName}=`);
   expect(setCookie).toContain(`${rememberCookieName}=`);
-  await expectRememberTokenRotated("remember-id", oldRandomToken);
+  expect(setCookie).toContain("Max-Age=0");
 });
 
 test("Account Worker account page renders the current icon", async () => {
@@ -2010,7 +2010,7 @@ test("Account Worker account page rejects users that left the Discord guild", as
   expect(body).toContain("利用資格がありません");
 });
 
-test("Account Worker clears remember cookies that cannot restore a session", async () => {
+test("Account Worker clears remember cookies on account management", async () => {
   const response = await fetchAccount("https://account.example.com/", {
     headers: {
       cookie: `${rememberCookieName}=remember-id.invalid-token`,
@@ -2023,7 +2023,7 @@ test("Account Worker clears remember cookies that cannot restore a session", asy
   expect(setCookie).toContain("Max-Age=0");
 });
 
-test("Account Worker clears remember cookies when the remembered user left the guild", async () => {
+test("Account Worker clears remember cookies on account management before guild checks", async () => {
   const oldRandomToken = "old-random-token";
   await createRememberToken(testAccountConfig(), {
     discordId: activeUser.discord_id,
@@ -2390,21 +2390,6 @@ async function expectRememberToken(
     .first<{ discord_id: string; token_hash: string; expires_at: number }>();
   expect(row?.discord_id).toBe(activeUser.discord_id);
   expect(row?.token_hash).toBe(tokenHash);
-  expect(row?.expires_at).toBeGreaterThanOrEqual(
-    Math.floor(Date.now() / 1000) + 15_552_000 - 1,
-  );
-}
-
-async function expectRememberTokenRotated(
-  tokenId: string,
-  oldRandomToken: string,
-): Promise<void> {
-  const row = await env.DB.prepare(
-    "SELECT token_hash, expires_at FROM remember_tokens WHERE token_id = ?",
-  )
-    .bind(tokenId)
-    .first<{ token_hash: string; expires_at: number }>();
-  expect(row?.token_hash).not.toBe(await hashTokenForTest(oldRandomToken));
   expect(row?.expires_at).toBeGreaterThanOrEqual(
     Math.floor(Date.now() / 1000) + 15_552_000 - 1,
   );

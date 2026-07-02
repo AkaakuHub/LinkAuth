@@ -37,7 +37,7 @@ import { verifyFormCsrf, verifyHeaderCsrf } from "../security/csrf.js";
 import {
   appendRememberCookieDeletion,
   appendSessionCookies,
-  requireSession,
+  requireFreshSession,
 } from "../security/session.js";
 import { clearAccountCookiesAndRedirect } from "../services/accountSessionCookie.js";
 import {
@@ -53,7 +53,7 @@ export async function accountHome(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -83,7 +83,7 @@ export async function updateProfile(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -127,7 +127,7 @@ export async function updateAvatar(
   config: AccountConfig,
   ctx: ExecutionContext,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -185,7 +185,7 @@ export async function deleteAccount(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -212,7 +212,7 @@ export async function createToken(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -256,7 +256,7 @@ export async function revokeToken(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -282,7 +282,7 @@ export async function updateAppGuildAccess(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,
@@ -335,7 +335,7 @@ export async function logout(
   url: URL,
   config: AccountConfig,
 ): Promise<Response> {
-  const session = await requireSession(request, config);
+  const session = await requireFreshSession(request, config);
   if (!session) {
     return appendRememberCookieDeletion(
       request,

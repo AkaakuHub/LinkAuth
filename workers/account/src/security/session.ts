@@ -41,6 +41,28 @@ export async function requireSession(
   return await restoreRememberSession(request, config);
 }
 
+export async function requireFreshSession(
+  request: Request,
+  config: AccountConfig,
+): Promise<{
+  discord_id: string;
+  persistent?: boolean;
+  setCookies: string[];
+} | null> {
+  const value = getSingleCookie(
+    request.headers.get("cookie"),
+    sessionCookieName,
+  );
+  const session = value
+    ? await verifySessionCookie(
+        value,
+        { [config.session.kid]: config.session.secret },
+        nowSeconds(),
+      )
+    : null;
+  return session ? { ...session, setCookies: [] } : null;
+}
+
 export function appendSessionCookies(
   response: Response,
   session: { setCookies: string[] },
