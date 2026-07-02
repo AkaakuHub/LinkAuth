@@ -10,6 +10,7 @@ import {
   verifySessionCookie,
 } from "../../src/session.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
+import { grantAppGuildAccess } from "../../workers/account/src/data/appGuildAccess.js";
 import { createOtpChallenge } from "../../workers/account/src/data/otpChallenges.js";
 import { createPersonalAccessToken } from "../../workers/account/src/data/personalAccessTokens.js";
 import { createRememberToken } from "../../workers/account/src/data/rememberTokens.js";
@@ -84,6 +85,11 @@ afterEach(() => {
 beforeEach(async () => {
   await resetDatabase();
   await seedActiveUser();
+  await grantAppGuildAccess(testAccountConfig(), {
+    appId: "hub",
+    createdByDiscordId: activeUser.discord_id,
+    guildId: "guild",
+  });
 });
 
 test("Account Worker rejects authorize requests for unknown apps", async () => {
@@ -190,6 +196,23 @@ test("Account Worker issues an auth code for an active session", async () => {
   expect(location.origin).toBe("https://app.example.com");
   expect(location.pathname).toBe("/_auth/callback");
   expect(location.searchParams.get("code")).toBeTruthy();
+});
+
+test("Account Worker authorize rejects users without app guild access", async () => {
+  await deleteAppGuildAccess("hub", "guild");
+  stubDiscordGuildMember();
+  const session = await createAccountSession();
+
+  const response = await fetchAccount(
+    "https://auth.example.com/authorize?app_id=hub&return_to=https%3A%2F%2Fapp.example.com%2F_auth%2Fcallback",
+    {
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
 });
 
 test("Account Worker inactive authorize errors return to the app callback", async () => {
@@ -426,6 +449,7 @@ test("Account Worker session verify rejects apps without a session verify secret
 });
 
 test("Account Worker session verify accepts a valid app session cookie", async () => {
+  stubDiscordGuildMember();
   await replaceActiveUser({
     displayName: "Current Akaaku",
     iconKey: "icons/123456789/avatar.webp",
@@ -454,6 +478,22 @@ test("Account Worker session verify accepts a valid app session cookie", async (
   });
 });
 
+test("Account Worker session verify rejects users without app guild access", async () => {
+  await deleteAppGuildAccess("hub", "guild");
+  const session = await createAppSession("hub");
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        cookie: `${appSessionCookieName("hub")}=${encodeURIComponent(session)}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
+});
+
 test("Account Worker session verify rejects an app session bearer token", async () => {
   const session = await createAppSession("hub");
   const response = await fetchAccount(
@@ -470,6 +510,7 @@ test("Account Worker session verify rejects an app session bearer token", async 
 });
 
 test("Account Worker session verify accepts a valid personal access token", async () => {
+  stubDiscordGuildMember();
   await replaceActiveUser({
     displayName: "Current Akaaku",
     iconKey: "icons/123456789/avatar.webp",
@@ -500,6 +541,26 @@ test("Account Worker session verify accepts a valid personal access token", asyn
       status: "active",
     },
   });
+});
+
+test("Account Worker session verify rejects personal access tokens without app guild access", async () => {
+  await deleteAppGuildAccess("hub", "guild");
+  const { token } = await createPersonalAccessToken(testAccountConfig(), {
+    discordId: "123456789",
+    expiration: "90d",
+    name: "local curl",
+  });
+  const response = await fetchAccount(
+    "https://auth.example.com/session/verify?app_id=hub",
+    {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "unauthorized" });
 });
 
 test("Account Worker session verify rejects an unknown personal access token", async () => {
@@ -547,6 +608,154 @@ test("Account Worker renders personal access token management", async () => {
   expect(body).toContain("Bearer token");
   expect(body).toContain('action="/tokens"');
   expect(body).toContain("発行済みtokenはありません。");
+});
+
+test("Account Worker renders app guild access management for admins", async () => {
+  const session = await createAccountSession();
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).toContain("アプリ閲覧権限");
+  expect(body).toContain('action="/admin/app-guild-access"');
+  expect(body).toContain("hub / guild");
+});
+
+test("Account Worker hides app guild access management from non-admin users", async () => {
+  await replaceActiveUser({ role: "user" });
+  const session = await createAccountSession({ role: "user" });
+  const response = await fetchAccount("https://account.example.com/", {
+    headers: {
+      cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+    },
+  });
+  const body = await response.text();
+
+  expect(response.status).toBe(200);
+  expect(body).not.toContain("アプリ閲覧権限");
+  expect(body).not.toContain('action="/admin/app-guild-access"');
+});
+
+test("Account Worker rejects app guild access updates from non-admin users", async () => {
+  await replaceActiveUser({ role: "user" });
+  const session = await createAccountSession({ role: "user" });
+  const csrfToken = await createAccountCsrfToken("app-guild-access");
+  const response = await fetchAccount(
+    "https://account.example.com/admin/app-guild-access",
+    {
+      body: new URLSearchParams({
+        action: "grant",
+        app_id: "hub",
+        csrf_token: csrfToken,
+        guild_id: "guild",
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(403);
+});
+
+test("Account Worker rejects app guild access updates without valid CSRF", async () => {
+  const session = await createAccountSession();
+  const response = await fetchAccount(
+    "https://account.example.com/admin/app-guild-access",
+    {
+      body: new URLSearchParams({
+        action: "grant",
+        app_id: "hub",
+        csrf_token: "tampered",
+        guild_id: "guild",
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(403);
+});
+
+test("Account Worker rejects app guild access updates for unknown apps", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("app-guild-access");
+  const response = await fetchAccount(
+    "https://account.example.com/admin/app-guild-access",
+    {
+      body: new URLSearchParams({
+        action: "grant",
+        app_id: "unknown",
+        csrf_token: csrfToken,
+        guild_id: "guild",
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(400);
+});
+
+test("Account Worker grants app guild access from the admin page", async () => {
+  await deleteAppGuildAccess("hub", "guild");
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("app-guild-access");
+  const response = await fetchAccount(
+    "https://account.example.com/admin/app-guild-access",
+    {
+      body: new URLSearchParams({
+        action: "grant",
+        app_id: "hub",
+        csrf_token: csrfToken,
+        guild_id: "guild",
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(303);
+  expect(await hasAppGuildAccess("hub", "guild")).toBe(true);
+});
+
+test("Account Worker revokes app guild access from the admin page", async () => {
+  const session = await createAccountSession();
+  const csrfToken = await createAccountCsrfToken("app-guild-access");
+  const response = await fetchAccount(
+    "https://account.example.com/admin/app-guild-access",
+    {
+      body: new URLSearchParams({
+        action: "revoke",
+        app_id: "hub",
+        csrf_token: csrfToken,
+        guild_id: "guild",
+      }),
+      headers: {
+        cookie: `${sessionCookieName}=${encodeURIComponent(session)}`,
+        origin: "https://account.example.com",
+      },
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(303);
+  expect(await hasAppGuildAccess("hub", "guild")).toBe(false);
 });
 
 test("Account Worker creates a personal access token from the account page", async () => {
@@ -1691,7 +1900,7 @@ test("Account Worker account page renders the current icon", async () => {
   expect(body).toContain("data-avatar-input");
   expect(body).toContain("data-avatar-cropper-dialog");
   expect(body).not.toContain("Discord ID");
-  expect(body).not.toContain("権限");
+  expect(body).not.toContain("管理者権限");
 });
 
 test("Account Worker treats malformed session cookies as unauthenticated", async () => {
@@ -1917,7 +2126,7 @@ async function expectMethodNotAllowed(
 }
 
 async function createAccountSession(
-  options: { persistent?: boolean } = {},
+  options: { persistent?: boolean; role?: "admin" | "user" } = {},
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return await signSessionCookie(
@@ -1932,7 +2141,7 @@ async function createAccountSession(
       ...(options.persistent === undefined
         ? {}
         : { persistent: options.persistent }),
-      role: "admin",
+      role: options.role ?? "admin",
     },
     env.SESSION_HMAC_SECRET,
   );
@@ -1957,7 +2166,13 @@ async function createAppSession(appId: string): Promise<string> {
 }
 
 async function createAccountCsrfToken(
-  action: "profile" | "avatar" | "delete" | "logout" | "token",
+  action:
+    | "profile"
+    | "avatar"
+    | "delete"
+    | "logout"
+    | "token"
+    | "app-guild-access",
 ): Promise<string> {
   return await createCsrfToken({
     action,
@@ -1967,6 +2182,29 @@ async function createAccountCsrfToken(
     origin: "https://account.example.com",
     secret: env.CSRF_HMAC_SECRET,
   });
+}
+
+async function deleteAppGuildAccess(
+  appId: string,
+  guildId: string,
+): Promise<void> {
+  await env.DB.prepare(
+    "DELETE FROM app_guild_access WHERE app_id = ? AND guild_id = ?",
+  )
+    .bind(appId, guildId)
+    .run();
+}
+
+async function hasAppGuildAccess(
+  appId: string,
+  guildId: string,
+): Promise<boolean> {
+  const row = await env.DB.prepare(
+    "SELECT 1 FROM app_guild_access WHERE app_id = ? AND guild_id = ?",
+  )
+    .bind(appId, guildId)
+    .first<{ "1": number }>();
+  return row !== null;
 }
 
 async function readPersonalAccessTokenCount(
@@ -2260,6 +2498,7 @@ async function seedActiveUser(
     guildCheckedAt?: string;
     status?: "active" | "disabled" | "deleted";
     disabledReason?: string | null;
+    role?: "admin" | "user";
   } = {},
 ): Promise<void> {
   const now = new Date().toISOString();
@@ -2268,11 +2507,12 @@ async function seedActiveUser(
         discord_id, display_name, role, status, guild_id, guild_member_status,
         guild_checked_at, disabled_reason, icon_source, icon_key, created_at,
         updated_at
-      ) VALUES (?, ?, 'admin', ?, 'guild', 'active', ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, 'guild', 'active', ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       input.discordId ?? activeUser.discord_id,
       input.displayName ?? activeUser.display_name,
+      input.role ?? "admin",
       input.status ?? "active",
       input.guildCheckedAt ?? now,
       input.disabledReason ?? null,
@@ -2282,12 +2522,24 @@ async function seedActiveUser(
       now,
     )
     .run();
+  await env.DB.prepare(
+    `INSERT INTO user_guild_memberships (
+      discord_id, guild_id, status, checked_at, created_at, updated_at
+    ) VALUES (?, 'guild', 'active', ?, ?, ?)`,
+  )
+    .bind(input.discordId ?? activeUser.discord_id, now, now, now)
+    .run();
 }
 
 async function replaceActiveUser(
   input: Parameters<typeof seedActiveUser>[0],
 ): Promise<void> {
   await env.DB.prepare("DELETE FROM users WHERE discord_id = ?")
+    .bind("123456789")
+    .run();
+  await env.DB.prepare(
+    "DELETE FROM user_guild_memberships WHERE discord_id = ?",
+  )
     .bind("123456789")
     .run();
   await seedActiveUser(input);

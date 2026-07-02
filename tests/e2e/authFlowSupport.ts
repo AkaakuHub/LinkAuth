@@ -95,7 +95,9 @@ export async function startAuthFlowServers(
   }
 > {
   const state: MockState = {
+    appGuildAccess: new Set(["hub:guild"]),
     authCodes: new Map(),
+    guildMemberships: new Set(),
     users: options.user
       ? new Map([[user.discord_id, options.user]])
       : new Map(),

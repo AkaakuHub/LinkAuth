@@ -4,6 +4,10 @@ import { hmacSha256, sha256Hex } from "../../src/crypto.js";
 import { hexEncode } from "../../src/encoding.js";
 import { loadAccountConfig } from "../../workers/account/src/accountConfig.js";
 import {
+  grantAppGuildAccess,
+  userCanAccessApp,
+} from "../../workers/account/src/data/appGuildAccess.js";
+import {
   consumeAuthCode,
   createAuthCode,
 } from "../../workers/account/src/data/authCodes.js";
@@ -228,6 +232,36 @@ test("OTP challenge rejects a wrong code and consumes the challenge", async () =
 
   expect(wrongResult).toBeNull();
   expect(correctResult).toBeNull();
+});
+
+test("App guild access accepts users with an allowed active guild membership", async () => {
+  await grantAppGuildAccess(testAccountConfig(), {
+    appId: "hub",
+    createdByDiscordId: "123456789",
+    guildId: "guild",
+  });
+
+  const allowed = await userCanAccessApp(testAccountConfig(), {
+    appId: "hub",
+    discordId: "123456789",
+  });
+
+  expect(allowed).toBe(true);
+});
+
+test("App guild access rejects users without an allowed active guild membership", async () => {
+  await grantAppGuildAccess(testAccountConfig(), {
+    appId: "other",
+    createdByDiscordId: "123456789",
+    guildId: "other-guild",
+  });
+
+  const allowed = await userCanAccessApp(testAccountConfig(), {
+    appId: "other",
+    discordId: "123456789",
+  });
+
+  expect(allowed).toBe(false);
 });
 
 test("OTP challenge rejects expired challenges", async () => {
@@ -838,6 +872,13 @@ async function seedUser(input: {
       nowIso,
       nowIso,
     )
+    .run();
+  await env.DB.prepare(
+    `INSERT INTO user_guild_memberships (
+      discord_id, guild_id, status, checked_at, created_at, updated_at
+    ) VALUES (?, 'guild', 'active', ?, ?, ?)`,
+  )
+    .bind(input.discordId, nowIso, nowIso, nowIso)
     .run();
 }
 

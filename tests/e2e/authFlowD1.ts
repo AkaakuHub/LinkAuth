@@ -121,6 +121,20 @@ function selectD1Row(
   if (query.startsWith("SELECT token_id, discord_id, name, token_hash")) {
     return state.personalAccessTokens.get(String(values[0])) ?? null;
   }
+  if (query.includes("FROM user_guild_memberships membership")) {
+    const appId = String(values[0]);
+    const discordId = String(values[1]);
+    for (const accessKey of state.appGuildAccess) {
+      const [accessAppId, guildId] = accessKey.split(":");
+      if (
+        accessAppId === appId &&
+        state.guildMemberships.has(`${discordId}:${guildId}`)
+      ) {
+        return { 1: 1 };
+      }
+    }
+    return null;
+  }
   return null;
 }
 
@@ -204,10 +218,15 @@ function runD1Statement(
     state.users.set(discordId, {
       discord_id: discordId,
       display_name: storedUser?.display_name ?? String(values[2]),
+      icon_key: storedUser?.icon_key ?? null,
+      icon_source: storedUser?.icon_source ?? "none",
       role: storedUser?.role ?? "user",
       status: "active",
       disabled_reason: null,
     });
+    changes = 1;
+  } else if (query.includes("INSERT INTO user_guild_memberships")) {
+    state.guildMemberships.add(`${String(values[0])}:${String(values[1])}`);
     changes = 1;
   } else if (query.startsWith("UPDATE personal_access_tokens")) {
     const token = state.personalAccessTokens.get(String(values[1]));
@@ -260,6 +279,14 @@ function selectD1Rows(
     return [...state.personalAccessTokens.values()].filter(
       (token) => token.discord_id === String(values[0]),
     );
+  }
+  if (query.includes("FROM app_guild_access")) {
+    return [...state.appGuildAccess]
+      .map((accessKey) => {
+        const [app_id, guild_id] = accessKey.split(":");
+        return { app_id, guild_id };
+      })
+      .filter((access) => access.app_id === String(values[0]));
   }
   return [];
 }
