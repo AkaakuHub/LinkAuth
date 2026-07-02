@@ -15,6 +15,7 @@ export async function asset(
   }
   return new Response(object.body, {
     headers: {
+      "access-control-allow-origin": "*",
       "cache-control": "public, max-age=31536000, immutable",
       "content-type": "image/webp",
       "x-content-type-options": "nosniff",
